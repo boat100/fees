@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, initDatabase } from '@/lib/database';
+import { db, initDatabase, FEE_TYPE_MAP } from '@/lib/database';
 
 // 初始化数据库
 initDatabase();
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    // 获取学生费用列表
+    // 获取学生费用列表（包含已交费汇总）
     const className = searchParams.get('className');
     const search = searchParams.get('search');
     
@@ -40,9 +40,47 @@ export async function GET(request: NextRequest) {
     
     sql += ' ORDER BY class_name, student_name';
     
-    const students = db.prepare(sql).all(...params);
+    const students = db.prepare(sql).all(...params) as Array<{
+      id: number;
+      class_name: string;
+      student_name: string;
+      tuition_fee: number;
+      lunch_fee: number;
+      nap_fee: number;
+      after_school_fee: number;
+      club_fee: number;
+      other_fee: number;
+      remark: string | null;
+      created_at: string;
+      updated_at: string | null;
+    }>;
     
-    return NextResponse.json({ data: students });
+    // 获取每个学生的已交费汇总
+    const studentsWithPayments = students.map(student => {
+      const payments = db.prepare(`
+        SELECT fee_type, SUM(amount) as total_paid
+        FROM payment_records
+        WHERE student_id = ?
+        GROUP BY fee_type
+      `).all(student.id) as Array<{ fee_type: string; total_paid: number }>;
+      
+      const paymentMap: Record<string, number> = {};
+      payments.forEach(p => {
+        paymentMap[p.fee_type] = p.total_paid;
+      });
+      
+      return {
+        ...student,
+        tuition_paid: paymentMap['tuition'] || 0,
+        lunch_paid: paymentMap['lunch'] || 0,
+        nap_paid: paymentMap['nap'] || 0,
+        after_school_paid: paymentMap['after_school'] || 0,
+        club_paid: paymentMap['club'] || 0,
+        other_paid: paymentMap['other'] || 0,
+      };
+    });
+    
+    return NextResponse.json({ data: studentsWithPayments });
   } catch (error) {
     console.error('Error fetching data:', error);
     return NextResponse.json(
@@ -59,12 +97,12 @@ export async function POST(request: NextRequest) {
     const {
       className,
       studentName,
-      tuitionFee = 0, tuitionPaid = 0, tuitionPaidDate = null,
-      lunchFee = 0, lunchPaid = 0, lunchPaidDate = null,
-      napFee = 0, napPaid = 0, napPaidDate = null,
-      afterSchoolFee = 0, afterSchoolPaid = 0, afterSchoolPaidDate = null,
-      clubFee = 0, clubPaid = 0, clubPaidDate = null,
-      otherFee = 0, otherPaid = 0, otherPaidDate = null,
+      tuitionFee = 0,
+      lunchFee = 0,
+      napFee = 0,
+      afterSchoolFee = 0,
+      clubFee = 0,
+      otherFee = 0,
       remark = null,
     } = body;
     
@@ -78,25 +116,19 @@ export async function POST(request: NextRequest) {
     
     const stmt = db.prepare(`
       INSERT INTO student_fees 
-      (class_name, student_name, 
-       tuition_fee, tuition_paid, tuition_paid_date,
-       lunch_fee, lunch_paid, lunch_paid_date,
-       nap_fee, nap_paid, nap_paid_date,
-       after_school_fee, after_school_paid, after_school_paid_date,
-       club_fee, club_paid, club_paid_date,
-       other_fee, other_paid, other_paid_date,
-       remark)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (class_name, student_name, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
-      className, studentName,
-      tuitionFee, tuitionPaid, tuitionPaidDate,
-      lunchFee, lunchPaid, lunchPaidDate,
-      napFee, napPaid, napPaidDate,
-      afterSchoolFee, afterSchoolPaid, afterSchoolPaidDate,
-      clubFee, clubPaid, clubPaidDate,
-      otherFee, otherPaid, otherPaidDate,
+      className,
+      studentName,
+      tuitionFee,
+      lunchFee,
+      napFee,
+      afterSchoolFee,
+      clubFee,
+      otherFee,
       remark
     );
     
@@ -125,42 +157,35 @@ export async function PUT(request: NextRequest) {
       );
     }
     
-    // 使用事务批量插入
     const insertStmt = db.prepare(`
       INSERT INTO student_fees 
-      (class_name, student_name, 
-       tuition_fee, tuition_paid, tuition_paid_date,
-       lunch_fee, lunch_paid, lunch_paid_date,
-       nap_fee, nap_paid, nap_paid_date,
-       after_school_fee, after_school_paid, after_school_paid_date,
-       club_fee, club_paid, club_paid_date,
-       other_fee, other_paid, other_paid_date,
-       remark)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (class_name, student_name, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const insertMany = db.transaction((students: Array<{
       className: string;
       studentName: string;
-      tuitionFee?: number; tuitionPaid?: number; tuitionPaidDate?: string;
-      lunchFee?: number; lunchPaid?: number; lunchPaidDate?: string;
-      napFee?: number; napPaid?: number; napPaidDate?: string;
-      afterSchoolFee?: number; afterSchoolPaid?: number; afterSchoolPaidDate?: string;
-      clubFee?: number; clubPaid?: number; clubPaidDate?: string;
-      otherFee?: number; otherPaid?: number; otherPaidDate?: string;
+      tuitionFee?: number;
+      lunchFee?: number;
+      napFee?: number;
+      afterSchoolFee?: number;
+      clubFee?: number;
+      otherFee?: number;
       remark?: string;
     }>) => {
       for (const student of students) {
         if (!student.className || !student.studentName) continue;
         
         insertStmt.run(
-          student.className, student.studentName,
-          student.tuitionFee || 0, student.tuitionPaid || 0, student.tuitionPaidDate || null,
-          student.lunchFee || 0, student.lunchPaid || 0, student.lunchPaidDate || null,
-          student.napFee || 0, student.napPaid || 0, student.napPaidDate || null,
-          student.afterSchoolFee || 0, student.afterSchoolPaid || 0, student.afterSchoolPaidDate || null,
-          student.clubFee || 0, student.clubPaid || 0, student.clubPaidDate || null,
-          student.otherFee || 0, student.otherPaid || 0, student.otherPaidDate || null,
+          student.className,
+          student.studentName,
+          student.tuitionFee || 0,
+          student.lunchFee || 0,
+          student.napFee || 0,
+          student.afterSchoolFee || 0,
+          student.clubFee || 0,
+          student.otherFee || 0,
           student.remark || null
         );
       }

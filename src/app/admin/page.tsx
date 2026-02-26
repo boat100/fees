@@ -32,17 +32,30 @@ import {
   Trash2,
   FileDown,
   FileUp,
-  Database
+  Database,
+  HardDriveDownload,
+  HardDriveUpload,
+  RefreshCw
 } from 'lucide-react';
 
 export default function AdminPage() {
   const router = useRouter();
   
-  // 导入预览数据
-  const [importData, setImportData] = useState<Array<Record<string, unknown>>>([]);
+  // 对话框状态
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  
+  // 导入预览数据
+  const [importData, setImportData] = useState<Array<Record<string, unknown>>>([]);
+  
+  // 恢复相关
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreFileName, setRestoreFileName] = useState('');
+  
+  // 文件引用
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
 
   // 下载导入模板
   const downloadTemplate = () => {
@@ -81,7 +94,7 @@ export default function AdminPage() {
     return data;
   };
 
-  // 处理文件上传
+  // 处理CSV文件上传
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -187,10 +200,8 @@ export default function AdminPage() {
       
       // 按班级输出
       Object.keys(classGroups).sort().forEach(className => {
-        // 班级行
         rows.push([`【${className}】`]);
         
-        // 学生行
         classGroups[className].forEach((student: typeof students[0]) => {
           const { totalFee, totalPaid } = calculateStudentTotals(student);
           rows.push([
@@ -217,7 +228,6 @@ export default function AdminPage() {
           ]);
         });
         
-        // 班级小计
         let classTotalFee = 0, classTotalPaid = 0;
         classGroups[className].forEach((student: typeof students[0]) => {
           const { totalFee, totalPaid } = calculateStudentTotals(student);
@@ -225,10 +235,9 @@ export default function AdminPage() {
           classTotalPaid += totalPaid;
         });
         rows.push(['小计', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', String(classTotalFee), String(classTotalPaid), '']);
-        rows.push([]); // 空行
+        rows.push([]);
       });
       
-      // 总合计
       rows.push(['总合计', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', String(grandTotalFee), String(grandTotalPaid), '']);
       
       const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
@@ -243,6 +252,94 @@ export default function AdminPage() {
     } catch (error) {
       console.error('Failed to export data:', error);
       alert('导出失败');
+    }
+  };
+
+  // 备份数据库
+  const backupDatabase = async () => {
+    try {
+      const response = await fetch('/api/backup');
+      
+      if (!response.ok) {
+        const error = await response.json();
+        alert(error.error || '备份失败');
+        return;
+      }
+      
+      // 获取文件名
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'school_fees_backup.db';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
+      
+      // 下载文件
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      window.URL.revokeObjectURL(url);
+      
+      alert('数据库备份成功！');
+    } catch (error) {
+      console.error('Backup failed:', error);
+      alert('备份失败');
+    }
+  };
+
+  // 选择恢复文件
+  const handleRestoreFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.name.endsWith('.db')) {
+      alert('请选择 .db 格式的备份文件');
+      if (restoreInputRef.current) {
+        restoreInputRef.current.value = '';
+      }
+      return;
+    }
+    
+    setRestoreFile(file);
+    setRestoreFileName(file.name);
+    setRestoreDialogOpen(true);
+    
+    if (restoreInputRef.current) {
+      restoreInputRef.current.value = '';
+    }
+  };
+
+  // 确认恢复数据库
+  const confirmRestore = async () => {
+    if (!restoreFile) return;
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', restoreFile);
+      
+      const response = await fetch('/api/backup', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert(result.message || '数据库恢复成功！');
+        setRestoreDialogOpen(false);
+        setRestoreFile(null);
+        setRestoreFileName('');
+        // 刷新页面以确保数据更新
+        window.location.reload();
+      } else {
+        alert(result.error || '恢复失败');
+      }
+    } catch (error) {
+      console.error('Restore failed:', error);
+      alert('恢复失败');
     }
   };
 
@@ -272,7 +369,6 @@ export default function AdminPage() {
 
       {/* 主内容区域 */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 功能卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
           {/* 数据导入卡片 */}
@@ -344,11 +440,69 @@ export default function AdminPage() {
             </CardContent>
           </Card>
           
+          {/* 数据库备份卡片 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <HardDriveDownload className="h-5 w-5 text-blue-600" />
+                数据库备份
+              </CardTitle>
+              <CardDescription>
+                下载完整数据库文件，用于数据备份或迁移
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button
+                onClick={backupDatabase}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Database className="h-4 w-4 mr-2" />
+                备份数据库
+              </Button>
+              <p className="text-xs text-gray-500">
+                * 备份文件为 .db 格式，包含所有学生信息和交费记录
+              </p>
+            </CardContent>
+          </Card>
+          
+          {/* 数据库恢复卡片 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-600">
+                <HardDriveUpload className="h-5 w-5" />
+                数据库恢复
+              </CardTitle>
+              <CardDescription>
+                从备份文件恢复数据库（将覆盖当前数据）
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button
+                onClick={() => restoreInputRef.current?.click()}
+                variant="outline"
+                className="w-full border-orange-600 text-orange-600 hover:bg-orange-50"
+              >
+                <HardDriveUpload className="h-4 w-4 mr-2" />
+                选择备份文件恢复
+              </Button>
+              <input
+                ref={restoreInputRef}
+                type="file"
+                accept=".db"
+                onChange={handleRestoreFileSelect}
+                className="hidden"
+              />
+              <p className="text-xs text-gray-500">
+                * 仅支持 .db 格式的备份文件，恢复前请先备份当前数据
+              </p>
+            </CardContent>
+          </Card>
+          
           {/* 数据管理卡片 */}
           <Card className="md:col-span-2 border-red-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-600">
-                <Database className="h-5 w-5" />
+                <Trash2 className="h-5 w-5" />
                 数据管理
               </CardTitle>
               <CardDescription>
@@ -397,12 +551,13 @@ export default function AdminPage() {
                 </ol>
               </div>
               <div>
-                <h4 className="font-semibold text-gray-900 mb-2">📤 数据导出说明</h4>
+                <h4 className="font-semibold text-gray-900 mb-2">💾 数据库备份恢复</h4>
                 <ul className="list-disc list-inside space-y-1">
-                  <li>导出文件为CSV格式，可用Excel打开</li>
-                  <li>包含所有班级学生数据</li>
-                  <li>按班级分组，含班级小计和总合计</li>
-                  <li>建议在清空前先备份数据</li>
+                  <li>备份文件包含完整数据库</li>
+                  <li>可用于跨环境迁移数据</li>
+                  <li>恢复会完全覆盖当前数据</li>
+                  <li>恢复前务必先备份当前数据</li>
+                  <li>恢复后需刷新页面</li>
                 </ul>
               </div>
             </div>
@@ -467,6 +622,74 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
+      {/* 恢复确认对话框 */}
+      <Dialog open={restoreDialogOpen} onOpenChange={setRestoreDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-600">
+              <HardDriveUpload className="h-5 w-5" />
+              ⚠️ 数据库恢复确认
+            </DialogTitle>
+            <DialogDescription>
+              此操作将用备份文件覆盖当前数据库
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {/* 警告提示 */}
+            <div className="bg-orange-100 border-2 border-orange-400 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-6 w-6 text-orange-600 flex-shrink-0" />
+                <div>
+                  <p className="font-bold text-orange-800 text-lg">⚠️ 注意</p>
+                  <p className="text-orange-700 mt-2">
+                    恢复操作将<strong>覆盖当前所有数据</strong>！
+                  </p>
+                  <ul className="mt-3 text-sm text-orange-700 space-y-1">
+                    <li>• 当前所有学生信息将被替换</li>
+                    <li>• 当前所有交费记录将被替换</li>
+                    <li>• 此操作<strong>无法撤销</strong></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            
+            {/* 文件信息 */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <p className="text-sm text-gray-600">
+                备份文件：<span className="font-semibold text-gray-900">{restoreFileName}</span>
+              </p>
+            </div>
+            
+            {/* 备份提醒 */}
+            <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mt-4">
+              <p className="text-yellow-800 font-medium">
+                📋 建议：恢复前请先备份当前数据库！
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { 
+              setRestoreDialogOpen(false); 
+              setRestoreFile(null); 
+              setRestoreFileName(''); 
+            }}>
+              取消
+            </Button>
+            <Button 
+              onClick={async () => {
+                // 确认对话框
+                if (!confirm('⚠️ 确定要恢复数据库吗？当前数据将被覆盖！')) return;
+                
+                await confirmRestore();
+              }}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              确认恢复
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* 清空所有数据对话框 */}
       <Dialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
@@ -502,7 +725,7 @@ export default function AdminPage() {
             {/* 备份提醒 */}
             <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
               <p className="text-yellow-800 font-medium">
-                📋 建议操作：请先使用"导出数据"功能备份当前数据！
+                📋 建议操作：请先使用"备份数据库"功能备份当前数据！
               </p>
             </div>
           </div>

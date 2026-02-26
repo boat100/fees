@@ -1,41 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
-import { insertFeeSchema } from '@/storage/database/shared/schema';
+import { db, initDatabase } from '@/lib/database';
+
+// 初始化数据库
+initDatabase();
 
 // GET - 获取费用列表
 export async function GET(request: NextRequest) {
   try {
-    const client = getSupabaseClient();
     const { searchParams } = new URL(request.url);
-    
     const studentId = searchParams.get('studentId');
     const status = searchParams.get('status');
     const feeType = searchParams.get('feeType');
     
-    let query = client
-      .from('fees')
-      .select('*')
-      .order('created_at', { ascending: false });
+    let sql = 'SELECT * FROM fees WHERE 1=1';
+    const params: (string | number)[] = [];
     
     if (studentId) {
-      query = query.eq('student_id', studentId);
+      sql += ' AND student_id = ?';
+      params.push(studentId);
     }
     
     if (status !== null) {
-      query = query.eq('status', status === 'true');
+      sql += ' AND status = ?';
+      params.push(status === 'true' ? 1 : 0);
     }
     
     if (feeType) {
-      query = query.eq('fee_type', feeType);
+      sql += ' AND fee_type = ?';
+      params.push(feeType);
     }
     
-    const { data, error } = await query;
+    sql += ' ORDER BY created_at DESC';
     
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const stmt = db.prepare(sql);
+    const fees = stmt.all(...params);
     
-    return NextResponse.json({ data });
+    return NextResponse.json({ data: fees });
   } catch (error) {
     console.error('Error fetching fees:', error);
     return NextResponse.json(
@@ -48,32 +48,43 @@ export async function GET(request: NextRequest) {
 // POST - 新增费用记录
 export async function POST(request: NextRequest) {
   try {
-    const client = getSupabaseClient();
     const body = await request.json();
+    const { studentId, feeType, amount, status, remark } = body;
     
-    // 验证输入
-    const validatedData = insertFeeSchema.parse(body);
-    
-    // 转换字段名称为 snake_case
-    const feeData = {
-      student_id: validatedData.studentId,
-      fee_type: validatedData.feeType,
-      amount: validatedData.amount,
-      status: validatedData.status ?? false,
-      remark: validatedData.remark,
-    };
-    
-    const { data, error } = await client
-      .from('fees')
-      .insert(feeData)
-      .select()
-      .single();
-    
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    // 验证必填字段
+    if (!studentId || !feeType || amount === undefined) {
+      return NextResponse.json(
+        { error: '学生ID、费用类型和金额为必填项' },
+        { status: 400 }
+      );
     }
     
-    return NextResponse.json({ data }, { status: 201 });
+    // 验证学生是否存在
+    const student = db.prepare('SELECT id FROM students WHERE id = ?').get(studentId);
+    if (!student) {
+      return NextResponse.json(
+        { error: '学生不存在' },
+        { status: 400 }
+      );
+    }
+    
+    const stmt = db.prepare(`
+      INSERT INTO fees (student_id, fee_type, amount, status, remark)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    
+    const result = stmt.run(
+      studentId,
+      feeType,
+      amount,
+      status ? 1 : 0,
+      remark || null
+    );
+    
+    // 获取插入的费用记录
+    const newFee = db.prepare('SELECT * FROM fees WHERE id = ?').get(result.lastInsertRowid);
+    
+    return NextResponse.json({ data: newFee }, { status: 201 });
   } catch (error) {
     console.error('Error creating fee:', error);
     return NextResponse.json(

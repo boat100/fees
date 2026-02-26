@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
-import { updateFeeSchema } from '@/storage/database/shared/schema';
+import { db, initDatabase } from '@/lib/database';
+
+// 初始化数据库
+initDatabase();
 
 // GET - 获取单条费用记录
 export async function GET(
@@ -8,20 +10,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const client = getSupabaseClient();
     const { id } = await params;
     
-    const { data, error } = await client
-      .from('fees')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const fee = db.prepare('SELECT * FROM fees WHERE id = ?').get(id);
     
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
+    if (!fee) {
+      return NextResponse.json({ error: '费用记录不存在' }, { status: 404 });
     }
     
-    return NextResponse.json({ data });
+    return NextResponse.json({ data: fee });
   } catch (error) {
     console.error('Error fetching fee:', error);
     return NextResponse.json(
@@ -37,33 +34,52 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const client = getSupabaseClient();
     const { id } = await params;
     const body = await request.json();
+    const { feeType, amount, status, remark } = body;
     
-    // 验证输入
-    const validatedData = updateFeeSchema.parse(body);
+    // 构建更新语句
+    const updates: string[] = [];
+    const values: (string | number | null)[] = [];
     
-    // 转换字段名称为 snake_case
-    const updateData: Record<string, unknown> = {};
-    if (validatedData.feeType !== undefined) updateData.fee_type = validatedData.feeType;
-    if (validatedData.amount !== undefined) updateData.amount = validatedData.amount;
-    if (validatedData.status !== undefined) updateData.status = validatedData.status;
-    if (validatedData.remark !== undefined) updateData.remark = validatedData.remark;
-    updateData.updated_at = new Date().toISOString();
-    
-    const { data, error } = await client
-      .from('fees')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    if (feeType !== undefined) {
+      updates.push('fee_type = ?');
+      values.push(feeType);
+    }
+    if (amount !== undefined) {
+      updates.push('amount = ?');
+      values.push(amount);
+    }
+    if (status !== undefined) {
+      updates.push('status = ?');
+      values.push(status ? 1 : 0);
+    }
+    if (remark !== undefined) {
+      updates.push('remark = ?');
+      values.push(remark || null);
     }
     
-    return NextResponse.json({ data });
+    updates.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    
+    values.push(id);
+    
+    const stmt = db.prepare(`
+      UPDATE fees 
+      SET ${updates.join(', ')}
+      WHERE id = ?
+    `);
+    
+    const result = stmt.run(...values);
+    
+    if (result.changes === 0) {
+      return NextResponse.json({ error: '费用记录不存在' }, { status: 404 });
+    }
+    
+    // 获取更新后的费用记录
+    const updatedFee = db.prepare('SELECT * FROM fees WHERE id = ?').get(id);
+    
+    return NextResponse.json({ data: updatedFee });
   } catch (error) {
     console.error('Error updating fee:', error);
     return NextResponse.json(
@@ -79,16 +95,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const client = getSupabaseClient();
     const { id } = await params;
     
-    const { error } = await client
-      .from('fees')
-      .delete()
-      .eq('id', id);
+    const result = db.prepare('DELETE FROM fees WHERE id = ?').run(id);
     
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    if (result.changes === 0) {
+      return NextResponse.json({ error: '费用记录不存在' }, { status: 404 });
     }
     
     return NextResponse.json({ success: true });

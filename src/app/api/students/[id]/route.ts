@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
-import { updateStudentSchema } from '@/storage/database/shared/schema';
+import { db, initDatabase } from '@/lib/database';
+
+// 初始化数据库
+initDatabase();
 
 // GET - 获取单个学生
 export async function GET(
@@ -8,20 +10,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const client = getSupabaseClient();
     const { id } = await params;
     
-    const { data, error } = await client
-      .from('students')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const student = db.prepare('SELECT * FROM students WHERE id = ?').get(id);
     
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
+    if (!student) {
+      return NextResponse.json({ error: '学生不存在' }, { status: 404 });
     }
     
-    return NextResponse.json({ data });
+    return NextResponse.json({ data: student });
   } catch (error) {
     console.error('Error fetching student:', error);
     return NextResponse.json(
@@ -37,38 +34,67 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const client = getSupabaseClient();
     const { id } = await params;
     const body = await request.json();
+    const { name, studentNumber, className, phone, email } = body;
     
-    // 验证输入
-    const validatedData = updateStudentSchema.parse(body);
+    // 构建更新语句
+    const updates: string[] = [];
+    const values: (string | null)[] = [];
     
-    // 转换字段名称为 snake_case
-    const updateData: Record<string, unknown> = {};
-    if (validatedData.name !== undefined) updateData.name = validatedData.name;
-    if (validatedData.studentNumber !== undefined) updateData.student_number = validatedData.studentNumber;
-    if (validatedData.className !== undefined) updateData.class_name = validatedData.className;
-    if (validatedData.phone !== undefined) updateData.phone = validatedData.phone;
-    if (validatedData.email !== undefined) updateData.email = validatedData.email;
-    updateData.updated_at = new Date().toISOString();
-    
-    const { data, error } = await client
-      .from('students')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    if (name !== undefined) {
+      updates.push('name = ?');
+      values.push(name);
+    }
+    if (studentNumber !== undefined) {
+      updates.push('student_number = ?');
+      values.push(studentNumber);
+    }
+    if (className !== undefined) {
+      updates.push('class_name = ?');
+      values.push(className);
+    }
+    if (phone !== undefined) {
+      updates.push('phone = ?');
+      values.push(phone || null);
+    }
+    if (email !== undefined) {
+      updates.push('email = ?');
+      values.push(email || null);
     }
     
-    return NextResponse.json({ data });
-  } catch (error) {
+    updates.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    
+    values.push(id);
+    
+    const stmt = db.prepare(`
+      UPDATE students 
+      SET ${updates.join(', ')}
+      WHERE id = ?
+    `);
+    
+    const result = stmt.run(...values);
+    
+    if (result.changes === 0) {
+      return NextResponse.json({ error: '学生不存在' }, { status: 404 });
+    }
+    
+    // 获取更新后的学生
+    const updatedStudent = db.prepare('SELECT * FROM students WHERE id = ?').get(id);
+    
+    return NextResponse.json({ data: updatedStudent });
+  } catch (error: unknown) {
     console.error('Error updating student:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update student';
+    if (errorMessage.includes('UNIQUE constraint failed')) {
+      return NextResponse.json(
+        { error: '学号已存在' },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
-      { error: 'Failed to update student' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
@@ -80,27 +106,16 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const client = getSupabaseClient();
     const { id } = await params;
     
-    // 先删除该学生的所有费用记录
-    const { error: feesError } = await client
-      .from('fees')
-      .delete()
-      .eq('student_id', id);
-    
-    if (feesError) {
-      console.error('Error deleting student fees:', feesError);
-    }
+    // 先删除该学生的所有费用记录（虽然外键设置了 CASCADE，但手动删除更安全）
+    db.prepare('DELETE FROM fees WHERE student_id = ?').run(id);
     
     // 再删除学生
-    const { error } = await client
-      .from('students')
-      .delete()
-      .eq('id', id);
+    const result = db.prepare('DELETE FROM students WHERE id = ?').run(id);
     
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    if (result.changes === 0) {
+      return NextResponse.json({ error: '学生不存在' }, { status: 404 });
     }
     
     return NextResponse.json({ success: true });

@@ -1,70 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { db, initDatabase } from '@/lib/database';
+
+// 初始化数据库
+initDatabase();
 
 // GET - 获取统计数据
 export async function GET(request: NextRequest) {
   try {
-    const client = getSupabaseClient();
     const { searchParams } = new URL(request.url);
     const className = searchParams.get('className');
     
-    // 获取所有学生
-    let studentsQuery = client.from('students').select('id, name, student_number, class_name');
+    // 获取学生总数
+    let studentCountSql = 'SELECT COUNT(*) as count FROM students';
+    const studentParams: string[] = [];
     if (className) {
-      studentsQuery = studentsQuery.eq('class_name', className);
+      studentCountSql += ' WHERE class_name = ?';
+      studentParams.push(className);
     }
-    const { data: students, error: studentsError } = await studentsQuery;
+    const totalStudents = (db.prepare(studentCountSql).get(...studentParams) as { count: number }).count;
     
-    if (studentsError) {
-      return NextResponse.json({ error: studentsError.message }, { status: 500 });
-    }
+    // 获取费用统计
+    let feesSql = `
+      SELECT 
+        f.id, f.student_id, f.fee_type, f.amount, f.status
+      FROM fees f
+    `;
+    const feesParams: (string | number)[] = [];
     
-    // 获取所有费用
-    let feesQuery = client.from('fees').select('*');
     if (className) {
-      // 先获取该班级的学生ID
-      const studentIds = students?.map(s => s.id) || [];
-      if (studentIds.length > 0) {
-        feesQuery = feesQuery.in('student_id', studentIds);
-      } else {
-        return NextResponse.json({
-          data: {
-            totalStudents: 0,
-            totalFees: 0,
-            paidFees: 0,
-            unpaidFees: 0,
-            paidCount: 0,
-            unpaidCount: 0,
-            feeTypeStats: [],
-            classStats: [],
-          }
-        });
-      }
+      feesSql += ' JOIN students s ON f.student_id = s.id WHERE s.class_name = ?';
+      feesParams.push(className);
     }
-    const { data: fees, error: feesError } = await feesQuery;
     
-    if (feesError) {
-      return NextResponse.json({ error: feesError.message }, { status: 500 });
-    }
+    const fees = db.prepare(feesSql).all(...feesParams) as Array<{
+      id: number;
+      student_id: number;
+      fee_type: string;
+      amount: number;
+      status: number;
+    }>;
     
     // 计算统计数据
-    const totalStudents = students?.length || 0;
-    const totalFees = fees?.reduce((sum, fee) => sum + parseFloat(fee.amount), 0) || 0;
-    const paidFees = fees?.filter(f => f.status).reduce((sum, fee) => sum + parseFloat(fee.amount), 0) || 0;
-    const unpaidFees = fees?.filter(f => !f.status).reduce((sum, fee) => sum + parseFloat(fee.amount), 0) || 0;
-    const paidCount = fees?.filter(f => f.status).length || 0;
-    const unpaidCount = fees?.filter(f => !f.status).length || 0;
+    const totalFees = fees.reduce((sum, fee) => sum + fee.amount, 0);
+    const paidFees = fees.filter(f => f.status === 1).reduce((sum, fee) => sum + fee.amount, 0);
+    const unpaidFees = fees.filter(f => f.status === 0).reduce((sum, fee) => sum + fee.amount, 0);
+    const paidCount = fees.filter(f => f.status === 1).length;
+    const unpaidCount = fees.filter(f => f.status === 0).length;
     
     // 按费用类型统计
     const feeTypeMap = new Map<string, { total: number; paid: number; unpaid: number; count: number }>();
-    fees?.forEach(fee => {
+    fees.forEach(fee => {
       const existing = feeTypeMap.get(fee.fee_type) || { total: 0, paid: 0, unpaid: 0, count: 0 };
-      existing.total += parseFloat(fee.amount);
+      existing.total += fee.amount;
       existing.count++;
-      if (fee.status) {
-        existing.paid += parseFloat(fee.amount);
+      if (fee.status === 1) {
+        existing.paid += fee.amount;
       } else {
-        existing.unpaid += parseFloat(fee.amount);
+        existing.unpaid += fee.amount;
       }
       feeTypeMap.set(fee.fee_type, existing);
     });
@@ -77,13 +69,25 @@ export async function GET(request: NextRequest) {
       count: stats.count,
     }));
     
+    // 获取学生列表用于班级统计
+    let studentsSql = 'SELECT id, class_name FROM students';
+    const studentsParams: string[] = [];
+    if (className) {
+      studentsSql += ' WHERE class_name = ?';
+      studentsParams.push(className);
+    }
+    const students = db.prepare(studentsSql).all(...studentsParams) as Array<{
+      id: number;
+      class_name: string;
+    }>;
+    
     // 按班级统计
     const classMap = new Map<string, { total: number; paid: number; unpaid: number; studentCount: number }>();
-    students?.forEach(student => {
-      const studentFees = fees?.filter(f => f.student_id === student.id) || [];
-      const total = studentFees.reduce((sum, f) => sum + parseFloat(f.amount), 0);
-      const paid = studentFees.filter(f => f.status).reduce((sum, f) => sum + parseFloat(f.amount), 0);
-      const unpaid = studentFees.filter(f => !f.status).reduce((sum, f) => sum + parseFloat(f.amount), 0);
+    students.forEach(student => {
+      const studentFees = fees.filter(f => f.student_id === student.id);
+      const total = studentFees.reduce((sum, f) => sum + f.amount, 0);
+      const paid = studentFees.filter(f => f.status === 1).reduce((sum, f) => sum + f.amount, 0);
+      const unpaid = studentFees.filter(f => f.status === 0).reduce((sum, f) => sum + f.amount, 0);
       
       const existing = classMap.get(student.class_name) || { total: 0, paid: 0, unpaid: 0, studentCount: 0 };
       existing.total += total;

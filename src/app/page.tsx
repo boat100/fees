@@ -52,7 +52,8 @@ import {
   Calendar,
   AlertCircle,
   ExternalLink,
-  CreditCard
+  CreditCard,
+  GraduationCap
 } from 'lucide-react';
 import { FEE_ITEMS } from '@/lib/constants';
 
@@ -61,6 +62,9 @@ interface StudentFee {
   id: number;
   class_name: string;
   student_name: string;
+  gender: string;
+  nap_status: string;
+  enrollment_status: string;
   tuition_fee: number;
   tuition_paid: number;
   lunch_fee: number;
@@ -108,6 +112,7 @@ export default function Home() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [batchPaymentDialogOpen, setBatchPaymentDialogOpen] = useState(false);
+  const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentFee | null>(null);
   
   // 批量录入状态
@@ -123,10 +128,20 @@ export default function Home() {
     remark: '',
   });
   
+  // 升学预览数据
+  const [promoteData, setPromoteData] = useState<{
+    grade6Classes: string[];
+    grade6StudentCount: number;
+    upgradeMap: Record<string, string>;
+  } | null>(null);
+  
   // 表单数据
   const [formData, setFormData] = useState({
     className: '',
     studentName: '',
+    gender: '男',
+    napStatus: '走读',
+    enrollmentStatus: '学籍',
     tuitionFee: 0,
     lunchFee: 0,
     napFee: 0,
@@ -241,6 +256,9 @@ export default function Home() {
     setFormData({
       className: selectedClass,
       studentName: '',
+      gender: '男',
+      napStatus: '走读',
+      enrollmentStatus: '学籍',
       tuitionFee: 0,
       lunchFee: 0,
       napFee: 0,
@@ -259,6 +277,9 @@ export default function Home() {
     setFormData({
       className: student.class_name,
       studentName: student.student_name,
+      gender: student.gender || '男',
+      napStatus: student.nap_status || '走读',
+      enrollmentStatus: student.enrollment_status || '学籍',
       tuitionFee: student.tuition_fee || 0,
       lunchFee: student.lunch_fee || 0,
       napFee: student.nap_fee || 0,
@@ -293,6 +314,9 @@ export default function Home() {
         body: JSON.stringify({
           className: formData.className,
           studentName: formData.studentName,
+          gender: formData.gender,
+          napStatus: formData.napStatus,
+          enrollmentStatus: formData.enrollmentStatus,
           tuitionFee: Number(formData.tuitionFee),
           lunchFee: Number(formData.lunchFee),
           napFee: Number(formData.napFee),
@@ -341,7 +365,7 @@ export default function Home() {
 
   // 下载导入模板
   const downloadTemplate = () => {
-    const headers = ['班级', '姓名', '学费', '午餐费', '午托费', '课后服务费', '社团费', '其他费用', '备注'];
+    const headers = ['班级', '姓名', '性别', '午托状态', '学籍状态', '学费', '午餐费', '午托费', '课后服务费', '社团费', '其他费用', '备注'];
     const csvContent = headers.join(',') + '\n';
     
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' });
@@ -398,6 +422,9 @@ export default function Home() {
     const formattedData = importData.map(row => ({
       className: String(row['班级'] || ''),
       studentName: String(row['姓名'] || ''),
+      gender: String(row['性别'] || '男'),
+      napStatus: String(row['午托状态'] || '走读'),
+      enrollmentStatus: String(row['学籍状态'] || '学籍'),
       tuitionFee: Number(row['学费'] || 0),
       lunchFee: Number(row['午餐费'] || 0),
       napFee: Number(row['午托费'] || 0),
@@ -440,12 +467,15 @@ export default function Home() {
       return;
     }
     
-    const headers = ['班级', '姓名', '学费应交', '学费已交', '午餐费应交', '午餐费已交', '午托费应交', '午托费已交', '课后服务费应交', '课后服务费已交', '社团费应交', '社团费已交', '其他费用应交', '其他费用已交', '应交合计', '已交合计', '备注'];
+    const headers = ['班级', '姓名', '性别', '午托状态', '学籍状态', '学费应交', '学费已交', '午餐费应交', '午餐费已交', '午托费应交', '午托费已交', '课后服务费应交', '课后服务费已交', '社团费应交', '社团费已交', '其他费用应交', '其他费用已交', '应交合计', '已交合计', '备注'];
     const rows = students.map(student => {
       const { totalFee, totalPaid } = calculateStudentTotals(student);
       return [
         student.class_name,
         student.student_name,
+        student.gender || '男',
+        student.nap_status || '走读',
+        student.enrollment_status || '学籍',
         student.tuition_fee || 0,
         student.tuition_paid || 0,
         student.lunch_fee || 0,
@@ -465,7 +495,7 @@ export default function Home() {
     });
     
     const totals = calculateTotals();
-    rows.push(['合计', '', totals.tuition_fee, totals.tuition_paid, totals.lunch_fee, totals.lunch_paid, totals.nap_fee, totals.nap_paid, totals.after_school_fee, totals.after_school_paid, totals.club_fee, totals.club_paid, totals.other_fee, totals.other_paid, totals.total_fee, totals.total_paid, '']);
+    rows.push(['合计', '', '', '', '', totals.tuition_fee, totals.tuition_paid, totals.lunch_fee, totals.lunch_paid, totals.nap_fee, totals.nap_paid, totals.after_school_fee, totals.after_school_paid, totals.club_fee, totals.club_paid, totals.other_fee, totals.other_paid, totals.total_fee, totals.total_paid, '']);
     
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
     
@@ -558,6 +588,22 @@ export default function Home() {
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 导出数据
               </Button>
+              
+              <Button
+                onClick={async () => {
+                  const response = await fetch('/api/promote');
+                  const result = await response.json();
+                  if (result.data) {
+                    setPromoteData(result.data);
+                    setPromoteDialogOpen(true);
+                  }
+                }}
+                variant="outline"
+                className="border-red-600 text-red-600 hover:bg-red-50"
+              >
+                <GraduationCap className="h-4 w-4 mr-2" />
+                一键升学
+              </Button>
             </nav>
           </div>
         </div>
@@ -637,6 +683,9 @@ export default function Home() {
                     <TableRow className="bg-gray-50">
                       <TableHead className="font-semibold">序号</TableHead>
                       <TableHead className="font-semibold">姓名</TableHead>
+                      <TableHead className="font-semibold text-center">性别</TableHead>
+                      <TableHead className="font-semibold text-center">午托</TableHead>
+                      <TableHead className="font-semibold text-center">学籍</TableHead>
                       <TableHead className="font-semibold text-right">学费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
                       <TableHead className="font-semibold text-right">午餐费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
                       <TableHead className="font-semibold text-right">午托费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
@@ -662,6 +711,17 @@ export default function Home() {
                               {student.student_name}
                               <ExternalLink className="h-3 w-3" />
                             </button>
+                          </TableCell>
+                          <TableCell className="text-center">{student.gender || '男'}</TableCell>
+                          <TableCell className="text-center">
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${(student.nap_status || '走读') === '午托' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                              {student.nap_status || '走读'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${(student.enrollment_status || '学籍') === '学籍' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                              {student.enrollment_status || '学籍'}
+                            </span>
                           </TableCell>
                           <TableCell>{renderFeeCell(student.tuition_fee, student.tuition_paid)}</TableCell>
                           <TableCell>{renderFeeCell(student.lunch_fee, student.lunch_paid)}</TableCell>
@@ -698,7 +758,7 @@ export default function Home() {
                     })}
                     {/* 合计行 */}
                     <TableRow className="bg-blue-50 font-semibold">
-                      <TableCell colSpan={2} className="text-center">合计</TableCell>
+                      <TableCell colSpan={5} className="text-center">合计</TableCell>
                       <TableCell className="text-right">
                         <div>{totals.tuition_fee.toFixed(0)}/{totals.tuition_paid.toFixed(0)}</div>
                       </TableCell>
@@ -759,6 +819,48 @@ export default function Home() {
                 className="col-span-3"
                 placeholder="请输入学生姓名"
               />
+            </div>
+            
+            {/* 性别 */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">性别</Label>
+              <Select value={formData.gender} onValueChange={(value) => setFormData({ ...formData, gender: value })}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="请选择性别" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="男">男</SelectItem>
+                  <SelectItem value="女">女</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* 午托状态 */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">午托状态</Label>
+              <Select value={formData.napStatus} onValueChange={(value) => setFormData({ ...formData, napStatus: value })}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="请选择午托状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="午托">午托</SelectItem>
+                  <SelectItem value="走读">走读</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* 学籍状态 */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">学籍状态</Label>
+              <Select value={formData.enrollmentStatus} onValueChange={(value) => setFormData({ ...formData, enrollmentStatus: value })}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="请选择学籍状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="学籍">学籍</SelectItem>
+                  <SelectItem value="借读">借读</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             
             {/* 学费 */}
@@ -1156,6 +1258,112 @@ export default function Home() {
               disabled={batchPaymentData.selectedStudents.length === 0 || batchPaymentData.payments.filter(p => p.amount > 0).length === 0}
             >
               确认录入
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 升学对话框 */}
+      <Dialog open={promoteDialogOpen} onOpenChange={setPromoteDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <GraduationCap className="h-5 w-5" />
+              一键升学
+            </DialogTitle>
+            <DialogDescription>
+              将所有班级升一级，同时删除六年级学生数据
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {promoteData && (
+              <div className="space-y-4">
+                {/* 警告提示 */}
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-red-800">重要提示</p>
+                      <p className="text-sm text-red-700 mt-1">
+                        升学操作将删除所有六年级学生的数据（包括交费记录），且无法恢复！
+                        请务必先使用"导出数据"功能备份当前数据。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* 六年级信息 */}
+                {promoteData.grade6Classes.length > 0 && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <p className="font-semibold text-orange-800">将要删除的六年级班级：</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {promoteData.grade6Classes.map((cls, i) => (
+                        <span key={i} className="bg-orange-200 text-orange-800 px-2 py-1 rounded text-sm">
+                          {cls}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-sm text-orange-700 mt-2">
+                      共 {promoteData.grade6StudentCount} 名学生将被删除
+                    </p>
+                  </div>
+                )}
+                
+                {/* 升级预览 */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="font-semibold text-blue-800">班级升级预览：</p>
+                  <div className="mt-2 space-y-1 text-sm">
+                    {Object.entries(promoteData.upgradeMap)
+                      .filter(([from, to]) => from !== to && !promoteData.grade6Classes.includes(from))
+                      .slice(0, 6)
+                      .map(([from, to], i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <span className="bg-blue-200 text-blue-800 px-2 py-0.5 rounded">{from}</span>
+                          <span className="text-blue-600">→</span>
+                          <span className="bg-green-200 text-green-800 px-2 py-0.5 rounded">{to}</span>
+                        </div>
+                      ))}
+                    {Object.keys(promoteData.upgradeMap).length > 6 && (
+                      <p className="text-blue-600">...还有更多班级</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPromoteDialogOpen(false)}>
+              取消
+            </Button>
+            <Button 
+              onClick={async () => {
+                if (!confirm('确定已备份数据并执行升学操作吗？此操作不可撤销！')) return;
+                
+                try {
+                  const response = await fetch('/api/promote', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ confirmed: true }),
+                  });
+                  
+                  const result = await response.json();
+                  
+                  if (response.ok) {
+                    alert(result.message);
+                    setPromoteDialogOpen(false);
+                    fetchClasses();
+                    fetchStudents();
+                  } else {
+                    alert(result.error || '升学操作失败');
+                  }
+                } catch (error) {
+                  console.error('Failed to promote:', error);
+                  alert('升学操作失败');
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              确认升学
             </Button>
           </DialogFooter>
         </DialogContent>

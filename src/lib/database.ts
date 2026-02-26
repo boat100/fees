@@ -25,6 +25,9 @@ export function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       class_name TEXT NOT NULL,
       student_name TEXT NOT NULL,
+      gender TEXT DEFAULT '男',
+      nap_status TEXT DEFAULT '走读',
+      enrollment_status TEXT DEFAULT '学籍',
       tuition_fee REAL DEFAULT 0,
       lunch_fee REAL DEFAULT 0,
       nap_fee REAL DEFAULT 0,
@@ -58,6 +61,23 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_payment_records_student_id ON payment_records(student_id);
     CREATE INDEX IF NOT EXISTS idx_payment_records_fee_type ON payment_records(fee_type);
   `);
+
+  // 检查并添加新字段（兼容旧数据库）
+  const tableInfo = db.prepare('PRAGMA table_info(student_fees)').all() as Array<{ name: string }>;
+  const existingColumns = tableInfo.map(col => col.name);
+
+  if (!existingColumns.includes('gender')) {
+    db.exec('ALTER TABLE student_fees ADD COLUMN gender TEXT DEFAULT \'男\'');
+    console.log('Added gender column');
+  }
+  if (!existingColumns.includes('nap_status')) {
+    db.exec('ALTER TABLE student_fees ADD COLUMN nap_status TEXT DEFAULT \'走读\'');
+    console.log('Added nap_status column');
+  }
+  if (!existingColumns.includes('enrollment_status')) {
+    db.exec('ALTER TABLE student_fees ADD COLUMN enrollment_status TEXT DEFAULT \'学籍\'');
+    console.log('Added enrollment_status column');
+  }
 
   console.log('Database initialized successfully');
 }

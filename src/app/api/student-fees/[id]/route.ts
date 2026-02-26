@@ -16,6 +16,9 @@ export async function GET(
       id: number;
       class_name: string;
       student_name: string;
+      gender: string;
+      nap_status: string;
+      enrollment_status: string;
       tuition_fee: number;
       lunch_fee: number;
       nap_fee: number;
@@ -87,6 +90,9 @@ export async function PUT(
     const {
       className,
       studentName,
+      gender,
+      napStatus,
+      enrollmentStatus,
       tuitionFee,
       lunchFee,
       napFee,
@@ -98,7 +104,7 @@ export async function PUT(
     
     const stmt = db.prepare(`
       UPDATE student_fees 
-      SET class_name = ?, student_name = ?, 
+      SET class_name = ?, student_name = ?, gender = ?, nap_status = ?, enrollment_status = ?,
           tuition_fee = ?, lunch_fee = ?, nap_fee = ?, 
           after_school_fee = ?, club_fee = ?, other_fee = ?,
           remark = ?, updated_at = ?
@@ -108,6 +114,9 @@ export async function PUT(
     const result = stmt.run(
       className,
       studentName,
+      gender ?? '男',
+      napStatus ?? '走读',
+      enrollmentStatus ?? '学籍',
       tuitionFee ?? 0,
       lunchFee ?? 0,
       napFee ?? 0,

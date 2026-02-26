@@ -47,6 +47,9 @@ interface StudentDetail {
   id: number;
   class_name: string;
   student_name: string;
+  gender: string;
+  nap_status: string;
+  enrollment_status: string;
   tuition_fee: number;
   lunch_fee: number;
   nap_fee: number;
@@ -261,7 +264,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
               <div>
                 <Label className="text-gray-500">姓名</Label>
                 <div className="font-semibold text-lg">{student.student_name}</div>
@@ -271,12 +274,28 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 <div className="font-semibold text-lg">{student.class_name}</div>
               </div>
               <div>
-                <Label className="text-gray-500">创建时间</Label>
-                <div className="text-sm">{formatDate(student.created_at)}</div>
+                <Label className="text-gray-500">性别</Label>
+                <div className="font-semibold">{student.gender || '男'}</div>
+              </div>
+              <div>
+                <Label className="text-gray-500">午托状态</Label>
+                <div className="font-semibold">
+                  <span className={`text-xs px-2 py-1 rounded ${(student.nap_status || '走读') === '午托' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                    {student.nap_status || '走读'}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <Label className="text-gray-500">学籍状态</Label>
+                <div className="font-semibold">
+                  <span className={`text-xs px-2 py-1 rounded ${(student.enrollment_status || '学籍') === '学籍' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                    {student.enrollment_status || '学籍'}
+                  </span>
+                </div>
               </div>
               <div>
                 <Label className="text-gray-500">备注</Label>
-                <div className="text-sm">{student.remark || '-'}</div>
+                <div className="text-sm truncate">{student.remark || '-'}</div>
               </div>
             </div>
           </CardContent>

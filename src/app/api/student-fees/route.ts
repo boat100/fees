@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, initDatabase, FEE_TYPE_MAP } from '@/lib/database';
+import { db, initDatabase } from '@/lib/database';
 
 // 初始化数据库
 initDatabase();
@@ -44,6 +44,9 @@ export async function GET(request: NextRequest) {
       id: number;
       class_name: string;
       student_name: string;
+      gender: string;
+      nap_status: string;
+      enrollment_status: string;
       tuition_fee: number;
       lunch_fee: number;
       nap_fee: number;
@@ -97,6 +100,9 @@ export async function POST(request: NextRequest) {
     const {
       className,
       studentName,
+      gender = '男',
+      napStatus = '走读',
+      enrollmentStatus = '学籍',
       tuitionFee = 0,
       lunchFee = 0,
       napFee = 0,
@@ -116,13 +122,16 @@ export async function POST(request: NextRequest) {
     
     const stmt = db.prepare(`
       INSERT INTO student_fees 
-      (class_name, student_name, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (class_name, student_name, gender, nap_status, enrollment_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
       className,
       studentName,
+      gender,
+      napStatus,
+      enrollmentStatus,
       tuitionFee,
       lunchFee,
       napFee,
@@ -144,7 +153,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - 批量导入数据
+// PUT - 批量导入数据（覆盖重复学生）
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
@@ -157,15 +166,29 @@ export async function PUT(request: NextRequest) {
       );
     }
     
+    let insertCount = 0;
+    let updateCount = 0;
+    
     const insertStmt = db.prepare(`
       INSERT INTO student_fees 
-      (class_name, student_name, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (class_name, student_name, gender, nap_status, enrollment_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
-    const insertMany = db.transaction((students: Array<{
+    const updateStmt = db.prepare(`
+      UPDATE student_fees 
+      SET gender = ?, nap_status = ?, enrollment_status = ?, 
+          tuition_fee = ?, lunch_fee = ?, nap_fee = ?, 
+          after_school_fee = ?, club_fee = ?, other_fee = ?, remark = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE class_name = ? AND student_name = ?
+    `);
+    
+    const importMany = db.transaction((students: Array<{
       className: string;
       studentName: string;
+      gender?: string;
+      napStatus?: string;
+      enrollmentStatus?: string;
       tuitionFee?: number;
       lunchFee?: number;
       napFee?: number;
@@ -177,58 +200,59 @@ export async function PUT(request: NextRequest) {
       for (const student of students) {
         if (!student.className || !student.studentName) continue;
         
-        insertStmt.run(
-          student.className,
-          student.studentName,
-          student.tuitionFee || 0,
-          student.lunchFee || 0,
-          student.napFee || 0,
-          student.afterSchoolFee || 0,
-          student.clubFee || 0,
-          student.otherFee || 0,
-          student.remark || null
-        );
+        // 检查学生是否已存在
+        const existing = db.prepare(
+          'SELECT id FROM student_fees WHERE class_name = ? AND student_name = ?'
+        ).get(student.className, student.studentName);
+        
+        if (existing) {
+          // 更新已存在学生
+          updateStmt.run(
+            student.gender || '男',
+            student.napStatus || '走读',
+            student.enrollmentStatus || '学籍',
+            student.tuitionFee || 0,
+            student.lunchFee || 0,
+            student.napFee || 0,
+            student.afterSchoolFee || 0,
+            student.clubFee || 0,
+            student.otherFee || 0,
+            student.remark || null,
+            student.className,
+            student.studentName
+          );
+          updateCount++;
+        } else {
+          // 新增学生
+          insertStmt.run(
+            student.className,
+            student.studentName,
+            student.gender || '男',
+            student.napStatus || '走读',
+            student.enrollmentStatus || '学籍',
+            student.tuitionFee || 0,
+            student.lunchFee || 0,
+            student.napFee || 0,
+            student.afterSchoolFee || 0,
+            student.clubFee || 0,
+            student.otherFee || 0,
+            student.remark || null
+          );
+          insertCount++;
+        }
       }
     });
     
-    insertMany(data);
+    importMany(data);
     
     return NextResponse.json({ 
       success: true,
-      message: `成功导入 ${data.length} 条数据`
+      message: `导入完成：新增 ${insertCount} 条，更新 ${updateCount} 条`
     });
   } catch (error) {
     console.error('Error importing data:', error);
     return NextResponse.json(
-      { error: 'Failed to import data' },
-      { status: 500 }
-    );
-  }
-}
-
-// DELETE - 清空所有数据
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const className = searchParams.get('className');
-    
-    if (className) {
-      db.prepare('DELETE FROM student_fees WHERE class_name = ?').run(className);
-      return NextResponse.json({ 
-        success: true,
-        message: `已删除班级 "${className}" 的所有数据`
-      });
-    } else {
-      db.prepare('DELETE FROM student_fees').run();
-      return NextResponse.json({ 
-        success: true,
-        message: '已清空所有数据'
-      });
-    }
-  } catch (error) {
-    console.error('Error deleting data:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete data' },
+      { error: '导入失败' },
       { status: 500 }
     );
   }

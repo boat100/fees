@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  school-fees:
+    build: .
+    container_name: school-fees-system
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data  # 持久化数据库
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production

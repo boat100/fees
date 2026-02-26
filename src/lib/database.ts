@@ -65,21 +65,5 @@ export function initDatabase() {
 // 导出数据库实例
 export { db };
 
-// 费用类型映射
-export const FEE_TYPE_MAP: Record<string, string> = {
-  tuition: '学费',
-  lunch: '午餐费',
-  nap: '午托费',
-  after_school: '课后服务费',
-  club: '社团费',
-  other: '其他费用',
-};
-
-export const FEE_TYPE_REVERSE_MAP: Record<string, string> = {
-  '学费': 'tuition',
-  '午餐费': 'lunch',
-  '午托费': 'nap',
-  '课后服务费': 'after_school',
-  '社团费': 'club',
-  '其他费用': 'other',
-};
+// 费用类型映射（从常量文件重新导出，方便后端使用）
+export { FEE_TYPE_MAP, FEE_TYPE_REVERSE_MAP } from './constants';

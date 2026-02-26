@@ -53,16 +53,7 @@ import {
   AlertCircle,
   ExternalLink
 } from 'lucide-react';
-
-// 费用项目定义
-const FEE_ITEMS = [
-  { key: 'tuition', label: '学费' },
-  { key: 'lunch', label: '午餐费' },
-  { key: 'nap', label: '午托费' },
-  { key: 'after_school', label: '课后服务费' },
-  { key: 'club', label: '社团费' },
-  { key: 'other', label: '其他费用' },
-] as const;
+import { FEE_ITEMS } from '@/lib/constants';
 
 // 类型定义
 interface StudentFee {

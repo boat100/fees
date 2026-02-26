@@ -40,17 +40,7 @@ import {
   AlertCircle,
   CheckCircle
 } from 'lucide-react';
-import { FEE_TYPE_MAP } from '@/lib/database';
-
-// 费用项目定义
-const FEE_ITEMS = [
-  { key: 'tuition', label: '学费', field: 'tuition_fee' },
-  { key: 'lunch', label: '午餐费', field: 'lunch_fee' },
-  { key: 'nap', label: '午托费', field: 'nap_fee' },
-  { key: 'after_school', label: '课后服务费', field: 'after_school_fee' },
-  { key: 'club', label: '社团费', field: 'club_fee' },
-  { key: 'other', label: '其他费用', field: 'other_fee' },
-] as const;
+import { FEE_TYPE_MAP, FEE_ITEMS } from '@/lib/constants';
 
 interface StudentDetail {
   id: number;

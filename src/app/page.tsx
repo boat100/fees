@@ -48,7 +48,9 @@ import {
   DollarSign,
   ExternalLink,
   CreditCard,
-  Settings
+  Settings,
+  BarChart3,
+  TrendingUp
 } from 'lucide-react';
 import { FEE_ITEMS } from '@/lib/constants';
 
@@ -87,6 +89,56 @@ interface FeeTotals {
   total_fee: number; total_paid: number;
 }
 
+// 统计数据类型
+interface ClassStat {
+  class_name: string;
+  student_count: number;
+  tuition_fee: number;
+  tuition_paid: number;
+  lunch_fee: number;
+  lunch_paid: number;
+  nap_fee: number;
+  nap_paid: number;
+  after_school_fee: number;
+  after_school_paid: number;
+  club_fee: number;
+  club_paid: number;
+  other_fee: number;
+  other_paid: number;
+  total_fee: number;
+  total_paid: number;
+}
+
+interface MonthlyStat {
+  month: string;
+  payments: Record<string, { amount: number; count: number }>;
+  total: number;
+}
+
+interface SchoolTotal {
+  student_count: number;
+  total_fee: number;
+  total_paid: number;
+  tuition_fee: number;
+  tuition_paid: number;
+  lunch_fee: number;
+  lunch_paid: number;
+  nap_fee: number;
+  nap_paid: number;
+  after_school_fee: number;
+  after_school_paid: number;
+  club_fee: number;
+  club_paid: number;
+  other_fee: number;
+  other_paid: number;
+}
+
+interface Statistics {
+  classStats: ClassStat[];
+  monthlyStats: MonthlyStat[];
+  schoolTotal: SchoolTotal;
+}
+
 // 格式化日期
 const formatDate = (dateStr: string | null): string => {
   if (!dateStr) return '';
@@ -106,7 +158,12 @@ export default function Home() {
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [batchPaymentDialogOpen, setBatchPaymentDialogOpen] = useState(false);
+  const [statsDialogOpen, setStatsDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentFee | null>(null);
+  
+  // 统计数据
+  const [statistics, setStatistics] = useState<Statistics | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
   
   // 批量录入状态
   const [batchPaymentData, setBatchPaymentData] = useState<{
@@ -172,6 +229,28 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 获取统计数据
+  const fetchStatistics = async () => {
+    setStatsLoading(true);
+    try {
+      const response = await fetch('/api/statistics');
+      const result = await response.json();
+      if (response.ok) {
+        setStatistics(result);
+      }
+    } catch (error) {
+      console.error('Failed to fetch statistics:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // 打开统计对话框
+  const openStatsDialog = () => {
+    fetchStatistics();
+    setStatsDialogOpen(true);
   };
 
   // 初始化加载
@@ -391,6 +470,15 @@ export default function Home() {
               >
                 <CreditCard className="h-4 w-4 mr-2" />
                 批量录入
+              </Button>
+              
+              <Button
+                onClick={openStatsDialog}
+                variant="outline"
+                className="border-green-600 text-green-600 hover:bg-green-50"
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                统计
               </Button>
               
               <Button
@@ -998,6 +1086,271 @@ export default function Home() {
               disabled={batchPaymentData.selectedStudents.length === 0 || batchPaymentData.payments.filter(p => p.amount > 0).length === 0}
             >
               确认录入
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 统计对话框 */}
+      <Dialog open={statsDialogOpen} onOpenChange={setStatsDialogOpen}>
+        <DialogContent className="sm:max-w-[900px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              费用统计
+            </DialogTitle>
+            <DialogDescription>
+              全校交费情况统计
+            </DialogDescription>
+          </DialogHeader>
+          
+          {statsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+              <span className="ml-2 text-gray-500">加载中...</span>
+            </div>
+          ) : statistics ? (
+            <div className="py-4 space-y-6">
+              {/* 全校汇总卡片 */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    全校汇总
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="bg-blue-50 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {statistics.schoolTotal.student_count}
+                      </div>
+                      <div className="text-sm text-gray-500">学生总数</div>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-green-600">
+                        ¥{statistics.schoolTotal.total_paid.toLocaleString()}
+                      </div>
+                      <div className="text-sm text-gray-500">已收金额</div>
+                    </div>
+                    <div className="bg-orange-50 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-orange-600">
+                        ¥{(statistics.schoolTotal.total_fee - statistics.schoolTotal.total_paid).toLocaleString()}
+                      </div>
+                      <div className="text-sm text-gray-500">待收金额</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-6 gap-2 text-center text-sm">
+                    <div className="p-2 bg-gray-50 rounded">
+                      <div className="font-semibold">学费</div>
+                      <div className="text-gray-500">{statistics.schoolTotal.tuition_paid.toLocaleString()}/{statistics.schoolTotal.tuition_fee.toLocaleString()}</div>
+                    </div>
+                    <div className="p-2 bg-gray-50 rounded">
+                      <div className="font-semibold">午餐费</div>
+                      <div className="text-gray-500">{statistics.schoolTotal.lunch_paid.toLocaleString()}/{statistics.schoolTotal.lunch_fee.toLocaleString()}</div>
+                    </div>
+                    <div className="p-2 bg-gray-50 rounded">
+                      <div className="font-semibold">午托费</div>
+                      <div className="text-gray-500">{statistics.schoolTotal.nap_paid.toLocaleString()}/{statistics.schoolTotal.nap_fee.toLocaleString()}</div>
+                    </div>
+                    <div className="p-2 bg-gray-50 rounded">
+                      <div className="font-semibold">课后服务</div>
+                      <div className="text-gray-500">{statistics.schoolTotal.after_school_paid.toLocaleString()}/{statistics.schoolTotal.after_school_fee.toLocaleString()}</div>
+                    </div>
+                    <div className="p-2 bg-gray-50 rounded">
+                      <div className="font-semibold">社团费</div>
+                      <div className="text-gray-500">{statistics.schoolTotal.club_paid.toLocaleString()}/{statistics.schoolTotal.club_fee.toLocaleString()}</div>
+                    </div>
+                    <div className="p-2 bg-gray-50 rounded">
+                      <div className="font-semibold">其他</div>
+                      <div className="text-gray-500">{statistics.schoolTotal.other_paid.toLocaleString()}/{statistics.schoolTotal.other_fee.toLocaleString()}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 各班级交费情况 */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">各班级交费情况</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {statistics.classStats.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">暂无数据</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gray-50">
+                            <TableHead className="font-semibold">班级</TableHead>
+                            <TableHead className="font-semibold text-center">人数</TableHead>
+                            <TableHead className="font-semibold text-right">学费<br/><span className="font-normal text-xs">已交/应交</span></TableHead>
+                            <TableHead className="font-semibold text-right">午餐费<br/><span className="font-normal text-xs">已交/应交</span></TableHead>
+                            <TableHead className="font-semibold text-right">午托费<br/><span className="font-normal text-xs">已交/应交</span></TableHead>
+                            <TableHead className="font-semibold text-right">课后服务<br/><span className="font-normal text-xs">已交/应交</span></TableHead>
+                            <TableHead className="font-semibold text-right">社团费<br/><span className="font-normal text-xs">已交/应交</span></TableHead>
+                            <TableHead className="font-semibold text-right">其他<br/><span className="font-normal text-xs">已交/应交</span></TableHead>
+                            <TableHead className="font-semibold text-right">合计<br/><span className="font-normal text-xs">已交/应交</span></TableHead>
+                            <TableHead className="font-semibold text-right">收缴率</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {statistics.classStats.map((stat) => (
+                            <TableRow key={stat.class_name}>
+                              <TableCell className="font-medium">{stat.class_name}</TableCell>
+                              <TableCell className="text-center">{stat.student_count}</TableCell>
+                              <TableCell className="text-right text-sm">
+                                <span className="text-green-600">{stat.tuition_paid}</span>/<span>{stat.tuition_fee}</span>
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                <span className="text-green-600">{stat.lunch_paid}</span>/<span>{stat.lunch_fee}</span>
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                <span className="text-green-600">{stat.nap_paid}</span>/<span>{stat.nap_fee}</span>
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                <span className="text-green-600">{stat.after_school_paid}</span>/<span>{stat.after_school_fee}</span>
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                <span className="text-green-600">{stat.club_paid}</span>/<span>{stat.club_fee}</span>
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                <span className="text-green-600">{stat.other_paid}</span>/<span>{stat.other_fee}</span>
+                              </TableCell>
+                              <TableCell className="text-right font-semibold">
+                                <span className="text-green-600">{stat.total_paid}</span>/<span>{stat.total_fee}</span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className={`px-2 py-1 rounded text-xs ${
+                                  stat.total_fee > 0 && stat.total_paid >= stat.total_fee 
+                                    ? 'bg-green-100 text-green-700' 
+                                    : stat.total_paid / stat.total_fee >= 0.8
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : stat.total_paid / stat.total_fee >= 0.5
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : 'bg-red-100 text-red-700'
+                                }`}>
+                                  {stat.total_fee > 0 ? ((stat.total_paid / stat.total_fee) * 100).toFixed(1) : 0}%
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {/* 合计行 */}
+                          <TableRow className="bg-blue-50 font-semibold">
+                            <TableCell>合计</TableCell>
+                            <TableCell className="text-center">{statistics.schoolTotal.student_count}</TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-green-600">{statistics.schoolTotal.tuition_paid}</span>/{statistics.schoolTotal.tuition_fee}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-green-600">{statistics.schoolTotal.lunch_paid}</span>/{statistics.schoolTotal.lunch_fee}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-green-600">{statistics.schoolTotal.nap_paid}</span>/{statistics.schoolTotal.nap_fee}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-green-600">{statistics.schoolTotal.after_school_paid}</span>/{statistics.schoolTotal.after_school_fee}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-green-600">{statistics.schoolTotal.club_paid}</span>/{statistics.schoolTotal.club_fee}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-green-600">{statistics.schoolTotal.other_paid}</span>/{statistics.schoolTotal.other_fee}
+                            </TableCell>
+                            <TableCell className="text-right text-lg">
+                              <span className="text-green-600">{statistics.schoolTotal.total_paid}</span>/{statistics.schoolTotal.total_fee}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-700">
+                                {statistics.schoolTotal.total_fee > 0 
+                                  ? ((statistics.schoolTotal.total_paid / statistics.schoolTotal.total_fee) * 100).toFixed(1) 
+                                  : 0}%
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* 每月交费情况 */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">每月交费情况</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {statistics.monthlyStats.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">暂无交费记录</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gray-50">
+                            <TableHead className="font-semibold">月份</TableHead>
+                            <TableHead className="font-semibold text-right">学费</TableHead>
+                            <TableHead className="font-semibold text-right">午餐费</TableHead>
+                            <TableHead className="font-semibold text-right">午托费</TableHead>
+                            <TableHead className="font-semibold text-right">课后服务</TableHead>
+                            <TableHead className="font-semibold text-right">社团费</TableHead>
+                            <TableHead className="font-semibold text-right">其他</TableHead>
+                            <TableHead className="font-semibold text-right">合计</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {statistics.monthlyStats.map((stat) => (
+                            <TableRow key={stat.month}>
+                              <TableCell className="font-medium">{stat.month}</TableCell>
+                              <TableCell className="text-right">
+                                {stat.payments['tuition'] ? (
+                                  <span>¥{stat.payments['tuition'].amount.toLocaleString()}</span>
+                                ) : <span className="text-gray-400">-</span>}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {stat.payments['lunch'] ? (
+                                  <span>¥{stat.payments['lunch'].amount.toLocaleString()}</span>
+                                ) : <span className="text-gray-400">-</span>}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {stat.payments['nap'] ? (
+                                  <span>¥{stat.payments['nap'].amount.toLocaleString()}</span>
+                                ) : <span className="text-gray-400">-</span>}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {stat.payments['after_school'] ? (
+                                  <span>¥{stat.payments['after_school'].amount.toLocaleString()}</span>
+                                ) : <span className="text-gray-400">-</span>}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {stat.payments['club'] ? (
+                                  <span>¥{stat.payments['club'].amount.toLocaleString()}</span>
+                                ) : <span className="text-gray-400">-</span>}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {stat.payments['other'] ? (
+                                  <span>¥{stat.payments['other'].amount.toLocaleString()}</span>
+                                ) : <span className="text-gray-400">-</span>}
+                              </TableCell>
+                              <TableCell className="text-right font-semibold text-green-600">
+                                ¥{stat.total.toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">加载失败</div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatsDialogOpen(false)}>
+              关闭
             </Button>
           </DialogFooter>
         </DialogContent>

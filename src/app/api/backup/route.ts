@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/database';
+import { resetDatabaseConnection } from '@/lib/database';
 import fs from 'fs';
 import path from 'path';
 
@@ -62,13 +62,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '无效的数据库文件格式' }, { status: 400 });
     }
 
-    // 关闭当前数据库连接
-    try {
-      db.close();
-    } catch {
-      // 忽略关闭错误
-    }
-
     // 备份当前数据库（以防恢复失败）
     const backupPath = `${dbPath}.bak`;
     if (fs.existsSync(dbPath)) {
@@ -76,13 +69,11 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+      // 先关闭当前数据库连接
+      resetDatabaseConnection();
+      
       // 写入新的数据库文件
       fs.writeFileSync(dbPath, buffer);
-
-      // 重新打开数据库连接
-      // 由于db是模块级变量，需要重新赋值
-      // 这里通过动态导入来重新初始化
-      delete require.cache[require.resolve('@/lib/database')];
 
       return NextResponse.json({ 
         success: true, 
@@ -93,7 +84,8 @@ export async function POST(request: NextRequest) {
       if (fs.existsSync(backupPath)) {
         fs.copyFileSync(backupPath, dbPath);
       }
-      throw writeError;
+      console.error('Write error:', writeError);
+      return NextResponse.json({ error: '写入文件失败' }, { status: 500 });
     }
   } catch (error) {
     console.error('Restore failed:', error);

@@ -11,14 +11,34 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-// 创建数据库连接
-const db = new Database(dbPath);
+// 数据库实例（单例）
+let dbInstance: Database.Database | null = null;
 
-// 启用外键约束
-db.pragma('foreign_keys = ON');
+// 获取数据库连接
+function getDb(): Database.Database {
+  if (!dbInstance || !dbInstance.open) {
+    dbInstance = new Database(dbPath);
+    dbInstance.pragma('foreign_keys = ON');
+  }
+  return dbInstance;
+}
+
+// 关闭并重置数据库连接（用于恢复数据库后）
+export function resetDatabaseConnection(): void {
+  if (dbInstance) {
+    try {
+      dbInstance.close();
+    } catch {
+      // 忽略关闭错误
+    }
+    dbInstance = null;
+  }
+}
 
 // 初始化数据表
 export function initDatabase() {
+  const db = getDb();
+  
   // 创建学生费用表（应交费用）
   db.exec(`
     CREATE TABLE IF NOT EXISTS student_fees (
@@ -82,8 +102,17 @@ export function initDatabase() {
   console.log('Database initialized successfully');
 }
 
-// 导出数据库实例
-export { db };
+// 导出数据库实例（使用 getter 确保连接有效）
+export const db = new Proxy({} as Database.Database, {
+  get(_target, prop) {
+    const database = getDb();
+    const value = (database as unknown as Record<string, unknown>)[prop as string];
+    if (typeof value === 'function') {
+      return value.bind(database);
+    }
+    return value;
+  }
+});
 
 // 费用类型映射（从常量文件重新导出，方便后端使用）
 export { FEE_TYPE_MAP, FEE_TYPE_REVERSE_MAP } from './constants';

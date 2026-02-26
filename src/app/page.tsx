@@ -53,7 +53,7 @@ import {
   AlertCircle,
   ExternalLink,
   CreditCard,
-  GraduationCap
+  AlertTriangle
 } from 'lucide-react';
 import { FEE_ITEMS } from '@/lib/constants';
 
@@ -112,7 +112,7 @@ export default function Home() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [batchPaymentDialogOpen, setBatchPaymentDialogOpen] = useState(false);
-  const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
+  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentFee | null>(null);
   
   // 批量录入状态
@@ -127,13 +127,6 @@ export default function Home() {
     paymentDate: '',
     remark: '',
   });
-  
-  // 升学预览数据
-  const [promoteData, setPromoteData] = useState<{
-    grade6Classes: string[];
-    grade6StudentCount: number;
-    upgradeMap: Record<string, string>;
-  } | null>(null);
   
   // 表单数据
   const [formData, setFormData] = useState({
@@ -590,19 +583,12 @@ export default function Home() {
               </Button>
               
               <Button
-                onClick={async () => {
-                  const response = await fetch('/api/promote');
-                  const result = await response.json();
-                  if (result.data) {
-                    setPromoteData(result.data);
-                    setPromoteDialogOpen(true);
-                  }
-                }}
+                onClick={() => setDeleteAllDialogOpen(true)}
                 variant="outline"
                 className="border-red-600 text-red-600 hover:bg-red-50"
               >
-                <GraduationCap className="h-4 w-4 mr-2" />
-                一键升学
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                清空数据
               </Button>
             </nav>
           </div>
@@ -1263,107 +1249,85 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      {/* 升学对话框 */}
-      <Dialog open={promoteDialogOpen} onOpenChange={setPromoteDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+      {/* 清空所有数据对话框 */}
+      <Dialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
-              <GraduationCap className="h-5 w-5" />
-              一键升学
+              <AlertTriangle className="h-5 w-5" />
+              ⚠️ 危险操作：清空所有数据
             </DialogTitle>
             <DialogDescription>
-              将所有班级升一级，同时删除六年级学生数据
+              此操作将删除所有学生和交费记录，且无法恢复！
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            {promoteData && (
-              <div className="space-y-4">
-                {/* 警告提示 */}
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-red-800">重要提示</p>
-                      <p className="text-sm text-red-700 mt-1">
-                        升学操作将删除所有六年级学生的数据（包括交费记录），且无法恢复！
-                        请务必先使用"导出数据"功能备份当前数据。
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* 六年级信息 */}
-                {promoteData.grade6Classes.length > 0 && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <p className="font-semibold text-orange-800">将要删除的六年级班级：</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {promoteData.grade6Classes.map((cls, i) => (
-                        <span key={i} className="bg-orange-200 text-orange-800 px-2 py-1 rounded text-sm">
-                          {cls}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="text-sm text-orange-700 mt-2">
-                      共 {promoteData.grade6StudentCount} 名学生将被删除
-                    </p>
-                  </div>
-                )}
-                
-                {/* 升级预览 */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="font-semibold text-blue-800">班级升级预览：</p>
-                  <div className="mt-2 space-y-1 text-sm">
-                    {Object.entries(promoteData.upgradeMap)
-                      .filter(([from, to]) => from !== to && !promoteData.grade6Classes.includes(from))
-                      .slice(0, 6)
-                      .map(([from, to], i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <span className="bg-blue-200 text-blue-800 px-2 py-0.5 rounded">{from}</span>
-                          <span className="text-blue-600">→</span>
-                          <span className="bg-green-200 text-green-800 px-2 py-0.5 rounded">{to}</span>
-                        </div>
-                      ))}
-                    {Object.keys(promoteData.upgradeMap).length > 6 && (
-                      <p className="text-blue-600">...还有更多班级</p>
-                    )}
-                  </div>
+            {/* 强警告提示 */}
+            <div className="bg-red-100 border-2 border-red-400 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-6 w-6 text-red-600 flex-shrink-0" />
+                <div>
+                  <p className="font-bold text-red-800 text-lg">⚠️ 警告</p>
+                  <p className="text-red-700 mt-2">
+                    您即将执行<strong>不可逆</strong>的操作！
+                  </p>
+                  <ul className="mt-3 text-sm text-red-700 space-y-1">
+                    <li>• 所有学生信息将被删除</li>
+                    <li>• 所有交费记录将被删除</li>
+                    <li>• 所有班级数据将被清空</li>
+                    <li>• 此操作<strong>无法撤销</strong></li>
+                  </ul>
                 </div>
               </div>
-            )}
+            </div>
+            
+            {/* 备份提醒 */}
+            <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+              <p className="text-yellow-800 font-medium">
+                📋 建议操作：请先使用"导出数据"功能备份当前数据！
+              </p>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPromoteDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setDeleteAllDialogOpen(false)}>
               取消
             </Button>
             <Button 
               onClick={async () => {
-                if (!confirm('确定已备份数据并执行升学操作吗？此操作不可撤销！')) return;
+                // 第一次确认
+                if (!confirm('⚠️ 确定要清空所有数据吗？此操作不可撤销！')) return;
+                
+                // 第二次确认
+                const input = prompt('请输入 "确认清空" 以继续：');
+                if (input !== '确认清空') {
+                  if (input !== null) alert('输入不正确，操作已取消');
+                  return;
+                }
                 
                 try {
-                  const response = await fetch('/api/promote', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ confirmed: true }),
+                  const response = await fetch('/api/student-fees/all', {
+                    method: 'DELETE',
                   });
                   
                   const result = await response.json();
                   
                   if (response.ok) {
-                    alert(result.message);
-                    setPromoteDialogOpen(false);
-                    fetchClasses();
-                    fetchStudents();
+                    alert(result.message || '数据已清空');
+                    setDeleteAllDialogOpen(false);
+                    setClasses([]);
+                    setSelectedClass('');
+                    setStudents([]);
                   } else {
-                    alert(result.error || '升学操作失败');
+                    alert(result.error || '清空失败');
                   }
                 } catch (error) {
-                  console.error('Failed to promote:', error);
-                  alert('升学操作失败');
+                  console.error('Failed to delete all:', error);
+                  alert('清空失败');
                 }
               }}
               className="bg-red-600 hover:bg-red-700"
             >
-              确认升学
+              确认清空所有数据
             </Button>
           </DialogFooter>
         </DialogContent>

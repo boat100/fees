@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,89 +30,116 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   UserPlus, 
   Edit, 
   Trash2, 
-  BarChart3, 
-  Search, 
+  Upload, 
+  Download, 
   RefreshCw,
   Users,
   DollarSign,
-  CheckCircle,
-  XCircle,
-  TrendingUp
+  FileSpreadsheet,
+  ChevronDown
 } from 'lucide-react';
 
+// 费用项目定义
+const FEE_ITEMS = [
+  { key: 'tuition_fee', label: '学费' },
+  { key: 'lunch_fee', label: '午餐费' },
+  { key: 'nap_fee', label: '午托费' },
+  { key: 'after_school_fee', label: '课后服务费' },
+  { key: 'club_fee', label: '社团费' },
+  { key: 'other_fee', label: '其他费用' },
+] as const;
+
 // 类型定义
-interface Student {
+interface StudentFee {
   id: number;
-  name: string;
-  student_number: string;
   class_name: string;
-  phone: string | null;
-  email: string | null;
+  student_name: string;
+  tuition_fee: number;
+  lunch_fee: number;
+  nap_fee: number;
+  after_school_fee: number;
+  club_fee: number;
+  other_fee: number;
+  remark: string | null;
   created_at: string;
   updated_at: string | null;
 }
 
-interface Statistics {
-  totalStudents: number;
-  totalFees: number;
-  paidFees: number;
-  unpaidFees: number;
-  paidCount: number;
-  unpaidCount: number;
-  feeTypeStats: Array<{
-    feeType: string;
-    total: number;
-    paid: number;
-    unpaid: number;
-    count: number;
-  }>;
-  classStats: Array<{
-    className: string;
-    total: number;
-    paid: number;
-    unpaid: number;
-    studentCount: number;
-  }>;
+interface FeeTotals {
+  tuition_fee: number;
+  lunch_fee: number;
+  nap_fee: number;
+  after_school_fee: number;
+  club_fee: number;
+  other_fee: number;
+  total: number;
 }
 
 export default function Home() {
   // 状态管理
-  const [activeTab, setActiveTab] = useState('students');
-  const [students, setStudents] = useState<Student[]>([]);
-  const [statistics, setStatistics] = useState<Statistics | null>(null);
+  const [classes, setClasses] = useState<string[]>([]);
+  const [selectedClass, setSelectedClass] = useState<string>('');
+  const [students, setStudents] = useState<StudentFee[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   
   // 对话框状态
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<StudentFee | null>(null);
   
   // 表单数据
   const [formData, setFormData] = useState({
-    name: '',
-    studentNumber: '',
     className: '',
-    phone: '',
-    email: '',
+    studentName: '',
+    tuitionFee: 0,
+    lunchFee: 0,
+    napFee: 0,
+    afterSchoolFee: 0,
+    clubFee: 0,
+    otherFee: 0,
+    remark: '',
   });
+  
+  // 导入预览数据
+  const [importData, setImportData] = useState<Array<Record<string, unknown>>>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 获取学生列表
+  // 获取班级列表
+  const fetchClasses = async () => {
+    try {
+      const response = await fetch('/api/student-fees?action=classes');
+      const result = await response.json();
+      if (result.data) {
+        setClasses(result.data);
+        if (result.data.length > 0 && !selectedClass) {
+          setSelectedClass(result.data[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch classes:', error);
+    }
+  };
+
+  // 获取学生费用列表
   const fetchStudents = async () => {
+    if (!selectedClass) return;
+    
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
-      const response = await fetch(`/api/students?${params}`);
+      const response = await fetch(`/api/student-fees?className=${encodeURIComponent(selectedClass)}`);
       const result = await response.json();
       if (result.data) {
         setStudents(result.data);
@@ -124,61 +151,96 @@ export default function Home() {
     }
   };
 
-  // 获取统计数据
-  const fetchStatistics = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/statistics');
-      const result = await response.json();
-      if (result.data) {
-        setStatistics(result.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch statistics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // 初始化加载
   useEffect(() => {
-    fetchStudents();
-  }, [searchTerm]);
+    fetchClasses();
+  }, []);
 
+  // 班级变化时重新加载
   useEffect(() => {
-    if (activeTab === 'statistics') {
-      fetchStatistics();
-    }
-  }, [activeTab]);
+    fetchStudents();
+  }, [selectedClass]);
+
+  // 计算费用总计
+  const calculateTotals = (): FeeTotals => {
+    const totals: FeeTotals = {
+      tuition_fee: 0,
+      lunch_fee: 0,
+      nap_fee: 0,
+      after_school_fee: 0,
+      club_fee: 0,
+      other_fee: 0,
+      total: 0,
+    };
+    
+    students.forEach(student => {
+      totals.tuition_fee += student.tuition_fee || 0;
+      totals.lunch_fee += student.lunch_fee || 0;
+      totals.nap_fee += student.nap_fee || 0;
+      totals.after_school_fee += student.after_school_fee || 0;
+      totals.club_fee += student.club_fee || 0;
+      totals.other_fee += student.other_fee || 0;
+    });
+    
+    totals.total = 
+      totals.tuition_fee + 
+      totals.lunch_fee + 
+      totals.nap_fee + 
+      totals.after_school_fee + 
+      totals.club_fee + 
+      totals.other_fee;
+    
+    return totals;
+  };
+
+  // 计算单个学生总费用
+  const calculateStudentTotal = (student: StudentFee): number => {
+    return (
+      (student.tuition_fee || 0) +
+      (student.lunch_fee || 0) +
+      (student.nap_fee || 0) +
+      (student.after_school_fee || 0) +
+      (student.club_fee || 0) +
+      (student.other_fee || 0)
+    );
+  };
 
   // 打开新增对话框
   const handleAddStudent = () => {
     setSelectedStudent(null);
     setFormData({
-      name: '',
-      studentNumber: '',
-      className: '',
-      phone: '',
-      email: '',
+      className: selectedClass,
+      studentName: '',
+      tuitionFee: 0,
+      lunchFee: 0,
+      napFee: 0,
+      afterSchoolFee: 0,
+      clubFee: 0,
+      otherFee: 0,
+      remark: '',
     });
     setStudentDialogOpen(true);
   };
 
   // 打开修改对话框
-  const handleEditStudent = (student: Student) => {
+  const handleEditStudent = (student: StudentFee) => {
     setSelectedStudent(student);
     setFormData({
-      name: student.name,
-      studentNumber: student.student_number,
       className: student.class_name,
-      phone: student.phone || '',
-      email: student.email || '',
+      studentName: student.student_name,
+      tuitionFee: student.tuition_fee || 0,
+      lunchFee: student.lunch_fee || 0,
+      napFee: student.nap_fee || 0,
+      afterSchoolFee: student.after_school_fee || 0,
+      clubFee: student.club_fee || 0,
+      otherFee: student.other_fee || 0,
+      remark: student.remark || '',
     });
     setStudentDialogOpen(true);
   };
 
   // 打开删除确认对话框
-  const handleDeleteConfirm = (student: Student) => {
+  const handleDeleteConfirm = (student: StudentFee) => {
     setSelectedStudent(student);
     setDeleteDialogOpen(true);
   };
@@ -187,8 +249,8 @@ export default function Home() {
   const handleSubmit = async () => {
     try {
       const url = selectedStudent 
-        ? `/api/students/${selectedStudent.id}` 
-        : '/api/students';
+        ? `/api/student-fees/${selectedStudent.id}` 
+        : '/api/student-fees';
       const method = selectedStudent ? 'PUT' : 'POST';
       
       const response = await fetch(url, {
@@ -197,24 +259,22 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: formData.name,
-          studentNumber: formData.studentNumber,
           className: formData.className,
-          phone: formData.phone || null,
-          email: formData.email || null,
+          studentName: formData.studentName,
+          tuitionFee: Number(formData.tuitionFee),
+          lunchFee: Number(formData.lunchFee),
+          napFee: Number(formData.napFee),
+          afterSchoolFee: Number(formData.afterSchoolFee),
+          clubFee: Number(formData.clubFee),
+          otherFee: Number(formData.otherFee),
+          remark: formData.remark || null,
         }),
       });
       
       if (response.ok) {
         setStudentDialogOpen(false);
+        fetchClasses();
         fetchStudents();
-        setFormData({
-          name: '',
-          studentNumber: '',
-          className: '',
-          phone: '',
-          email: '',
-        });
       } else {
         const error = await response.json();
         alert(error.error || '操作失败');
@@ -230,7 +290,7 @@ export default function Home() {
     if (!selectedStudent) return;
     
     try {
-      const response = await fetch(`/api/students/${selectedStudent.id}`, {
+      const response = await fetch(`/api/student-fees/${selectedStudent.id}`, {
         method: 'DELETE',
       });
       
@@ -247,6 +307,139 @@ export default function Home() {
     }
   };
 
+  // 下载导入模板
+  const downloadTemplate = () => {
+    const headers = ['班级', '姓名', '学费', '午餐费', '午托费', '课后服务费', '社团费', '其他费用', '备注'];
+    const csvContent = headers.join(',') + '\n';
+    
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '学生费用导入模板.csv';
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // 解析CSV文件
+  const parseCSV = (text: string): Array<Record<string, unknown>> => {
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length < 2) return [];
+    
+    const headers = lines[0].split(',').map(h => h.trim());
+    const data: Array<Record<string, unknown>> = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',');
+      if (values.length < 2) continue;
+      
+      const row: Record<string, unknown> = {};
+      headers.forEach((header, index) => {
+        const value = values[index]?.trim() || '';
+        row[header] = value;
+      });
+      data.push(row);
+    }
+    
+    return data;
+  };
+
+  // 处理文件上传
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const text = await file.text();
+    const data = parseCSV(text);
+    setImportData(data);
+    setImportDialogOpen(true);
+    
+    // 重置文件输入
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // 确认导入
+  const confirmImport = async () => {
+    if (importData.length === 0) return;
+    
+    // 转换数据格式
+    const formattedData = importData.map(row => ({
+      className: String(row['班级'] || row['class_name'] || ''),
+      studentName: String(row['姓名'] || row['student_name'] || ''),
+      tuitionFee: Number(row['学费'] || row['tuition_fee'] || 0),
+      lunchFee: Number(row['午餐费'] || row['lunch_fee'] || 0),
+      napFee: Number(row['午托费'] || row['nap_fee'] || 0),
+      afterSchoolFee: Number(row['课后服务费'] || row['after_school_fee'] || 0),
+      clubFee: Number(row['社团费'] || row['club_fee'] || 0),
+      otherFee: Number(row['其他费用'] || row['other_fee'] || 0),
+      remark: String(row['备注'] || row['remark'] || ''),
+    }));
+    
+    try {
+      const response = await fetch('/api/student-fees', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ data: formattedData }),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert(result.message);
+        setImportDialogOpen(false);
+        setImportData([]);
+        fetchClasses();
+        fetchStudents();
+      } else {
+        alert(result.error || '导入失败');
+      }
+    } catch (error) {
+      console.error('Failed to import data:', error);
+      alert('导入失败');
+    }
+  };
+
+  // 导出数据
+  const exportData = () => {
+    if (students.length === 0) {
+      alert('没有数据可导出');
+      return;
+    }
+    
+    const headers = ['班级', '姓名', '学费', '午餐费', '午托费', '课后服务费', '社团费', '其他费用', '总计', '备注'];
+    const rows = students.map(student => [
+      student.class_name,
+      student.student_name,
+      student.tuition_fee || 0,
+      student.lunch_fee || 0,
+      student.nap_fee || 0,
+      student.after_school_fee || 0,
+      student.club_fee || 0,
+      student.other_fee || 0,
+      calculateStudentTotal(student),
+      student.remark || '',
+    ]);
+    
+    const totals = calculateTotals();
+    rows.push(['合计', '', totals.tuition_fee, totals.lunch_fee, totals.nap_fee, totals.after_school_fee, totals.club_fee, totals.other_fee, totals.total, '']);
+    
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${selectedClass}_费用明细.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const totals = calculateTotals();
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* 顶部导航栏 */}
@@ -254,7 +447,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <Users className="h-8 w-8 text-blue-600" />
+              <DollarSign className="h-8 w-8 text-blue-600" />
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">
                 学校费用统计系统
               </h1>
@@ -271,21 +464,36 @@ export default function Home() {
               </Button>
               
               <Button
-                onClick={() => setActiveTab('students')}
-                variant={activeTab === 'students' ? 'default' : 'outline'}
-                className={activeTab === 'students' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                onClick={downloadTemplate}
+                variant="outline"
               >
-                <Users className="h-4 w-4 mr-2" />
-                学生管理
+                <Download className="h-4 w-4 mr-2" />
+                下载模板
               </Button>
               
               <Button
-                onClick={() => setActiveTab('statistics')}
-                variant={activeTab === 'statistics' ? 'default' : 'outline'}
-                className={activeTab === 'statistics' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                className="border-green-600 text-green-600 hover:bg-green-50"
               >
-                <BarChart3 className="h-4 w-4 mr-2" />
-                费用统计
+                <Upload className="h-4 w-4 mr-2" />
+                批量导入
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              
+              <Button
+                onClick={exportData}
+                variant="outline"
+                className="border-purple-600 text-purple-600 hover:bg-purple-50"
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                导出数据
               </Button>
             </nav>
           </div>
@@ -294,309 +502,159 @@ export default function Home() {
 
       {/* 主内容区域 */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'students' && (
-          <>
-            {/* 搜索栏 */}
-            <div className="mb-6 flex items-center gap-4">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="搜索学生姓名或学号..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+        {/* 班级选择 */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              班级选择
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="class-select" className="whitespace-nowrap">选择班级：</Label>
+                <Select value={selectedClass} onValueChange={setSelectedClass}>
+                  <SelectTrigger id="class-select" className="w-[200px]">
+                    <SelectValue placeholder="请选择班级" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes.map((className) => (
+                      <SelectItem key={className} value={className}>
+                        {className}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+              
               <Button
-                onClick={() => fetchStudents()}
+                onClick={() => { fetchClasses(); fetchStudents(); }}
                 variant="outline"
                 size="icon"
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </Button>
+              
+              {selectedClass && (
+                <div className="text-sm text-gray-500">
+                  共 <span className="font-semibold text-gray-900">{students.length}</span> 名学生
+                </div>
+              )}
             </div>
+          </CardContent>
+        </Card>
 
-            {/* 学生列表 */}
-            <Card>
-              <CardHeader>
-                <CardTitle>学生列表</CardTitle>
-                <CardDescription>
-                  共 {students.length} 名学生
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
-                    <span className="ml-2 text-gray-500">加载中...</span>
-                  </div>
-                ) : students.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    暂无学生数据，点击"新增学生"添加
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>学号</TableHead>
-                        <TableHead>姓名</TableHead>
-                        <TableHead>班级</TableHead>
-                        <TableHead>联系电话</TableHead>
-                        <TableHead>电子邮箱</TableHead>
-                        <TableHead className="text-right">操作</TableHead>
+        {/* 费用明细表格 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>费用明细</CardTitle>
+            <CardDescription>
+              {selectedClass ? `班级：${selectedClass}` : '请先选择班级'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!selectedClass ? (
+              <div className="text-center py-8 text-gray-500">
+                请先选择一个班级
+              </div>
+            ) : loading ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+                <span className="ml-2 text-gray-500">加载中...</span>
+              </div>
+            ) : students.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                暂无数据，点击"新增学生"添加或"批量导入"数据
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold">序号</TableHead>
+                      <TableHead className="font-semibold">姓名</TableHead>
+                      <TableHead className="font-semibold text-right">学费</TableHead>
+                      <TableHead className="font-semibold text-right">午餐费</TableHead>
+                      <TableHead className="font-semibold text-right">午托费</TableHead>
+                      <TableHead className="font-semibold text-right">课后服务费</TableHead>
+                      <TableHead className="font-semibold text-right">社团费</TableHead>
+                      <TableHead className="font-semibold text-right">其他费用</TableHead>
+                      <TableHead className="font-semibold text-right">合计</TableHead>
+                      <TableHead className="font-semibold">备注</TableHead>
+                      <TableHead className="font-semibold text-right">操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {students.map((student, index) => (
+                      <TableRow key={student.id}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell className="font-medium">{student.student_name}</TableCell>
+                        <TableCell className="text-right">{student.tuition_fee?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell className="text-right">{student.lunch_fee?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell className="text-right">{student.nap_fee?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell className="text-right">{student.after_school_fee?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell className="text-right">{student.club_fee?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell className="text-right">{student.other_fee?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell className="text-right font-semibold text-blue-600">
+                          {calculateStudentTotal(student).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="max-w-[100px] truncate">{student.remark || '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              onClick={() => handleEditStudent(student)}
+                              variant="outline"
+                              size="sm"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteConfirm(student)}
+                              variant="destructive"
+                              size="sm"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {students.map((student) => (
-                        <TableRow key={student.id}>
-                          <TableCell className="font-medium">
-                            {student.student_number}
-                          </TableCell>
-                          <TableCell>{student.name}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">
-                              {student.class_name}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{student.phone || '-'}</TableCell>
-                          <TableCell>{student.email || '-'}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                onClick={() => handleEditStudent(student)}
-                                variant="outline"
-                                size="sm"
-                              >
-                                <Edit className="h-4 w-4 mr-1" />
-                                修改
-                              </Button>
-                              <Button
-                                onClick={() => handleDeleteConfirm(student)}
-                                variant="destructive"
-                                size="sm"
-                              >
-                                <Trash2 className="h-4 w-4 mr-1" />
-                                删除
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        )}
-
-        {activeTab === 'statistics' && (
-          <div className="space-y-6">
-            {/* 统计概览卡片 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    学生总数
-                  </CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {statistics?.totalStudents || 0}
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    费用总额
-                  </CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    ¥{statistics?.totalFees.toFixed(2) || '0.00'}
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    已缴费用
-                  </CardTitle>
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">
-                    ¥{statistics?.paidFees.toFixed(2) || '0.00'}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {statistics?.paidCount || 0} 笔
-                  </p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    未缴费用
-                  </CardTitle>
-                  <XCircle className="h-4 w-4 text-red-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">
-                    ¥{statistics?.unpaidFees.toFixed(2) || '0.00'}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {statistics?.unpaidCount || 0} 笔
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* 费用类型统计 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  费用类型统计
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {statistics?.feeTypeStats && statistics.feeTypeStats.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>费用类型</TableHead>
-                        <TableHead>总金额</TableHead>
-                        <TableHead>已缴金额</TableHead>
-                        <TableHead>未缴金额</TableHead>
-                        <TableHead>记录数</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {statistics.feeTypeStats.map((stat, index) => (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">
-                            {stat.feeType}
-                          </TableCell>
-                          <TableCell>¥{stat.total.toFixed(2)}</TableCell>
-                          <TableCell className="text-green-600">
-                            ¥{stat.paid.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-red-600">
-                            ¥{stat.unpaid.toFixed(2)}
-                          </TableCell>
-                          <TableCell>{stat.count}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    暂无费用统计数据
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* 班级统计 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  班级费用统计
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {statistics?.classStats && statistics.classStats.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>班级</TableHead>
-                        <TableHead>学生人数</TableHead>
-                        <TableHead>总金额</TableHead>
-                        <TableHead>已缴金额</TableHead>
-                        <TableHead>未缴金额</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {statistics.classStats.map((stat, index) => (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">
-                            {stat.className}
-                          </TableCell>
-                          <TableCell>{stat.studentCount}</TableCell>
-                          <TableCell>¥{stat.total.toFixed(2)}</TableCell>
-                          <TableCell className="text-green-600">
-                            ¥{stat.paid.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-red-600">
-                            ¥{stat.unpaid.toFixed(2)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    暂无班级统计数据
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                    ))}
+                    {/* 合计行 */}
+                    <TableRow className="bg-blue-50 font-semibold">
+                      <TableCell colSpan={2} className="text-center">合计</TableCell>
+                      <TableCell className="text-right text-blue-700">{totals.tuition_fee.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-blue-700">{totals.lunch_fee.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-blue-700">{totals.nap_fee.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-blue-700">{totals.after_school_fee.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-blue-700">{totals.club_fee.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-blue-700">{totals.other_fee.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-blue-700 text-lg">{totals.total.toFixed(2)}</TableCell>
+                      <TableCell colSpan={2}></TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </main>
 
       {/* 学生表单对话框 */}
       <Dialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
-              {selectedStudent ? '修改学生信息' : '新增学生'}
+              {selectedStudent ? '修改学生费用' : '新增学生费用'}
             </DialogTitle>
             <DialogDescription>
-              {selectedStudent 
-                ? '修改学生基本信息，点击保存完成更新' 
-                : '填写学生基本信息，点击保存完成添加'}
+              填写学生费用信息，点击保存完成操作
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                姓名 *
-              </Label>
+              <Label className="text-right">班级 *</Label>
               <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="col-span-3"
-                placeholder="请输入学生姓名"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="studentNumber" className="text-right">
-                学号 *
-              </Label>
-              <Input
-                id="studentNumber"
-                value={formData.studentNumber}
-                onChange={(e) => setFormData({ ...formData, studentNumber: e.target.value })}
-                className="col-span-3"
-                placeholder="请输入学号"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="className" className="text-right">
-                班级 *
-              </Label>
-              <Input
-                id="className"
                 value={formData.className}
                 onChange={(e) => setFormData({ ...formData, className: e.target.value })}
                 className="col-span-3"
@@ -604,28 +662,81 @@ export default function Home() {
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="phone" className="text-right">
-                联系电话
-              </Label>
+              <Label className="text-right">姓名 *</Label>
               <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                value={formData.studentName}
+                onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
                 className="col-span-3"
-                placeholder="请输入联系电话（选填）"
+                placeholder="请输入学生姓名"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email" className="text-right">
-                电子邮箱
-              </Label>
+              <Label className="text-right">学费</Label>
               <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                type="number"
+                value={formData.tuitionFee}
+                onChange={(e) => setFormData({ ...formData, tuitionFee: Number(e.target.value) })}
                 className="col-span-3"
-                placeholder="请输入电子邮箱（选填）"
+                placeholder="0.00"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">午餐费</Label>
+              <Input
+                type="number"
+                value={formData.lunchFee}
+                onChange={(e) => setFormData({ ...formData, lunchFee: Number(e.target.value) })}
+                className="col-span-3"
+                placeholder="0.00"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">午托费</Label>
+              <Input
+                type="number"
+                value={formData.napFee}
+                onChange={(e) => setFormData({ ...formData, napFee: Number(e.target.value) })}
+                className="col-span-3"
+                placeholder="0.00"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">课后服务费</Label>
+              <Input
+                type="number"
+                value={formData.afterSchoolFee}
+                onChange={(e) => setFormData({ ...formData, afterSchoolFee: Number(e.target.value) })}
+                className="col-span-3"
+                placeholder="0.00"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">社团费</Label>
+              <Input
+                type="number"
+                value={formData.clubFee}
+                onChange={(e) => setFormData({ ...formData, clubFee: Number(e.target.value) })}
+                className="col-span-3"
+                placeholder="0.00"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">其他费用</Label>
+              <Input
+                type="number"
+                value={formData.otherFee}
+                onChange={(e) => setFormData({ ...formData, otherFee: Number(e.target.value) })}
+                className="col-span-3"
+                placeholder="0.00"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">备注</Label>
+              <Input
+                value={formData.remark}
+                onChange={(e) => setFormData({ ...formData, remark: e.target.value })}
+                className="col-span-3"
+                placeholder="备注信息（选填）"
               />
             </div>
           </div>
@@ -635,7 +746,7 @@ export default function Home() {
             </Button>
             <Button 
               onClick={handleSubmit}
-              disabled={!formData.name || !formData.studentNumber || !formData.className}
+              disabled={!formData.className || !formData.studentName}
               className="bg-blue-600 hover:bg-blue-700"
             >
               保存
@@ -650,7 +761,7 @@ export default function Home() {
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除学生 "{selectedStudent?.name}" 吗？此操作将同时删除该学生的所有费用记录，且无法撤销。
+              确定要删除学生 "{selectedStudent?.student_name}" 的费用记录吗？此操作无法撤销。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -664,6 +775,63 @@ export default function Home() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 导入预览对话框 */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>导入预览</DialogTitle>
+            <DialogDescription>
+              共解析到 {importData.length} 条数据，确认无误后点击导入
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {importData.length > 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {Object.keys(importData[0]).map((key) => (
+                        <TableHead key={key}>{key}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importData.slice(0, 10).map((row, index) => (
+                      <TableRow key={index}>
+                        {Object.values(row).map((value, i) => (
+                          <TableCell key={i}>{String(value)}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {importData.length > 10 && (
+                  <div className="text-center text-sm text-gray-500 mt-2">
+                    还有 {importData.length - 10} 条数据未显示...
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                没有解析到有效数据
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setImportDialogOpen(false); setImportData([]); }}>
+              取消
+            </Button>
+            <Button 
+              onClick={confirmImport}
+              disabled={importData.length === 0}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              确认导入
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

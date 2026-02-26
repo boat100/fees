@@ -51,7 +51,8 @@ import {
   FileSpreadsheet,
   Calendar,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  CreditCard
 } from 'lucide-react';
 import { FEE_ITEMS } from '@/lib/constants';
 
@@ -106,7 +107,21 @@ export default function Home() {
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [batchPaymentDialogOpen, setBatchPaymentDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentFee | null>(null);
+  
+  // 批量录入状态
+  const [batchPaymentData, setBatchPaymentData] = useState<{
+    selectedStudents: number[];
+    payments: Array<{ feeType: string; amount: number }>;
+    paymentDate: string;
+    remark: string;
+  }>({
+    selectedStudents: [],
+    payments: [],
+    paymentDate: '',
+    remark: '',
+  });
   
   // 表单数据
   const [formData, setFormData] = useState({
@@ -481,8 +496,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* 顶部导航栏 */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      {/* 顶部导航栏 - 固定置顶 */}
+      <header className="sticky top-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
@@ -500,6 +515,15 @@ export default function Home() {
               >
                 <UserPlus className="h-4 w-4 mr-2" />
                 新增学生
+              </Button>
+              
+              <Button
+                onClick={() => setBatchPaymentDialogOpen(true)}
+                variant="outline"
+                className="border-orange-600 text-orange-600 hover:bg-orange-50"
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                批量录入
               </Button>
               
               <Button
@@ -914,6 +938,224 @@ export default function Home() {
               className="bg-green-600 hover:bg-green-700"
             >
               确认导入
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 批量录入交费对话框 */}
+      <Dialog open={batchPaymentDialogOpen} onOpenChange={setBatchPaymentDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              批量录入交费
+            </DialogTitle>
+            <DialogDescription>
+              选择学生和费用项目，批量录入交费记录。支持多学生多项目同时录入。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {/* 交费日期 */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">交费日期 *</Label>
+              <Input
+                type="date"
+                value={batchPaymentData.paymentDate}
+                onChange={(e) => setBatchPaymentData({ ...batchPaymentData, paymentDate: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            
+            {/* 选择学生 */}
+            <div className="border-t pt-4">
+              <Label className="mb-2 block">选择学生（可多选）</Label>
+              <div className="border rounded-lg max-h-[200px] overflow-y-auto">
+                {students.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500">暂无学生数据</div>
+                ) : (
+                  <div className="divide-y">
+                    {students.map((student) => {
+                      const isSelected = batchPaymentData.selectedStudents.includes(student.id);
+                      return (
+                        <label
+                          key={student.id}
+                          className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 ${
+                            isSelected ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setBatchPaymentData({
+                                  ...batchPaymentData,
+                                  selectedStudents: [...batchPaymentData.selectedStudents, student.id],
+                                });
+                              } else {
+                                setBatchPaymentData({
+                                  ...batchPaymentData,
+                                  selectedStudents: batchPaymentData.selectedStudents.filter(id => id !== student.id),
+                                });
+                              }
+                            }}
+                            className="h-4 w-4"
+                          />
+                          <span className="font-medium">{student.student_name}</span>
+                          <span className="text-sm text-gray-500">({student.class_name})</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setBatchPaymentData({
+                    ...batchPaymentData,
+                    selectedStudents: students.map(s => s.id),
+                  })}
+                >
+                  全选
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setBatchPaymentData({
+                    ...batchPaymentData,
+                    selectedStudents: [],
+                  })}
+                >
+                  清空
+                </Button>
+              </div>
+            </div>
+            
+            {/* 选择费用项目和金额 */}
+            <div className="border-t pt-4">
+              <Label className="mb-2 block">费用项目和金额</Label>
+              <div className="space-y-3">
+                {FEE_ITEMS.map((item) => {
+                  const existingPayment = batchPaymentData.payments.find(p => p.feeType === item.key);
+                  return (
+                    <div key={item.key} className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={!!existingPayment}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setBatchPaymentData({
+                              ...batchPaymentData,
+                              payments: [...batchPaymentData.payments, { feeType: item.key, amount: 0 }],
+                            });
+                          } else {
+                            setBatchPaymentData({
+                              ...batchPaymentData,
+                              payments: batchPaymentData.payments.filter(p => p.feeType !== item.key),
+                            });
+                          }
+                        }}
+                        className="h-4 w-4"
+                      />
+                      <Label className="w-24">{item.label}</Label>
+                      <Input
+                        type="number"
+                        value={existingPayment?.amount || ''}
+                        onChange={(e) => {
+                          const newPayments = batchPaymentData.payments.map(p =>
+                            p.feeType === item.key ? { ...p, amount: Number(e.target.value) } : p
+                          );
+                          setBatchPaymentData({ ...batchPaymentData, payments: newPayments });
+                        }}
+                        placeholder="金额"
+                        className="w-32"
+                        disabled={!existingPayment}
+                      />
+                      <span className="text-sm text-gray-500">元</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            
+            {/* 备注 */}
+            <div className="grid grid-cols-4 items-center gap-4 border-t pt-4">
+              <Label className="text-right">备注</Label>
+              <Input
+                value={batchPaymentData.remark}
+                onChange={(e) => setBatchPaymentData({ ...batchPaymentData, remark: e.target.value })}
+                className="col-span-3"
+                placeholder="备注信息（选填）"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBatchPaymentDialogOpen(false)}>
+              取消
+            </Button>
+            <Button 
+              onClick={async () => {
+                if (batchPaymentData.selectedStudents.length === 0) {
+                  alert('请选择至少一个学生');
+                  return;
+                }
+                const validPayments = batchPaymentData.payments.filter(p => p.amount > 0);
+                if (validPayments.length === 0) {
+                  alert('请至少填写一项费用金额');
+                  return;
+                }
+                if (!batchPaymentData.paymentDate) {
+                  alert('请选择交费日期');
+                  return;
+                }
+                
+                // 构建批量录入数据
+                const payments = batchPaymentData.selectedStudents.flatMap(studentId =>
+                  validPayments.map(payment => ({
+                    studentId,
+                    feeType: payment.feeType,
+                    amount: payment.amount,
+                  }))
+                );
+                
+                try {
+                  const response = await fetch('/api/payments/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      payments,
+                      paymentDate: batchPaymentData.paymentDate,
+                      remark: batchPaymentData.remark || null,
+                    }),
+                  });
+                  
+                  const result = await response.json();
+                  
+                  if (response.ok) {
+                    alert(result.message);
+                    setBatchPaymentDialogOpen(false);
+                    setBatchPaymentData({
+                      selectedStudents: [],
+                      payments: [],
+                      paymentDate: '',
+                      remark: '',
+                    });
+                    fetchStudents();
+                  } else {
+                    alert(result.error || '批量录入失败');
+                  }
+                } catch (error) {
+                  console.error('Failed to batch payment:', error);
+                  alert('批量录入失败');
+                }
+              }}
+              className="bg-orange-600 hover:bg-orange-700"
+              disabled={batchPaymentData.selectedStudents.length === 0 || batchPaymentData.payments.filter(p => p.amount > 0).length === 0}
+            >
+              确认录入
             </Button>
           </DialogFooter>
         </DialogContent>

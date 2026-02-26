@@ -40,19 +40,24 @@ export async function PUT(
     const {
       className,
       studentName,
-      tuitionFee,
-      lunchFee,
-      napFee,
-      afterSchoolFee,
-      clubFee,
-      otherFee,
+      tuitionFee, tuitionPaid, tuitionPaidDate,
+      lunchFee, lunchPaid, lunchPaidDate,
+      napFee, napPaid, napPaidDate,
+      afterSchoolFee, afterSchoolPaid, afterSchoolPaidDate,
+      clubFee, clubPaid, clubPaidDate,
+      otherFee, otherPaid, otherPaidDate,
       remark,
     } = body;
     
     const stmt = db.prepare(`
       UPDATE student_fees 
-      SET class_name = ?, student_name = ?, tuition_fee = ?, lunch_fee = ?, 
-          nap_fee = ?, after_school_fee = ?, club_fee = ?, other_fee = ?, 
+      SET class_name = ?, student_name = ?, 
+          tuition_fee = ?, tuition_paid = ?, tuition_paid_date = ?,
+          lunch_fee = ?, lunch_paid = ?, lunch_paid_date = ?,
+          nap_fee = ?, nap_paid = ?, nap_paid_date = ?,
+          after_school_fee = ?, after_school_paid = ?, after_school_paid_date = ?,
+          club_fee = ?, club_paid = ?, club_paid_date = ?,
+          other_fee = ?, other_paid = ?, other_paid_date = ?,
           remark = ?, updated_at = ?
       WHERE id = ?
     `);
@@ -60,12 +65,12 @@ export async function PUT(
     const result = stmt.run(
       className,
       studentName,
-      tuitionFee || 0,
-      lunchFee || 0,
-      napFee || 0,
-      afterSchoolFee || 0,
-      clubFee || 0,
-      otherFee || 0,
+      tuitionFee ?? 0, tuitionPaid ?? 0, tuitionPaidDate || null,
+      lunchFee ?? 0, lunchPaid ?? 0, lunchPaidDate || null,
+      napFee ?? 0, napPaid ?? 0, napPaidDate || null,
+      afterSchoolFee ?? 0, afterSchoolPaid ?? 0, afterSchoolPaidDate || null,
+      clubFee ?? 0, clubPaid ?? 0, clubPaidDate || null,
+      otherFee ?? 0, otherPaid ?? 0, otherPaidDate || null,
       remark || null,
       new Date().toISOString(),
       id

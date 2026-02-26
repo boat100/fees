@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { 
   UserPlus, 
   Edit, 
@@ -48,17 +49,19 @@ import {
   Users,
   DollarSign,
   FileSpreadsheet,
-  ChevronDown
+  Calendar,
+  Check,
+  X
 } from 'lucide-react';
 
 // 费用项目定义
 const FEE_ITEMS = [
-  { key: 'tuition_fee', label: '学费' },
-  { key: 'lunch_fee', label: '午餐费' },
-  { key: 'nap_fee', label: '午托费' },
-  { key: 'after_school_fee', label: '课后服务费' },
-  { key: 'club_fee', label: '社团费' },
-  { key: 'other_fee', label: '其他费用' },
+  { key: 'tuition', label: '学费' },
+  { key: 'lunch', label: '午餐费' },
+  { key: 'nap', label: '午托费' },
+  { key: 'after_school', label: '课后服务费' },
+  { key: 'club', label: '社团费' },
+  { key: 'other', label: '其他费用' },
 ] as const;
 
 // 类型定义
@@ -67,25 +70,50 @@ interface StudentFee {
   class_name: string;
   student_name: string;
   tuition_fee: number;
+  tuition_paid: number;
+  tuition_paid_date: string | null;
   lunch_fee: number;
+  lunch_paid: number;
+  lunch_paid_date: string | null;
   nap_fee: number;
+  nap_paid: number;
+  nap_paid_date: string | null;
   after_school_fee: number;
+  after_school_paid: number;
+  after_school_paid_date: string | null;
   club_fee: number;
+  club_paid: number;
+  club_paid_date: string | null;
   other_fee: number;
+  other_paid: number;
+  other_paid_date: string | null;
   remark: string | null;
   created_at: string;
   updated_at: string | null;
 }
 
 interface FeeTotals {
-  tuition_fee: number;
-  lunch_fee: number;
-  nap_fee: number;
-  after_school_fee: number;
-  club_fee: number;
-  other_fee: number;
-  total: number;
+  tuition_fee: number; tuition_paid: number;
+  lunch_fee: number; lunch_paid: number;
+  nap_fee: number; nap_paid: number;
+  after_school_fee: number; after_school_paid: number;
+  club_fee: number; club_paid: number;
+  other_fee: number; other_paid: number;
+  total_fee: number; total_paid: number;
 }
+
+// 日期格式化
+const formatDate = (date: string | null): string => {
+  if (!date) return '';
+  const d = new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+// 获取今天的日期字符串
+const getTodayString = (): string => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+};
 
 export default function Home() {
   // 状态管理
@@ -104,12 +132,12 @@ export default function Home() {
   const [formData, setFormData] = useState({
     className: '',
     studentName: '',
-    tuitionFee: 0,
-    lunchFee: 0,
-    napFee: 0,
-    afterSchoolFee: 0,
-    clubFee: 0,
-    otherFee: 0,
+    tuitionFee: 0, tuitionPaid: 0, tuitionPaidDate: '',
+    lunchFee: 0, lunchPaid: 0, lunchPaidDate: '',
+    napFee: 0, napPaid: 0, napPaidDate: '',
+    afterSchoolFee: 0, afterSchoolPaid: 0, afterSchoolPaidDate: '',
+    clubFee: 0, clubPaid: 0, clubPaidDate: '',
+    otherFee: 0, otherPaid: 0, otherPaidDate: '',
     remark: '',
   });
   
@@ -164,45 +192,49 @@ export default function Home() {
   // 计算费用总计
   const calculateTotals = (): FeeTotals => {
     const totals: FeeTotals = {
-      tuition_fee: 0,
-      lunch_fee: 0,
-      nap_fee: 0,
-      after_school_fee: 0,
-      club_fee: 0,
-      other_fee: 0,
-      total: 0,
+      tuition_fee: 0, tuition_paid: 0,
+      lunch_fee: 0, lunch_paid: 0,
+      nap_fee: 0, nap_paid: 0,
+      after_school_fee: 0, after_school_paid: 0,
+      club_fee: 0, club_paid: 0,
+      other_fee: 0, other_paid: 0,
+      total_fee: 0, total_paid: 0,
     };
     
     students.forEach(student => {
       totals.tuition_fee += student.tuition_fee || 0;
+      totals.tuition_paid += student.tuition_paid || 0;
       totals.lunch_fee += student.lunch_fee || 0;
+      totals.lunch_paid += student.lunch_paid || 0;
       totals.nap_fee += student.nap_fee || 0;
+      totals.nap_paid += student.nap_paid || 0;
       totals.after_school_fee += student.after_school_fee || 0;
+      totals.after_school_paid += student.after_school_paid || 0;
       totals.club_fee += student.club_fee || 0;
+      totals.club_paid += student.club_paid || 0;
       totals.other_fee += student.other_fee || 0;
+      totals.other_paid += student.other_paid || 0;
     });
     
-    totals.total = 
-      totals.tuition_fee + 
-      totals.lunch_fee + 
-      totals.nap_fee + 
-      totals.after_school_fee + 
-      totals.club_fee + 
-      totals.other_fee;
+    totals.total_fee = 
+      totals.tuition_fee + totals.lunch_fee + totals.nap_fee + 
+      totals.after_school_fee + totals.club_fee + totals.other_fee;
+    totals.total_paid = 
+      totals.tuition_paid + totals.lunch_paid + totals.nap_paid + 
+      totals.after_school_paid + totals.club_paid + totals.other_paid;
     
     return totals;
   };
 
   // 计算单个学生总费用
-  const calculateStudentTotal = (student: StudentFee): number => {
-    return (
-      (student.tuition_fee || 0) +
-      (student.lunch_fee || 0) +
-      (student.nap_fee || 0) +
-      (student.after_school_fee || 0) +
-      (student.club_fee || 0) +
-      (student.other_fee || 0)
-    );
+  const calculateStudentTotals = (student: StudentFee) => {
+    const totalFee = 
+      (student.tuition_fee || 0) + (student.lunch_fee || 0) + (student.nap_fee || 0) +
+      (student.after_school_fee || 0) + (student.club_fee || 0) + (student.other_fee || 0);
+    const totalPaid = 
+      (student.tuition_paid || 0) + (student.lunch_paid || 0) + (student.nap_paid || 0) +
+      (student.after_school_paid || 0) + (student.club_paid || 0) + (student.other_paid || 0);
+    return { totalFee, totalPaid };
   };
 
   // 打开新增对话框
@@ -211,12 +243,12 @@ export default function Home() {
     setFormData({
       className: selectedClass,
       studentName: '',
-      tuitionFee: 0,
-      lunchFee: 0,
-      napFee: 0,
-      afterSchoolFee: 0,
-      clubFee: 0,
-      otherFee: 0,
+      tuitionFee: 0, tuitionPaid: 0, tuitionPaidDate: '',
+      lunchFee: 0, lunchPaid: 0, lunchPaidDate: '',
+      napFee: 0, napPaid: 0, napPaidDate: '',
+      afterSchoolFee: 0, afterSchoolPaid: 0, afterSchoolPaidDate: '',
+      clubFee: 0, clubPaid: 0, clubPaidDate: '',
+      otherFee: 0, otherPaid: 0, otherPaidDate: '',
       remark: '',
     });
     setStudentDialogOpen(true);
@@ -228,12 +260,12 @@ export default function Home() {
     setFormData({
       className: student.class_name,
       studentName: student.student_name,
-      tuitionFee: student.tuition_fee || 0,
-      lunchFee: student.lunch_fee || 0,
-      napFee: student.nap_fee || 0,
-      afterSchoolFee: student.after_school_fee || 0,
-      clubFee: student.club_fee || 0,
-      otherFee: student.other_fee || 0,
+      tuitionFee: student.tuition_fee || 0, tuitionPaid: student.tuition_paid || 0, tuitionPaidDate: student.tuition_paid_date || '',
+      lunchFee: student.lunch_fee || 0, lunchPaid: student.lunch_paid || 0, lunchPaidDate: student.lunch_paid_date || '',
+      napFee: student.nap_fee || 0, napPaid: student.nap_paid || 0, napPaidDate: student.nap_paid_date || '',
+      afterSchoolFee: student.after_school_fee || 0, afterSchoolPaid: student.after_school_paid || 0, afterSchoolPaidDate: student.after_school_paid_date || '',
+      clubFee: student.club_fee || 0, clubPaid: student.club_paid || 0, clubPaidDate: student.club_paid_date || '',
+      otherFee: student.other_fee || 0, otherPaid: student.other_paid || 0, otherPaidDate: student.other_paid_date || '',
       remark: student.remark || '',
     });
     setStudentDialogOpen(true);
@@ -262,11 +294,23 @@ export default function Home() {
           className: formData.className,
           studentName: formData.studentName,
           tuitionFee: Number(formData.tuitionFee),
+          tuitionPaid: Number(formData.tuitionPaid),
+          tuitionPaidDate: formData.tuitionPaidDate || null,
           lunchFee: Number(formData.lunchFee),
+          lunchPaid: Number(formData.lunchPaid),
+          lunchPaidDate: formData.lunchPaidDate || null,
           napFee: Number(formData.napFee),
+          napPaid: Number(formData.napPaid),
+          napPaidDate: formData.napPaidDate || null,
           afterSchoolFee: Number(formData.afterSchoolFee),
+          afterSchoolPaid: Number(formData.afterSchoolPaid),
+          afterSchoolPaidDate: formData.afterSchoolPaidDate || null,
           clubFee: Number(formData.clubFee),
+          clubPaid: Number(formData.clubPaid),
+          clubPaidDate: formData.clubPaidDate || null,
           otherFee: Number(formData.otherFee),
+          otherPaid: Number(formData.otherPaid),
+          otherPaidDate: formData.otherPaidDate || null,
           remark: formData.remark || null,
         }),
       });
@@ -309,7 +353,7 @@ export default function Home() {
 
   // 下载导入模板
   const downloadTemplate = () => {
-    const headers = ['班级', '姓名', '学费', '午餐费', '午托费', '课后服务费', '社团费', '其他费用', '备注'];
+    const headers = ['班级', '姓名', '学费应交', '学费已交', '午餐费应交', '午餐费已交', '午托费应交', '午托费已交', '课后服务费应交', '课后服务费已交', '社团费应交', '社团费已交', '其他费用应交', '其他费用已交', '备注'];
     const csvContent = headers.join(',') + '\n';
     
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' });
@@ -354,7 +398,6 @@ export default function Home() {
     setImportData(data);
     setImportDialogOpen(true);
     
-    // 重置文件输入
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -364,17 +407,22 @@ export default function Home() {
   const confirmImport = async () => {
     if (importData.length === 0) return;
     
-    // 转换数据格式
     const formattedData = importData.map(row => ({
-      className: String(row['班级'] || row['class_name'] || ''),
-      studentName: String(row['姓名'] || row['student_name'] || ''),
-      tuitionFee: Number(row['学费'] || row['tuition_fee'] || 0),
-      lunchFee: Number(row['午餐费'] || row['lunch_fee'] || 0),
-      napFee: Number(row['午托费'] || row['nap_fee'] || 0),
-      afterSchoolFee: Number(row['课后服务费'] || row['after_school_fee'] || 0),
-      clubFee: Number(row['社团费'] || row['club_fee'] || 0),
-      otherFee: Number(row['其他费用'] || row['other_fee'] || 0),
-      remark: String(row['备注'] || row['remark'] || ''),
+      className: String(row['班级'] || ''),
+      studentName: String(row['姓名'] || ''),
+      tuitionFee: Number(row['学费应交'] || 0),
+      tuitionPaid: Number(row['学费已交'] || 0),
+      lunchFee: Number(row['午餐费应交'] || 0),
+      lunchPaid: Number(row['午餐费已交'] || 0),
+      napFee: Number(row['午托费应交'] || 0),
+      napPaid: Number(row['午托费已交'] || 0),
+      afterSchoolFee: Number(row['课后服务费应交'] || 0),
+      afterSchoolPaid: Number(row['课后服务费已交'] || 0),
+      clubFee: Number(row['社团费应交'] || 0),
+      clubPaid: Number(row['社团费已交'] || 0),
+      otherFee: Number(row['其他费用应交'] || 0),
+      otherPaid: Number(row['其他费用已交'] || 0),
+      remark: String(row['备注'] || ''),
     }));
     
     try {
@@ -410,22 +458,32 @@ export default function Home() {
       return;
     }
     
-    const headers = ['班级', '姓名', '学费', '午餐费', '午托费', '课后服务费', '社团费', '其他费用', '总计', '备注'];
-    const rows = students.map(student => [
-      student.class_name,
-      student.student_name,
-      student.tuition_fee || 0,
-      student.lunch_fee || 0,
-      student.nap_fee || 0,
-      student.after_school_fee || 0,
-      student.club_fee || 0,
-      student.other_fee || 0,
-      calculateStudentTotal(student),
-      student.remark || '',
-    ]);
+    const headers = ['班级', '姓名', '学费应交', '学费已交', '午餐费应交', '午餐费已交', '午托费应交', '午托费已交', '课后服务费应交', '课后服务费已交', '社团费应交', '社团费已交', '其他费用应交', '其他费用已交', '应交合计', '已交合计', '备注'];
+    const rows = students.map(student => {
+      const { totalFee, totalPaid } = calculateStudentTotals(student);
+      return [
+        student.class_name,
+        student.student_name,
+        student.tuition_fee || 0,
+        student.tuition_paid || 0,
+        student.lunch_fee || 0,
+        student.lunch_paid || 0,
+        student.nap_fee || 0,
+        student.nap_paid || 0,
+        student.after_school_fee || 0,
+        student.after_school_paid || 0,
+        student.club_fee || 0,
+        student.club_paid || 0,
+        student.other_fee || 0,
+        student.other_paid || 0,
+        totalFee,
+        totalPaid,
+        student.remark || '',
+      ];
+    });
     
     const totals = calculateTotals();
-    rows.push(['合计', '', totals.tuition_fee, totals.lunch_fee, totals.nap_fee, totals.after_school_fee, totals.club_fee, totals.other_fee, totals.total, '']);
+    rows.push(['合计', '', totals.tuition_fee, totals.tuition_paid, totals.lunch_fee, totals.lunch_paid, totals.nap_fee, totals.nap_paid, totals.after_school_fee, totals.after_school_paid, totals.club_fee, totals.club_paid, totals.other_fee, totals.other_paid, totals.total_fee, totals.total_paid, '']);
     
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
     
@@ -439,6 +497,26 @@ export default function Home() {
   };
 
   const totals = calculateTotals();
+
+  // 渲染费用单元格（应交/已交格式）
+  const renderFeeCell = (fee: number, paid: number, paidDate: string | null) => {
+    const isPaid = paid > 0;
+    const isFull = paid >= fee && fee > 0;
+    
+    return (
+      <div className="text-right">
+        <div className={isFull ? 'text-green-600 font-medium' : ''}>
+          {fee.toFixed(0)}/{paid.toFixed(0)}
+        </div>
+        {isPaid && paidDate && (
+          <div className="text-xs text-gray-400 flex items-center justify-end gap-1">
+            <Calendar className="h-3 w-3" />
+            {formatDate(paidDate)}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -550,7 +628,7 @@ export default function Home() {
           <CardHeader>
             <CardTitle>费用明细</CardTitle>
             <CardDescription>
-              {selectedClass ? `班级：${selectedClass}` : '请先选择班级'}
+              {selectedClass ? `班级：${selectedClass} | 格式：应交/已交` : '请先选择班级'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -574,62 +652,81 @@ export default function Home() {
                     <TableRow className="bg-gray-50">
                       <TableHead className="font-semibold">序号</TableHead>
                       <TableHead className="font-semibold">姓名</TableHead>
-                      <TableHead className="font-semibold text-right">学费</TableHead>
-                      <TableHead className="font-semibold text-right">午餐费</TableHead>
-                      <TableHead className="font-semibold text-right">午托费</TableHead>
-                      <TableHead className="font-semibold text-right">课后服务费</TableHead>
-                      <TableHead className="font-semibold text-right">社团费</TableHead>
-                      <TableHead className="font-semibold text-right">其他费用</TableHead>
-                      <TableHead className="font-semibold text-right">合计</TableHead>
+                      <TableHead className="font-semibold text-right">学费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right">午餐费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right">午托费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right">课后服务费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right">社团费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right">其他费用<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right">合计<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
                       <TableHead className="font-semibold">备注</TableHead>
                       <TableHead className="font-semibold text-right">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {students.map((student, index) => (
-                      <TableRow key={student.id}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell className="font-medium">{student.student_name}</TableCell>
-                        <TableCell className="text-right">{student.tuition_fee?.toFixed(2) || '0.00'}</TableCell>
-                        <TableCell className="text-right">{student.lunch_fee?.toFixed(2) || '0.00'}</TableCell>
-                        <TableCell className="text-right">{student.nap_fee?.toFixed(2) || '0.00'}</TableCell>
-                        <TableCell className="text-right">{student.after_school_fee?.toFixed(2) || '0.00'}</TableCell>
-                        <TableCell className="text-right">{student.club_fee?.toFixed(2) || '0.00'}</TableCell>
-                        <TableCell className="text-right">{student.other_fee?.toFixed(2) || '0.00'}</TableCell>
-                        <TableCell className="text-right font-semibold text-blue-600">
-                          {calculateStudentTotal(student).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="max-w-[100px] truncate">{student.remark || '-'}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              onClick={() => handleEditStudent(student)}
-                              variant="outline"
-                              size="sm"
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              onClick={() => handleDeleteConfirm(student)}
-                              variant="destructive"
-                              size="sm"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {students.map((student, index) => {
+                      const { totalFee, totalPaid } = calculateStudentTotals(student);
+                      return (
+                        <TableRow key={student.id}>
+                          <TableCell>{index + 1}</TableCell>
+                          <TableCell className="font-medium">{student.student_name}</TableCell>
+                          <TableCell>{renderFeeCell(student.tuition_fee, student.tuition_paid, student.tuition_paid_date)}</TableCell>
+                          <TableCell>{renderFeeCell(student.lunch_fee, student.lunch_paid, student.lunch_paid_date)}</TableCell>
+                          <TableCell>{renderFeeCell(student.nap_fee, student.nap_paid, student.nap_paid_date)}</TableCell>
+                          <TableCell>{renderFeeCell(student.after_school_fee, student.after_school_paid, student.after_school_paid_date)}</TableCell>
+                          <TableCell>{renderFeeCell(student.club_fee, student.club_paid, student.club_paid_date)}</TableCell>
+                          <TableCell>{renderFeeCell(student.other_fee, student.other_paid, student.other_paid_date)}</TableCell>
+                          <TableCell className="text-right font-semibold">
+                            <div className={totalPaid >= totalFee && totalFee > 0 ? 'text-green-600' : 'text-blue-600'}>
+                              {totalFee.toFixed(0)}/{totalPaid.toFixed(0)}
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-[100px] truncate">{student.remark || '-'}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                onClick={() => handleEditStudent(student)}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                onClick={() => handleDeleteConfirm(student)}
+                                variant="destructive"
+                                size="sm"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                     {/* 合计行 */}
                     <TableRow className="bg-blue-50 font-semibold">
                       <TableCell colSpan={2} className="text-center">合计</TableCell>
-                      <TableCell className="text-right text-blue-700">{totals.tuition_fee.toFixed(2)}</TableCell>
-                      <TableCell className="text-right text-blue-700">{totals.lunch_fee.toFixed(2)}</TableCell>
-                      <TableCell className="text-right text-blue-700">{totals.nap_fee.toFixed(2)}</TableCell>
-                      <TableCell className="text-right text-blue-700">{totals.after_school_fee.toFixed(2)}</TableCell>
-                      <TableCell className="text-right text-blue-700">{totals.club_fee.toFixed(2)}</TableCell>
-                      <TableCell className="text-right text-blue-700">{totals.other_fee.toFixed(2)}</TableCell>
-                      <TableCell className="text-right text-blue-700 text-lg">{totals.total.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        <div>{totals.tuition_fee.toFixed(0)}/{totals.tuition_paid.toFixed(0)}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div>{totals.lunch_fee.toFixed(0)}/{totals.lunch_paid.toFixed(0)}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div>{totals.nap_fee.toFixed(0)}/{totals.nap_paid.toFixed(0)}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div>{totals.after_school_fee.toFixed(0)}/{totals.after_school_paid.toFixed(0)}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div>{totals.club_fee.toFixed(0)}/{totals.club_paid.toFixed(0)}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div>{totals.other_fee.toFixed(0)}/{totals.other_paid.toFixed(0)}</div>
+                      </TableCell>
+                      <TableCell className="text-right text-lg text-blue-700">
+                        {totals.total_fee.toFixed(0)}/{totals.total_paid.toFixed(0)}
+                      </TableCell>
                       <TableCell colSpan={2}></TableCell>
                     </TableRow>
                   </TableBody>
@@ -642,13 +739,13 @@ export default function Home() {
 
       {/* 学生表单对话框 */}
       <Dialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {selectedStudent ? '修改学生费用' : '新增学生费用'}
             </DialogTitle>
             <DialogDescription>
-              填写学生费用信息，点击保存完成操作
+              填写学生费用信息。录入已交费金额时，请选择交费日期。
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -670,67 +767,255 @@ export default function Home() {
                 placeholder="请输入学生姓名"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">学费</Label>
-              <Input
-                type="number"
-                value={formData.tuitionFee}
-                onChange={(e) => setFormData({ ...formData, tuitionFee: Number(e.target.value) })}
-                className="col-span-3"
-                placeholder="0.00"
-              />
+            
+            {/* 学费 */}
+            <div className="grid grid-cols-4 items-center gap-4 border-t pt-4">
+              <Label className="text-right font-semibold text-blue-600">学费</Label>
+              <div className="col-span-3 grid grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">应交金额</Label>
+                  <Input
+                    type="number"
+                    value={formData.tuitionFee}
+                    onChange={(e) => setFormData({ ...formData, tuitionFee: Number(e.target.value) })}
+                    placeholder="应交"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">已交金额</Label>
+                  <Input
+                    type="number"
+                    value={formData.tuitionPaid}
+                    onChange={(e) => {
+                      const paid = Number(e.target.value);
+                      setFormData(prev => ({
+                        ...prev,
+                        tuitionPaid: paid,
+                        tuitionPaidDate: paid > 0 && !prev.tuitionPaidDate ? getTodayString() : prev.tuitionPaidDate
+                      }));
+                    }}
+                    placeholder="已交"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">交费日期</Label>
+                  <Input
+                    type="date"
+                    value={formData.tuitionPaidDate}
+                    onChange={(e) => setFormData({ ...formData, tuitionPaidDate: e.target.value })}
+                    disabled={formData.tuitionPaid <= 0}
+                  />
+                </div>
+              </div>
             </div>
+            
+            {/* 午餐费 */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">午餐费</Label>
-              <Input
-                type="number"
-                value={formData.lunchFee}
-                onChange={(e) => setFormData({ ...formData, lunchFee: Number(e.target.value) })}
-                className="col-span-3"
-                placeholder="0.00"
-              />
+              <Label className="text-right font-semibold text-blue-600">午餐费</Label>
+              <div className="col-span-3 grid grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">应交金额</Label>
+                  <Input
+                    type="number"
+                    value={formData.lunchFee}
+                    onChange={(e) => setFormData({ ...formData, lunchFee: Number(e.target.value) })}
+                    placeholder="应交"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">已交金额</Label>
+                  <Input
+                    type="number"
+                    value={formData.lunchPaid}
+                    onChange={(e) => {
+                      const paid = Number(e.target.value);
+                      setFormData(prev => ({
+                        ...prev,
+                        lunchPaid: paid,
+                        lunchPaidDate: paid > 0 && !prev.lunchPaidDate ? getTodayString() : prev.lunchPaidDate
+                      }));
+                    }}
+                    placeholder="已交"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">交费日期</Label>
+                  <Input
+                    type="date"
+                    value={formData.lunchPaidDate}
+                    onChange={(e) => setFormData({ ...formData, lunchPaidDate: e.target.value })}
+                    disabled={formData.lunchPaid <= 0}
+                  />
+                </div>
+              </div>
             </div>
+            
+            {/* 午托费 */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">午托费</Label>
-              <Input
-                type="number"
-                value={formData.napFee}
-                onChange={(e) => setFormData({ ...formData, napFee: Number(e.target.value) })}
-                className="col-span-3"
-                placeholder="0.00"
-              />
+              <Label className="text-right font-semibold text-blue-600">午托费</Label>
+              <div className="col-span-3 grid grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">应交金额</Label>
+                  <Input
+                    type="number"
+                    value={formData.napFee}
+                    onChange={(e) => setFormData({ ...formData, napFee: Number(e.target.value) })}
+                    placeholder="应交"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">已交金额</Label>
+                  <Input
+                    type="number"
+                    value={formData.napPaid}
+                    onChange={(e) => {
+                      const paid = Number(e.target.value);
+                      setFormData(prev => ({
+                        ...prev,
+                        napPaid: paid,
+                        napPaidDate: paid > 0 && !prev.napPaidDate ? getTodayString() : prev.napPaidDate
+                      }));
+                    }}
+                    placeholder="已交"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">交费日期</Label>
+                  <Input
+                    type="date"
+                    value={formData.napPaidDate}
+                    onChange={(e) => setFormData({ ...formData, napPaidDate: e.target.value })}
+                    disabled={formData.napPaid <= 0}
+                  />
+                </div>
+              </div>
             </div>
+            
+            {/* 课后服务费 */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">课后服务费</Label>
-              <Input
-                type="number"
-                value={formData.afterSchoolFee}
-                onChange={(e) => setFormData({ ...formData, afterSchoolFee: Number(e.target.value) })}
-                className="col-span-3"
-                placeholder="0.00"
-              />
+              <Label className="text-right font-semibold text-blue-600">课后服务费</Label>
+              <div className="col-span-3 grid grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">应交金额</Label>
+                  <Input
+                    type="number"
+                    value={formData.afterSchoolFee}
+                    onChange={(e) => setFormData({ ...formData, afterSchoolFee: Number(e.target.value) })}
+                    placeholder="应交"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">已交金额</Label>
+                  <Input
+                    type="number"
+                    value={formData.afterSchoolPaid}
+                    onChange={(e) => {
+                      const paid = Number(e.target.value);
+                      setFormData(prev => ({
+                        ...prev,
+                        afterSchoolPaid: paid,
+                        afterSchoolPaidDate: paid > 0 && !prev.afterSchoolPaidDate ? getTodayString() : prev.afterSchoolPaidDate
+                      }));
+                    }}
+                    placeholder="已交"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">交费日期</Label>
+                  <Input
+                    type="date"
+                    value={formData.afterSchoolPaidDate}
+                    onChange={(e) => setFormData({ ...formData, afterSchoolPaidDate: e.target.value })}
+                    disabled={formData.afterSchoolPaid <= 0}
+                  />
+                </div>
+              </div>
             </div>
+            
+            {/* 社团费 */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">社团费</Label>
-              <Input
-                type="number"
-                value={formData.clubFee}
-                onChange={(e) => setFormData({ ...formData, clubFee: Number(e.target.value) })}
-                className="col-span-3"
-                placeholder="0.00"
-              />
+              <Label className="text-right font-semibold text-blue-600">社团费</Label>
+              <div className="col-span-3 grid grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">应交金额</Label>
+                  <Input
+                    type="number"
+                    value={formData.clubFee}
+                    onChange={(e) => setFormData({ ...formData, clubFee: Number(e.target.value) })}
+                    placeholder="应交"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">已交金额</Label>
+                  <Input
+                    type="number"
+                    value={formData.clubPaid}
+                    onChange={(e) => {
+                      const paid = Number(e.target.value);
+                      setFormData(prev => ({
+                        ...prev,
+                        clubPaid: paid,
+                        clubPaidDate: paid > 0 && !prev.clubPaidDate ? getTodayString() : prev.clubPaidDate
+                      }));
+                    }}
+                    placeholder="已交"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">交费日期</Label>
+                  <Input
+                    type="date"
+                    value={formData.clubPaidDate}
+                    onChange={(e) => setFormData({ ...formData, clubPaidDate: e.target.value })}
+                    disabled={formData.clubPaid <= 0}
+                  />
+                </div>
+              </div>
             </div>
+            
+            {/* 其他费用 */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">其他费用</Label>
-              <Input
-                type="number"
-                value={formData.otherFee}
-                onChange={(e) => setFormData({ ...formData, otherFee: Number(e.target.value) })}
-                className="col-span-3"
-                placeholder="0.00"
-              />
+              <Label className="text-right font-semibold text-blue-600">其他费用</Label>
+              <div className="col-span-3 grid grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">应交金额</Label>
+                  <Input
+                    type="number"
+                    value={formData.otherFee}
+                    onChange={(e) => setFormData({ ...formData, otherFee: Number(e.target.value) })}
+                    placeholder="应交"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">已交金额</Label>
+                  <Input
+                    type="number"
+                    value={formData.otherPaid}
+                    onChange={(e) => {
+                      const paid = Number(e.target.value);
+                      setFormData(prev => ({
+                        ...prev,
+                        otherPaid: paid,
+                        otherPaidDate: paid > 0 && !prev.otherPaidDate ? getTodayString() : prev.otherPaidDate
+                      }));
+                    }}
+                    placeholder="已交"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">交费日期</Label>
+                  <Input
+                    type="date"
+                    value={formData.otherPaidDate}
+                    onChange={(e) => setFormData({ ...formData, otherPaidDate: e.target.value })}
+                    disabled={formData.otherPaid <= 0}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
+            
+            {/* 备注 */}
+            <div className="grid grid-cols-4 items-center gap-4 border-t pt-4">
               <Label className="text-right">备注</Label>
               <Input
                 value={formData.remark}

@@ -59,12 +59,12 @@ export async function POST(request: NextRequest) {
     const {
       className,
       studentName,
-      tuitionFee = 0,
-      lunchFee = 0,
-      napFee = 0,
-      afterSchoolFee = 0,
-      clubFee = 0,
-      otherFee = 0,
+      tuitionFee = 0, tuitionPaid = 0, tuitionPaidDate = null,
+      lunchFee = 0, lunchPaid = 0, lunchPaidDate = null,
+      napFee = 0, napPaid = 0, napPaidDate = null,
+      afterSchoolFee = 0, afterSchoolPaid = 0, afterSchoolPaidDate = null,
+      clubFee = 0, clubPaid = 0, clubPaidDate = null,
+      otherFee = 0, otherPaid = 0, otherPaidDate = null,
       remark = null,
     } = body;
     
@@ -78,19 +78,25 @@ export async function POST(request: NextRequest) {
     
     const stmt = db.prepare(`
       INSERT INTO student_fees 
-      (class_name, student_name, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (class_name, student_name, 
+       tuition_fee, tuition_paid, tuition_paid_date,
+       lunch_fee, lunch_paid, lunch_paid_date,
+       nap_fee, nap_paid, nap_paid_date,
+       after_school_fee, after_school_paid, after_school_paid_date,
+       club_fee, club_paid, club_paid_date,
+       other_fee, other_paid, other_paid_date,
+       remark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
-      className,
-      studentName,
-      tuitionFee,
-      lunchFee,
-      napFee,
-      afterSchoolFee,
-      clubFee,
-      otherFee,
+      className, studentName,
+      tuitionFee, tuitionPaid, tuitionPaidDate,
+      lunchFee, lunchPaid, lunchPaidDate,
+      napFee, napPaid, napPaidDate,
+      afterSchoolFee, afterSchoolPaid, afterSchoolPaidDate,
+      clubFee, clubPaid, clubPaidDate,
+      otherFee, otherPaid, otherPaidDate,
       remark
     );
     
@@ -122,33 +128,39 @@ export async function PUT(request: NextRequest) {
     // 使用事务批量插入
     const insertStmt = db.prepare(`
       INSERT INTO student_fees 
-      (class_name, student_name, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (class_name, student_name, 
+       tuition_fee, tuition_paid, tuition_paid_date,
+       lunch_fee, lunch_paid, lunch_paid_date,
+       nap_fee, nap_paid, nap_paid_date,
+       after_school_fee, after_school_paid, after_school_paid_date,
+       club_fee, club_paid, club_paid_date,
+       other_fee, other_paid, other_paid_date,
+       remark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const insertMany = db.transaction((students: Array<{
       className: string;
       studentName: string;
-      tuitionFee?: number;
-      lunchFee?: number;
-      napFee?: number;
-      afterSchoolFee?: number;
-      clubFee?: number;
-      otherFee?: number;
+      tuitionFee?: number; tuitionPaid?: number; tuitionPaidDate?: string;
+      lunchFee?: number; lunchPaid?: number; lunchPaidDate?: string;
+      napFee?: number; napPaid?: number; napPaidDate?: string;
+      afterSchoolFee?: number; afterSchoolPaid?: number; afterSchoolPaidDate?: string;
+      clubFee?: number; clubPaid?: number; clubPaidDate?: string;
+      otherFee?: number; otherPaid?: number; otherPaidDate?: string;
       remark?: string;
     }>) => {
       for (const student of students) {
         if (!student.className || !student.studentName) continue;
         
         insertStmt.run(
-          student.className,
-          student.studentName,
-          student.tuitionFee || 0,
-          student.lunchFee || 0,
-          student.napFee || 0,
-          student.afterSchoolFee || 0,
-          student.clubFee || 0,
-          student.otherFee || 0,
+          student.className, student.studentName,
+          student.tuitionFee || 0, student.tuitionPaid || 0, student.tuitionPaidDate || null,
+          student.lunchFee || 0, student.lunchPaid || 0, student.lunchPaidDate || null,
+          student.napFee || 0, student.napPaid || 0, student.napPaidDate || null,
+          student.afterSchoolFee || 0, student.afterSchoolPaid || 0, student.afterSchoolPaidDate || null,
+          student.clubFee || 0, student.clubPaid || 0, student.clubPaidDate || null,
+          student.otherFee || 0, student.otherPaid || 0, student.otherPaidDate || null,
           student.remark || null
         );
       }

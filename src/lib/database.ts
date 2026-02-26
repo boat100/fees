@@ -19,18 +19,30 @@ db.pragma('foreign_keys = ON');
 
 // 初始化数据表
 export function initDatabase() {
-  // 创建学生费用表
+  // 创建学生费用表（包含应交费和已交费）
   db.exec(`
     CREATE TABLE IF NOT EXISTS student_fees (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       class_name TEXT NOT NULL,
       student_name TEXT NOT NULL,
       tuition_fee REAL DEFAULT 0,
+      tuition_paid REAL DEFAULT 0,
+      tuition_paid_date TEXT,
       lunch_fee REAL DEFAULT 0,
+      lunch_paid REAL DEFAULT 0,
+      lunch_paid_date TEXT,
       nap_fee REAL DEFAULT 0,
+      nap_paid REAL DEFAULT 0,
+      nap_paid_date TEXT,
       after_school_fee REAL DEFAULT 0,
+      after_school_paid REAL DEFAULT 0,
+      after_school_paid_date TEXT,
       club_fee REAL DEFAULT 0,
+      club_paid REAL DEFAULT 0,
+      club_paid_date TEXT,
       other_fee REAL DEFAULT 0,
+      other_paid REAL DEFAULT 0,
+      other_paid_date TEXT,
       remark TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME

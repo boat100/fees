@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,17 +43,12 @@ import {
   UserPlus, 
   Edit, 
   Trash2, 
-  Upload, 
-  Download, 
   RefreshCw,
   Users,
   DollarSign,
-  FileSpreadsheet,
-  Calendar,
-  AlertCircle,
   ExternalLink,
   CreditCard,
-  AlertTriangle
+  Settings
 } from 'lucide-react';
 import { FEE_ITEMS } from '@/lib/constants';
 
@@ -110,9 +105,7 @@ export default function Home() {
   // 对话框状态
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [batchPaymentDialogOpen, setBatchPaymentDialogOpen] = useState(false);
-  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentFee | null>(null);
   
   // 批量录入状态
@@ -146,10 +139,6 @@ export default function Home() {
   
   // 表单校验警告
   const [formWarnings, setFormWarnings] = useState<Record<string, string>>({});
-  
-  // 导入预览数据
-  const [importData, setImportData] = useState<Array<Record<string, unknown>>>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 获取班级列表
   const fetchClasses = async () => {
@@ -356,151 +345,6 @@ export default function Home() {
     }
   };
 
-  // 下载导入模板
-  const downloadTemplate = () => {
-    const headers = ['班级', '姓名', '性别', '午托状态', '学籍状态', '学费', '午餐费', '午托费', '课后服务费', '社团费', '其他费用', '备注'];
-    const csvContent = headers.join(',') + '\n';
-    
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = '学生费用导入模板.csv';
-    link.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  // 解析CSV文件
-  const parseCSV = (text: string): Array<Record<string, unknown>> => {
-    const lines = text.split('\n').filter(line => line.trim());
-    if (lines.length < 2) return [];
-    
-    const headers = lines[0].split(',').map(h => h.trim());
-    const data: Array<Record<string, unknown>> = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',');
-      if (values.length < 2) continue;
-      
-      const row: Record<string, unknown> = {};
-      headers.forEach((header, index) => {
-        const value = values[index]?.trim() || '';
-        row[header] = value;
-      });
-      data.push(row);
-    }
-    
-    return data;
-  };
-
-  // 处理文件上传
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    
-    const text = await file.text();
-    const data = parseCSV(text);
-    setImportData(data);
-    setImportDialogOpen(true);
-    
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  // 确认导入
-  const confirmImport = async () => {
-    if (importData.length === 0) return;
-    
-    const formattedData = importData.map(row => ({
-      className: String(row['班级'] || ''),
-      studentName: String(row['姓名'] || ''),
-      gender: String(row['性别'] || '男'),
-      napStatus: String(row['午托状态'] || '走读'),
-      enrollmentStatus: String(row['学籍状态'] || '学籍'),
-      tuitionFee: Number(row['学费'] || 0),
-      lunchFee: Number(row['午餐费'] || 0),
-      napFee: Number(row['午托费'] || 0),
-      afterSchoolFee: Number(row['课后服务费'] || 0),
-      clubFee: Number(row['社团费'] || 0),
-      otherFee: Number(row['其他费用'] || 0),
-      remark: String(row['备注'] || ''),
-    }));
-    
-    try {
-      const response = await fetch('/api/student-fees', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ data: formattedData }),
-      });
-      
-      const result = await response.json();
-      
-      if (response.ok) {
-        alert(result.message);
-        setImportDialogOpen(false);
-        setImportData([]);
-        fetchClasses();
-        fetchStudents();
-      } else {
-        alert(result.error || '导入失败');
-      }
-    } catch (error) {
-      console.error('Failed to import data:', error);
-      alert('导入失败');
-    }
-  };
-
-  // 导出数据
-  const exportData = () => {
-    if (students.length === 0) {
-      alert('没有数据可导出');
-      return;
-    }
-    
-    const headers = ['班级', '姓名', '性别', '午托状态', '学籍状态', '学费应交', '学费已交', '午餐费应交', '午餐费已交', '午托费应交', '午托费已交', '课后服务费应交', '课后服务费已交', '社团费应交', '社团费已交', '其他费用应交', '其他费用已交', '应交合计', '已交合计', '备注'];
-    const rows = students.map(student => {
-      const { totalFee, totalPaid } = calculateStudentTotals(student);
-      return [
-        student.class_name,
-        student.student_name,
-        student.gender || '男',
-        student.nap_status || '走读',
-        student.enrollment_status || '学籍',
-        student.tuition_fee || 0,
-        student.tuition_paid || 0,
-        student.lunch_fee || 0,
-        student.lunch_paid || 0,
-        student.nap_fee || 0,
-        student.nap_paid || 0,
-        student.after_school_fee || 0,
-        student.after_school_paid || 0,
-        student.club_fee || 0,
-        student.club_paid || 0,
-        student.other_fee || 0,
-        student.other_paid || 0,
-        totalFee,
-        totalPaid,
-        student.remark || '',
-      ];
-    });
-    
-    const totals = calculateTotals();
-    rows.push(['合计', '', '', '', '', totals.tuition_fee, totals.tuition_paid, totals.lunch_fee, totals.lunch_paid, totals.nap_fee, totals.nap_paid, totals.after_school_fee, totals.after_school_paid, totals.club_fee, totals.club_paid, totals.other_fee, totals.other_paid, totals.total_fee, totals.total_paid, '']);
-    
-    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
-    
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${selectedClass}_费用明细.csv`;
-    link.click();
-    window.URL.revokeObjectURL(url);
-  };
-
   const totals = calculateTotals();
 
   // 渲染费用单元格（应交/已交格式）
@@ -550,45 +394,12 @@ export default function Home() {
               </Button>
               
               <Button
-                onClick={downloadTemplate}
-                variant="outline"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                下载模板
-              </Button>
-              
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                variant="outline"
-                className="border-green-600 text-green-600 hover:bg-green-50"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                批量导入
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              
-              <Button
-                onClick={exportData}
+                onClick={() => router.push('/admin')}
                 variant="outline"
                 className="border-purple-600 text-purple-600 hover:bg-purple-50"
               >
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                导出数据
-              </Button>
-              
-              <Button
-                onClick={() => setDeleteAllDialogOpen(true)}
-                variant="outline"
-                className="border-red-600 text-red-600 hover:bg-red-50"
-              >
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                清空数据
+                <Settings className="h-4 w-4 mr-2" />
+                后台管理
               </Button>
             </nav>
           </div>
@@ -974,63 +785,6 @@ export default function Home() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 导入预览对话框 */}
-      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>导入预览</DialogTitle>
-            <DialogDescription>
-              共解析到 {importData.length} 条数据，确认无误后点击导入
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            {importData.length > 0 ? (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {Object.keys(importData[0]).map((key) => (
-                        <TableHead key={key}>{key}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {importData.slice(0, 10).map((row, index) => (
-                      <TableRow key={index}>
-                        {Object.values(row).map((value, i) => (
-                          <TableCell key={i}>{String(value)}</TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {importData.length > 10 && (
-                  <div className="text-center text-sm text-gray-500 mt-2">
-                    还有 {importData.length - 10} 条数据未显示...
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                没有解析到有效数据
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setImportDialogOpen(false); setImportData([]); }}>
-              取消
-            </Button>
-            <Button 
-              onClick={confirmImport}
-              disabled={importData.length === 0}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              确认导入
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* 批量录入交费对话框 */}
       <Dialog open={batchPaymentDialogOpen} onOpenChange={setBatchPaymentDialogOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
@@ -1244,90 +998,6 @@ export default function Home() {
               disabled={batchPaymentData.selectedStudents.length === 0 || batchPaymentData.payments.filter(p => p.amount > 0).length === 0}
             >
               确认录入
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 清空所有数据对话框 */}
-      <Dialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="h-5 w-5" />
-              ⚠️ 危险操作：清空所有数据
-            </DialogTitle>
-            <DialogDescription>
-              此操作将删除所有学生和交费记录，且无法恢复！
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            {/* 强警告提示 */}
-            <div className="bg-red-100 border-2 border-red-400 rounded-lg p-4 mb-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-6 w-6 text-red-600 flex-shrink-0" />
-                <div>
-                  <p className="font-bold text-red-800 text-lg">⚠️ 警告</p>
-                  <p className="text-red-700 mt-2">
-                    您即将执行<strong>不可逆</strong>的操作！
-                  </p>
-                  <ul className="mt-3 text-sm text-red-700 space-y-1">
-                    <li>• 所有学生信息将被删除</li>
-                    <li>• 所有交费记录将被删除</li>
-                    <li>• 所有班级数据将被清空</li>
-                    <li>• 此操作<strong>无法撤销</strong></li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            
-            {/* 备份提醒 */}
-            <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
-              <p className="text-yellow-800 font-medium">
-                📋 建议操作：请先使用"导出数据"功能备份当前数据！
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteAllDialogOpen(false)}>
-              取消
-            </Button>
-            <Button 
-              onClick={async () => {
-                // 第一次确认
-                if (!confirm('⚠️ 确定要清空所有数据吗？此操作不可撤销！')) return;
-                
-                // 第二次确认
-                const input = prompt('请输入 "确认清空" 以继续：');
-                if (input !== '确认清空') {
-                  if (input !== null) alert('输入不正确，操作已取消');
-                  return;
-                }
-                
-                try {
-                  const response = await fetch('/api/student-fees/all', {
-                    method: 'DELETE',
-                  });
-                  
-                  const result = await response.json();
-                  
-                  if (response.ok) {
-                    alert(result.message || '数据已清空');
-                    setDeleteAllDialogOpen(false);
-                    setClasses([]);
-                    setSelectedClass('');
-                    setStudents([]);
-                  } else {
-                    alert(result.error || '清空失败');
-                  }
-                } catch (error) {
-                  console.error('Failed to delete all:', error);
-                  alert('清空失败');
-                }
-              }}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              确认清空所有数据
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -103,6 +104,10 @@ export default function Home() {
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [students, setStudents] = useState<StudentFee[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  // 操作状态
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   
   // 对话框状态
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
@@ -279,8 +284,52 @@ export default function Home() {
     setDeleteDialogOpen(true);
   };
 
-  // 提交表单
+  // 提交表单（乐观更新）
   const handleSubmit = async () => {
+    setSubmitting(true);
+    
+    // 准备学生数据
+    const studentData = {
+      class_name: formData.className,
+      student_name: formData.studentName,
+      gender: formData.gender,
+      nap_status: (formData.napFee ?? 0) > 0 ? '午托' : '走读',
+      tuition_fee: Number(formData.tuitionFee),
+      lunch_fee: Number(formData.lunchFee),
+      nap_fee: Number(formData.napFee),
+      after_school_fee: Number(formData.afterSchoolFee),
+      club_fee: Number(formData.clubFee),
+      agency_fee: Number(formData.agencyFee) || 600,
+      agency_balance: Number(formData.agencyFee) || 600,
+      tuition_paid: 0,
+      lunch_paid: 0,
+      nap_paid: 0,
+      after_school_paid: 0,
+      club_paid: 0,
+      remark: formData.remark || null,
+      created_at: new Date().toISOString(),
+      updated_at: null,
+    };
+    
+    // 乐观更新：先更新本地状态
+    const previousStudents = [...students];
+    
+    if (selectedStudent) {
+      // 修改：更新本地学生数据
+      setStudents(prev => prev.map(s => 
+        s.id === selectedStudent.id 
+          ? { ...s, ...studentData }
+          : s
+      ));
+    } else {
+      // 新增：临时添加到列表（使用临时ID）
+      const tempId = Date.now();
+      setStudents(prev => [...prev, { id: tempId, ...studentData } as StudentFee]);
+    }
+    
+    setStudentDialogOpen(false);
+    toast.loading(selectedStudent ? '正在修改...' : '正在添加...', { id: 'submit-student' });
+    
     try {
       const url = selectedStudent 
         ? `/api/student-fees/${selectedStudent.id}` 
@@ -306,23 +355,54 @@ export default function Home() {
         }),
       });
       
+      const result = await response.json();
+      
       if (response.ok) {
-        setStudentDialogOpen(false);
-        fetchClasses();
-        fetchStudents();
+        toast.success(selectedStudent ? '修改成功' : '添加成功', { id: 'submit-student' });
+        
+        // 更新班级列表（如果有新班级）
+        if (!classes.includes(formData.className)) {
+          setClasses(prev => [...prev, formData.className].sort());
+        }
+        
+        // 用服务器返回的真实数据更新列表
+        if (selectedStudent) {
+          setStudents(prev => prev.map(s => 
+            s.id === selectedStudent.id 
+              ? { ...s, ...result.data }
+              : s
+          ));
+        } else {
+          // 替换临时数据为真实数据
+          fetchStudents();
+        }
       } else {
-        const error = await response.json();
-        alert(error.error || '操作失败');
+        // 回滚
+        setStudents(previousStudents);
+        toast.error(result.error || '操作失败', { id: 'submit-student' });
       }
     } catch (error) {
       console.error('Failed to save student:', error);
-      alert('保存失败');
+      // 回滚
+      setStudents(previousStudents);
+      toast.error('保存失败，请重试', { id: 'submit-student' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  // 删除学生
+  // 删除学生（乐观更新）
   const handleDelete = async () => {
     if (!selectedStudent) return;
+    
+    setDeleting(true);
+    
+    // 乐观更新：先从本地移除
+    const previousStudents = [...students];
+    setStudents(prev => prev.filter(s => s.id !== selectedStudent.id));
+    setDeleteDialogOpen(false);
+    
+    toast.loading('正在删除...', { id: 'delete-student' });
     
     try {
       const response = await fetch(`/api/student-fees/${selectedStudent.id}`, {
@@ -330,15 +410,20 @@ export default function Home() {
       });
       
       if (response.ok) {
-        setDeleteDialogOpen(false);
-        fetchStudents();
+        toast.success('删除成功', { id: 'delete-student' });
       } else {
-        const error = await response.json();
-        alert(error.error || '删除失败');
+        // 回滚
+        const result = await response.json();
+        setStudents(previousStudents);
+        toast.error(result.error || '删除失败', { id: 'delete-student' });
       }
     } catch (error) {
       console.error('Failed to delete student:', error);
-      alert('删除失败');
+      // 回滚
+      setStudents(previousStudents);
+      toast.error('删除失败，请重试', { id: 'delete-student' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -807,15 +892,15 @@ export default function Home() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setStudentDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setStudentDialogOpen(false)} disabled={submitting}>
               取消
             </Button>
             <Button 
               onClick={handleSubmit}
-              disabled={!formData.className || !formData.studentName}
+              disabled={!formData.className || !formData.studentName || submitting}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              保存
+              {submitting ? '保存中...' : '保存'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -831,12 +916,13 @@ export default function Home() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
+              disabled={deleting}
               className="bg-red-600 hover:bg-red-700"
             >
-              删除
+              {deleting ? '删除中...' : '删除'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

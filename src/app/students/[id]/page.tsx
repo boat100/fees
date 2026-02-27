@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -93,6 +94,11 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [student, setStudent] = useState<StudentDetail | null>(null);
   const [loading, setLoading] = useState(true);
   
+  // 操作状态
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingPayment, setDeletingPayment] = useState<number | null>(null);
+  const [deletingAgencyItem, setDeletingAgencyItem] = useState<number | null>(null);
+  
   // 交费对话框状态
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedFeeType, setSelectedFeeType] = useState<string>('');
@@ -133,11 +139,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         // 同时获取代办费扣除项目
         fetchAgencyFeeItems();
       } else {
-        alert('学生不存在');
+        toast.error('学生不存在');
         router.push('/');
       }
     } catch (error) {
       console.error('Failed to fetch student:', error);
+      toast.error('获取学生信息失败');
     } finally {
       setLoading(false);
     }
@@ -194,19 +201,55 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  // 提交交费记录
+  // 提交交费记录（乐观更新）
   const submitPayment = async () => {
     if (!selectedFeeType || paymentAmount <= 0 || !paymentDate) {
-      alert('请填写完整的交费信息');
+      toast.error('请填写完整的交费信息');
       return;
     }
+    
+    if (!student) return;
+    
+    setSubmitting(true);
+    
+    // 乐观更新：先更新本地状态
+    const tempId = Date.now();
+    const newRecord = {
+      id: tempId,
+      student_id: student.id,
+      fee_type: selectedFeeType,
+      amount: paymentAmount,
+      payment_date: paymentDate,
+      remark: paymentRemark || null,
+      created_at: new Date().toISOString(),
+    };
+    
+    // 更新 paymentRecords 和 paymentsByType
+    const previousStudent = { ...student };
+    setStudent(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        paymentRecords: [newRecord, ...prev.paymentRecords],
+        paymentsByType: {
+          ...prev.paymentsByType,
+          [selectedFeeType]: {
+            records: [newRecord, ...(prev.paymentsByType[selectedFeeType]?.records || [])],
+            total: (prev.paymentsByType[selectedFeeType]?.total || 0) + paymentAmount,
+          },
+        },
+      };
+    });
+    
+    setPaymentDialogOpen(false);
+    toast.loading('正在提交...', { id: 'submit-payment' });
     
     try {
       const response = await fetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentId: student?.id,
+          studentId: student.id,
           feeType: selectedFeeType,
           amount: paymentAmount,
           paymentDate: paymentDate,
@@ -217,21 +260,52 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const result = await response.json();
       
       if (response.ok) {
-        alert(result.message);
-        setPaymentDialogOpen(false);
+        toast.success(result.message || '交费成功', { id: 'submit-payment' });
+        // 用服务器返回的真实数据更新
         fetchStudent();
       } else {
-        alert(result.error || '交费失败');
+        // 回滚
+        setStudent(previousStudent);
+        toast.error(result.error || '交费失败', { id: 'submit-payment' });
       }
     } catch (error) {
       console.error('Failed to submit payment:', error);
-      alert('交费失败');
+      // 回滚
+      setStudent(previousStudent);
+      toast.error('交费失败，请重试', { id: 'submit-payment' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  // 删除交费记录
+  // 删除交费记录（乐观更新）
   const deletePayment = async (recordId: number) => {
-    if (!confirm('确定要删除这条交费记录吗？')) return;
+    if (!student) return;
+    
+    const record = student.paymentRecords.find(r => r.id === recordId);
+    if (!record) return;
+    
+    setDeletingPayment(recordId);
+    
+    // 乐观更新：先从本地移除
+    const previousStudent = { ...student };
+    setStudent(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        paymentRecords: prev.paymentRecords.filter(r => r.id !== recordId),
+        paymentsByType: {
+          ...prev.paymentsByType,
+          [record.fee_type]: {
+            ...prev.paymentsByType[record.fee_type],
+            records: prev.paymentsByType[record.fee_type]?.records.filter(r => r.id !== recordId) || [],
+            total: (prev.paymentsByType[record.fee_type]?.total || 0) - record.amount,
+          },
+        },
+      };
+    });
+    
+    toast.loading('正在删除...', { id: 'delete-payment' });
     
     try {
       const response = await fetch(`/api/payments/${recordId}`, {
@@ -239,30 +313,69 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       });
       
       if (response.ok) {
+        toast.success('删除成功', { id: 'delete-payment' });
+        // 可选：用服务器数据同步
         fetchStudent();
       } else {
+        // 回滚
+        setStudent(previousStudent);
         const result = await response.json();
-        alert(result.error || '删除失败');
+        toast.error(result.error || '删除失败', { id: 'delete-payment' });
       }
     } catch (error) {
       console.error('Failed to delete payment:', error);
-      alert('删除失败');
+      // 回滚
+      setStudent(previousStudent);
+      toast.error('删除失败，请重试', { id: 'delete-payment' });
+    } finally {
+      setDeletingPayment(null);
     }
   };
 
-  // 提交代办费扣除
+  // 提交代办费扣除（乐观更新）
   const submitAgencyFeeItem = async () => {
     if (!agencyFeeItemType || agencyFeeAmount <= 0 || !agencyFeeDate) {
-      alert('请填写完整信息');
+      toast.error('请填写完整信息');
       return;
     }
+    
+    if (!student) return;
+    
+    setSubmitting(true);
+    
+    // 乐观更新：先更新本地状态
+    const tempId = Date.now();
+    const newItem = {
+      id: tempId,
+      student_id: student.id,
+      item_type: agencyFeeItemType,
+      amount: agencyFeeAmount,
+      item_date: agencyFeeDate,
+      remark: agencyFeeRemark || null,
+    };
+    
+    const previousAgencyItems = [...agencyFeeItems];
+    const previousStudent = { ...student };
+    
+    setAgencyFeeItems(prev => [newItem, ...prev]);
+    setStudent(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        agencyUsed: (prev.agencyUsed || 0) + agencyFeeAmount,
+        agencyBalance: (prev.agencyBalance || prev.agency_fee || 600) - agencyFeeAmount,
+      };
+    });
+    
+    setAgencyFeeDialogOpen(false);
+    toast.loading('正在提交...', { id: 'submit-agency' });
     
     try {
       const response = await fetch('/api/agency-fee-items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentId: student?.id,
+          studentId: student.id,
           itemType: agencyFeeItemType,
           amount: agencyFeeAmount,
           deductDate: agencyFeeDate,
@@ -273,28 +386,55 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const result = await response.json();
       
       if (response.ok) {
-        alert(result.message);
-        setAgencyFeeDialogOpen(false);
+        toast.success(result.message || '添加成功', { id: 'submit-agency' });
         setAgencyFeeItemType('');
         setAgencyFeeAmount(0);
         setAgencyFeeDate('');
         setAgencyFeeRemark('');
+        // 用服务器数据同步
         fetchStudent();
         fetchAgencyFeeItems();
       } else {
-        alert(result.error || '添加失败');
+        // 回滚
+        setAgencyFeeItems(previousAgencyItems);
+        setStudent(previousStudent);
+        toast.error(result.error || '添加失败', { id: 'submit-agency' });
       }
     } catch (error) {
       console.error('Failed to add agency fee item:', error);
-      alert('添加失败');
+      // 回滚
+      setAgencyFeeItems(previousAgencyItems);
+      setStudent(previousStudent);
+      toast.error('添加失败，请重试', { id: 'submit-agency' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  // 删除代办费扣除
+  // 删除代办费扣除（乐观更新）
   const deleteAgencyFeeItem = async (id: number) => {
-    if (!confirm('确定要删除这条扣除记录吗？')) {
-      return;
-    }
+    if (!student) return;
+    
+    const item = agencyFeeItems.find(i => i.id === id);
+    if (!item) return;
+    
+    setDeletingAgencyItem(id);
+    
+    // 乐观更新
+    const previousAgencyItems = [...agencyFeeItems];
+    const previousStudent = { ...student };
+    
+    setAgencyFeeItems(prev => prev.filter(i => i.id !== id));
+    setStudent(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        agencyUsed: (prev.agencyUsed || 0) - item.amount,
+        agencyBalance: (prev.agencyBalance || prev.agency_fee || 600) + item.amount,
+      };
+    });
+    
+    toast.loading('正在删除...', { id: 'delete-agency' });
     
     try {
       const response = await fetch(`/api/agency-fee-items?id=${id}`, {
@@ -302,15 +442,25 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       });
       
       if (response.ok) {
+        toast.success('删除成功', { id: 'delete-agency' });
+        // 可选：用服务器数据同步
         fetchStudent();
         fetchAgencyFeeItems();
       } else {
+        // 回滚
+        setAgencyFeeItems(previousAgencyItems);
+        setStudent(previousStudent);
         const result = await response.json();
-        alert(result.error || '删除失败');
+        toast.error(result.error || '删除失败', { id: 'delete-agency' });
       }
     } catch (error) {
       console.error('Failed to delete agency fee item:', error);
-      alert('删除失败');
+      // 回滚
+      setAgencyFeeItems(previousAgencyItems);
+      setStudent(previousStudent);
+      toast.error('删除失败，请重试', { id: 'delete-agency' });
+    } finally {
+      setDeletingAgencyItem(null);
     }
   };
 
@@ -590,8 +740,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       variant="ghost"
                       className="text-red-500 hover:text-red-700 hover:bg-red-50"
                       onClick={() => deletePayment(record.id)}
+                      disabled={deletingPayment === record.id}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className={`h-4 w-4 ${deletingPayment === record.id ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
                 ))}
@@ -640,8 +791,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                           variant="ghost"
                           className="text-red-500 hover:text-red-700 hover:bg-red-50"
                           onClick={() => deleteAgencyFeeItem(item.id)}
+                          disabled={deletingAgencyItem === item.id}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className={`h-4 w-4 ${deletingAgencyItem === item.id ? 'animate-spin' : ''}`} />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -719,15 +871,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setPaymentDialogOpen(false)} disabled={submitting}>
               取消
             </Button>
             <Button 
               onClick={submitPayment}
-              disabled={paymentAmount <= 0 || !paymentDate}
+              disabled={paymentAmount <= 0 || !paymentDate || submitting}
               className="bg-green-600 hover:bg-green-700"
             >
-              确认交费
+              {submitting ? '提交中...' : '确认交费'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -932,15 +1084,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAgencyFeeDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setAgencyFeeDialogOpen(false)} disabled={submitting}>
               取消
             </Button>
             <Button 
               onClick={submitAgencyFeeItem}
-              disabled={!agencyFeeItemType || agencyFeeAmount <= 0 || !agencyFeeDate}
+              disabled={!agencyFeeItemType || agencyFeeAmount <= 0 || !agencyFeeDate || submitting}
               className="bg-purple-600 hover:bg-purple-700"
             >
-              确认扣除
+              {submitting ? '提交中...' : '确认扣除'}
             </Button>
           </DialogFooter>
         </DialogContent>

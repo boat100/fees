@@ -59,7 +59,7 @@ export default function AdminPage() {
 
   // 下载导入模板
   const downloadTemplate = () => {
-    const headers = ['班级', '姓名', '性别', '午托状态', '学籍状态', '学费', '午餐费', '午托费', '课后服务费', '社团费', '其他费用', '备注'];
+    const headers = ['班级', '姓名', '性别', '学费', '午餐费', '午托费', '课后服务费', '社团费', '其他费用', '备注'];
     const csvContent = headers.join(',') + '\n';
     
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' });
@@ -117,8 +117,6 @@ export default function AdminPage() {
       className: String(row['班级'] || ''),
       studentName: String(row['姓名'] || ''),
       gender: String(row['性别'] || '男'),
-      napStatus: String(row['午托状态'] || '走读'),
-      enrollmentStatus: String(row['学籍状态'] || '学籍'),
       tuitionFee: Number(row['学费'] || 0),
       lunchFee: Number(row['午餐费'] || 0),
       napFee: Number(row['午托费'] || 0),
@@ -194,7 +192,7 @@ export default function AdminPage() {
       });
       
       // 生成CSV
-      const headers = ['班级', '姓名', '性别', '午托状态', '学籍状态', '学费应交', '学费已交', '午餐费应交', '午餐费已交', '午托费应交', '午托费已交', '课后服务费应交', '课后服务费已交', '社团费应交', '社团费已交', '其他费用应交', '其他费用已交', '应交合计', '已交合计', '备注'];
+      const headers = ['班级', '姓名', '性别', '午托状态', '学费应交', '学费已交', '午餐费应交', '午餐费已交', '午托费应交', '午托费已交', '课后服务费应交', '课后服务费已交', '社团费应交', '社团费已交', '其他费用应交', '其他费用已交', '应交合计', '已交合计', '备注'];
       
       const rows: string[][] = [];
       
@@ -208,8 +206,7 @@ export default function AdminPage() {
             student.class_name,
             student.student_name,
             student.gender || '男',
-            student.nap_status || '走读',
-            student.enrollment_status || '学籍',
+            (student.nap_fee || 0) > 0 ? '午托' : '走读',
             String(student.tuition_fee || 0),
             String(student.tuition_paid || 0),
             String(student.lunch_fee || 0),
@@ -234,11 +231,11 @@ export default function AdminPage() {
           classTotalFee += totalFee;
           classTotalPaid += totalPaid;
         });
-        rows.push(['小计', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', String(classTotalFee), String(classTotalPaid), '']);
+        rows.push(['小计', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', String(classTotalFee), String(classTotalPaid), '']);
         rows.push([]);
       });
       
-      rows.push(['总合计', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', String(grandTotalFee), String(grandTotalPaid), '']);
+      rows.push(['总合计', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', String(grandTotalFee), String(grandTotalPaid), '']);
       
       const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
       

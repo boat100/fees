@@ -91,8 +91,6 @@ export async function PUT(
       className,
       studentName,
       gender,
-      napStatus,
-      enrollmentStatus,
       tuitionFee,
       lunchFee,
       napFee,
@@ -102,9 +100,12 @@ export async function PUT(
       remark,
     } = body;
     
+    // 根据午托费自动判断午托状态
+    const napStatus = (napFee ?? 0) > 0 ? '午托' : '走读';
+    
     const stmt = db.prepare(`
       UPDATE student_fees 
-      SET class_name = ?, student_name = ?, gender = ?, nap_status = ?, enrollment_status = ?,
+      SET class_name = ?, student_name = ?, gender = ?, nap_status = ?,
           tuition_fee = ?, lunch_fee = ?, nap_fee = ?, 
           after_school_fee = ?, club_fee = ?, other_fee = ?,
           remark = ?, updated_at = ?
@@ -115,8 +116,7 @@ export async function PUT(
       className,
       studentName,
       gender ?? '男',
-      napStatus ?? '走读',
-      enrollmentStatus ?? '学籍',
+      napStatus,
       tuitionFee ?? 0,
       lunchFee ?? 0,
       napFee ?? 0,

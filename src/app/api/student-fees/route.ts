@@ -101,8 +101,6 @@ export async function POST(request: NextRequest) {
       className,
       studentName,
       gender = '男',
-      napStatus = '走读',
-      enrollmentStatus = '学籍',
       tuitionFee = 0,
       lunchFee = 0,
       napFee = 0,
@@ -120,10 +118,13 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // 根据午托费自动判断午托状态
+    const napStatus = napFee > 0 ? '午托' : '走读';
+    
     const stmt = db.prepare(`
       INSERT INTO student_fees 
-      (class_name, student_name, gender, nap_status, enrollment_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
@@ -131,7 +132,6 @@ export async function POST(request: NextRequest) {
       studentName,
       gender,
       napStatus,
-      enrollmentStatus,
       tuitionFee,
       lunchFee,
       napFee,
@@ -171,13 +171,13 @@ export async function PUT(request: NextRequest) {
     
     const insertStmt = db.prepare(`
       INSERT INTO student_fees 
-      (class_name, student_name, gender, nap_status, enrollment_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const updateStmt = db.prepare(`
       UPDATE student_fees 
-      SET gender = ?, nap_status = ?, enrollment_status = ?, 
+      SET gender = ?, nap_status = ?, 
           tuition_fee = ?, lunch_fee = ?, nap_fee = ?, 
           after_school_fee = ?, club_fee = ?, other_fee = ?, remark = ?, updated_at = CURRENT_TIMESTAMP
       WHERE class_name = ? AND student_name = ?
@@ -187,8 +187,6 @@ export async function PUT(request: NextRequest) {
       className: string;
       studentName: string;
       gender?: string;
-      napStatus?: string;
-      enrollmentStatus?: string;
       tuitionFee?: number;
       lunchFee?: number;
       napFee?: number;
@@ -200,6 +198,9 @@ export async function PUT(request: NextRequest) {
       for (const student of students) {
         if (!student.className || !student.studentName) continue;
         
+        // 根据午托费自动判断午托状态
+        const napStatus = (student.napFee || 0) > 0 ? '午托' : '走读';
+        
         // 检查学生是否已存在
         const existing = db.prepare(
           'SELECT id FROM student_fees WHERE class_name = ? AND student_name = ?'
@@ -209,8 +210,7 @@ export async function PUT(request: NextRequest) {
           // 更新已存在学生
           updateStmt.run(
             student.gender || '男',
-            student.napStatus || '走读',
-            student.enrollmentStatus || '学籍',
+            napStatus,
             student.tuitionFee || 0,
             student.lunchFee || 0,
             student.napFee || 0,
@@ -228,8 +228,7 @@ export async function PUT(request: NextRequest) {
             student.className,
             student.studentName,
             student.gender || '男',
-            student.napStatus || '走读',
-            student.enrollmentStatus || '学籍',
+            napStatus,
             student.tuitionFee || 0,
             student.lunchFee || 0,
             student.napFee || 0,

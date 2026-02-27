@@ -280,16 +280,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               <div>
                 <Label className="text-gray-500">午托状态</Label>
                 <div className="font-semibold">
-                  <span className={`text-xs px-2 py-1 rounded ${(student.nap_status || '走读') === '午托' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                    {student.nap_status || '走读'}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <Label className="text-gray-500">学籍状态</Label>
-                <div className="font-semibold">
-                  <span className={`text-xs px-2 py-1 rounded ${(student.enrollment_status || '学籍') === '学籍' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
-                    {student.enrollment_status || '学籍'}
+                  <span className={`text-xs px-2 py-1 rounded ${student.nap_fee > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                    {student.nap_fee > 0 ? '午托' : '走读'}
                   </span>
                 </div>
               </div>

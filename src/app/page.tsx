@@ -126,7 +126,6 @@ export default function Home() {
     className: '',
     studentName: '',
     gender: '男',
-    napStatus: '走读',
     tuitionFee: 0,
     lunchFee: 0,
     napFee: 0,
@@ -238,7 +237,6 @@ export default function Home() {
       className: selectedClass,
       studentName: '',
       gender: '男',
-      napStatus: '走读',
       tuitionFee: 0,
       lunchFee: 0,
       napFee: 0,
@@ -258,7 +256,6 @@ export default function Home() {
       className: student.class_name,
       studentName: student.student_name,
       gender: student.gender || '男',
-      napStatus: student.nap_status || '走读',
       tuitionFee: student.tuition_fee || 0,
       lunchFee: student.lunch_fee || 0,
       napFee: student.nap_fee || 0,
@@ -294,7 +291,6 @@ export default function Home() {
           className: formData.className,
           studentName: formData.studentName,
           gender: formData.gender,
-          napStatus: formData.napStatus,
           tuitionFee: Number(formData.tuitionFee),
           lunchFee: Number(formData.lunchFee),
           napFee: Number(formData.napFee),
@@ -515,8 +511,8 @@ export default function Home() {
                           </TableCell>
                           <TableCell className="text-center">{student.gender || '男'}</TableCell>
                           <TableCell className="text-center">
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${(student.nap_status || '走读') === '午托' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                              {student.nap_status || '走读'}
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${student.nap_fee > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                              {student.nap_fee > 0 ? '午托' : '走读'}
                             </span>
                           </TableCell>
                           <TableCell>{renderFeeCell(student.tuition_fee, student.tuition_paid)}</TableCell>
@@ -627,20 +623,6 @@ export default function Home() {
                 <SelectContent>
                   <SelectItem value="男">男</SelectItem>
                   <SelectItem value="女">女</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {/* 午托状态 */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">午托状态</Label>
-              <Select value={formData.napStatus} onValueChange={(value) => setFormData({ ...formData, napStatus: value })}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="请选择午托状态" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="午托">午托</SelectItem>
-                  <SelectItem value="走读">走读</SelectItem>
                 </SelectContent>
               </Select>
             </div>

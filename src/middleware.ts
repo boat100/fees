@@ -18,10 +18,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 检查登录状态
+  // 检查登录状态 - 同时检查 request.cookies 和 cookie header
   const authToken = request.cookies.get('auth_token');
   
-  if (!authToken || authToken.value !== 'authenticated') {
+  // 备用方案：从 cookie header 直接解析
+  const cookieHeader = request.headers.get('cookie') || '';
+  const hasAuthToken = cookieHeader.includes('auth_token=authenticated');
+  
+  if ((!authToken || authToken.value !== 'authenticated') && !hasAuthToken) {
     // 未登录，重定向到登录页
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);

@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 // 管理员账户配置
@@ -15,9 +15,14 @@ export function validateCredentials(username: string, password: string): boolean
 // 设置登录 cookie
 export async function setAuthCookie(): Promise<void> {
   const cookieStore = await cookies();
+  // 判断是否是 HTTPS 环境
+  const headersList = await headers();
+  const protocol = headersList.get('x-forwarded-proto') || 'http';
+  const isSecure = protocol === 'https' || process.env.NODE_ENV === 'production';
+  
   cookieStore.set('auth_token', 'authenticated', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecure,
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 7, // 7 days
     path: '/',
@@ -34,7 +39,15 @@ export async function clearAuthCookie(): Promise<void> {
 export async function isAuthenticated(): Promise<boolean> {
   const cookieStore = await cookies();
   const token = cookieStore.get('auth_token');
-  return token?.value === 'authenticated';
+  
+  if (token?.value === 'authenticated') {
+    return true;
+  }
+  
+  // 备用方案：从 header 直接读取
+  const headersList = await headers();
+  const cookieHeader = headersList.get('cookie') || '';
+  return cookieHeader.includes('auth_token=authenticated');
 }
 
 // 获取当前用户信息

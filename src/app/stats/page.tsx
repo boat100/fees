@@ -18,7 +18,8 @@ import {
   TrendingUp, 
   RefreshCw,
   Users,
-  DollarSign
+  DollarSign,
+  Download
 } from 'lucide-react';
 
 // 类型定义
@@ -75,6 +76,7 @@ export default function StatsPage() {
   const router = useRouter();
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState<string | null>(null);
 
   // 获取统计数据
   const fetchStatistics = async () => {
@@ -89,6 +91,37 @@ export default function StatsPage() {
       console.error('Failed to fetch statistics:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 导出统计数据
+  const handleExport = async (type: 'class' | 'month') => {
+    setExporting(type);
+    try {
+      const response = await fetch(`/api/export/stats?type=${type}`);
+      if (!response.ok) {
+        throw new Error('导出失败');
+      }
+      
+      // 获取文件 blob
+      const blob = await response.blob();
+      
+      // 创建下载链接
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = type === 'class' ? '班级费用统计.xlsx' : '月度费用统计.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      
+      // 清理
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('导出失败，请重试');
+    } finally {
+      setExporting(null);
     }
   };
 
@@ -118,6 +151,30 @@ export default function StatsPage() {
                 disabled={loading}
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button
+                onClick={() => handleExport('class')}
+                variant="outline"
+                disabled={exporting !== null || loading}
+              >
+                {exporting === 'class' ? (
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                导出班级统计
+              </Button>
+              <Button
+                onClick={() => handleExport('month')}
+                variant="outline"
+                disabled={exporting !== null || loading}
+              >
+                {exporting === 'month' ? (
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                导出月度统计
               </Button>
               <Button
                 onClick={() => router.push('/')}

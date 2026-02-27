@@ -60,7 +60,6 @@ interface StudentFee {
   student_name: string;
   gender: string;
   nap_status: string;
-  enrollment_status: string;
   tuition_fee: number;
   tuition_paid: number;
   lunch_fee: number;
@@ -128,7 +127,6 @@ export default function Home() {
     studentName: '',
     gender: '男',
     napStatus: '走读',
-    enrollmentStatus: '学籍',
     tuitionFee: 0,
     lunchFee: 0,
     napFee: 0,
@@ -241,7 +239,6 @@ export default function Home() {
       studentName: '',
       gender: '男',
       napStatus: '走读',
-      enrollmentStatus: '学籍',
       tuitionFee: 0,
       lunchFee: 0,
       napFee: 0,
@@ -262,7 +259,6 @@ export default function Home() {
       studentName: student.student_name,
       gender: student.gender || '男',
       napStatus: student.nap_status || '走读',
-      enrollmentStatus: student.enrollment_status || '学籍',
       tuitionFee: student.tuition_fee || 0,
       lunchFee: student.lunch_fee || 0,
       napFee: student.nap_fee || 0,
@@ -299,7 +295,6 @@ export default function Home() {
           studentName: formData.studentName,
           gender: formData.gender,
           napStatus: formData.napStatus,
-          enrollmentStatus: formData.enrollmentStatus,
           tuitionFee: Number(formData.tuitionFee),
           lunchFee: Number(formData.lunchFee),
           napFee: Number(formData.napFee),
@@ -492,7 +487,6 @@ export default function Home() {
                       <TableHead className="font-semibold">姓名</TableHead>
                       <TableHead className="font-semibold text-center">性别</TableHead>
                       <TableHead className="font-semibold text-center">午托</TableHead>
-                      <TableHead className="font-semibold text-center">学籍</TableHead>
                       <TableHead className="font-semibold text-right">学费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
                       <TableHead className="font-semibold text-right">午餐费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
                       <TableHead className="font-semibold text-right">午托费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
@@ -523,11 +517,6 @@ export default function Home() {
                           <TableCell className="text-center">
                             <span className={`text-xs px-1.5 py-0.5 rounded ${(student.nap_status || '走读') === '午托' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
                               {student.nap_status || '走读'}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${(student.enrollment_status || '学籍') === '学籍' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
-                              {student.enrollment_status || '学籍'}
                             </span>
                           </TableCell>
                           <TableCell>{renderFeeCell(student.tuition_fee, student.tuition_paid)}</TableCell>
@@ -565,7 +554,7 @@ export default function Home() {
                     })}
                     {/* 合计行 */}
                     <TableRow className="bg-blue-50 font-semibold">
-                      <TableCell colSpan={5} className="text-center">合计</TableCell>
+                      <TableCell colSpan={4} className="text-center">合计</TableCell>
                       <TableCell className="text-right">
                         <div>{totals.tuition_fee.toFixed(0)}/{totals.tuition_paid.toFixed(0)}</div>
                       </TableCell>
@@ -652,20 +641,6 @@ export default function Home() {
                 <SelectContent>
                   <SelectItem value="午托">午托</SelectItem>
                   <SelectItem value="走读">走读</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {/* 学籍状态 */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">学籍状态</Label>
-              <Select value={formData.enrollmentStatus} onValueChange={(value) => setFormData({ ...formData, enrollmentStatus: value })}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="请选择学籍状态" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="学籍">学籍</SelectItem>
-                  <SelectItem value="借读">借读</SelectItem>
                 </SelectContent>
               </Select>
             </div>

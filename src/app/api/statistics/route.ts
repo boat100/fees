@@ -230,11 +230,49 @@ export async function GET() {
       }
     });
 
+    // 5. 各班级各项目参与人数统计
+    const classProjectStats = db.prepare(`
+      SELECT 
+        sf.class_name,
+        COUNT(*) as total_students,
+        SUM(CASE WHEN sf.tuition_fee > 0 THEN 1 ELSE 0 END) as tuition_count,
+        SUM(CASE WHEN sf.lunch_fee > 0 THEN 1 ELSE 0 END) as lunch_count,
+        SUM(CASE WHEN sf.nap_fee > 0 THEN 1 ELSE 0 END) as nap_count,
+        SUM(CASE WHEN sf.after_school_fee > 0 THEN 1 ELSE 0 END) as after_school_count,
+        SUM(CASE WHEN sf.club_fee > 0 THEN 1 ELSE 0 END) as club_count,
+        SUM(CASE WHEN sf.other_fee > 0 THEN 1 ELSE 0 END) as other_count
+      FROM student_fees sf
+      GROUP BY sf.class_name
+      ORDER BY sf.class_name
+    `).all() as Array<{
+      class_name: string;
+      total_students: number;
+      tuition_count: number;
+      lunch_count: number;
+      nap_count: number;
+      after_school_count: number;
+      club_count: number;
+      other_count: number;
+    }>;
+
+    // 6. 全校各项目参与人数统计
+    const schoolProjectStats = {
+      total_students: studentPayments.length,
+      tuition: completionStats.tuition.total,
+      lunch: completionStats.lunch.total,
+      nap: completionStats.nap.total,
+      after_school: completionStats.after_school.total,
+      club: completionStats.club.total,
+      other: completionStats.other.total,
+    };
+
     return NextResponse.json({
       classStats: classStatsWithTotals,
       monthlyStats: Object.values(monthlyData).sort((a, b) => b.month.localeCompare(a.month)),
       schoolTotal,
       completionStats,
+      classProjectStats,
+      schoolProjectStats,
     });
   } catch (error) {
     console.error('Error fetching statistics:', error);

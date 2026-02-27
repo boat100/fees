@@ -76,11 +76,34 @@ interface CompletionStats {
   other: { total: number; completed: number };
 }
 
+interface ClassProjectStats {
+  class_name: string;
+  total_students: number;
+  tuition_count: number;
+  lunch_count: number;
+  nap_count: number;
+  after_school_count: number;
+  club_count: number;
+  other_count: number;
+}
+
+interface SchoolProjectStats {
+  total_students: number;
+  tuition: number;
+  lunch: number;
+  nap: number;
+  after_school: number;
+  club: number;
+  other: number;
+}
+
 interface Statistics {
   classStats: ClassStat[];
   monthlyStats: MonthlyStat[];
   schoolTotal: SchoolTotal;
   completionStats: CompletionStats;
+  classProjectStats: ClassProjectStats[];
+  schoolProjectStats: SchoolProjectStats;
 }
 
 export default function StatsPage() {
@@ -353,6 +376,138 @@ export default function StatsPage() {
                     );
                   })}
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* 全校各项目参与人数统计 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-blue-600" />
+                  全校各项目参与人数
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                  <div className="bg-blue-50 rounded-lg p-4 text-center">
+                    <div className="font-semibold text-gray-700 mb-2">学生总数</div>
+                    <div className="text-3xl font-bold text-blue-600">
+                      {statistics.schoolProjectStats.total_students}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">人</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 text-center">
+                    <div className="font-semibold text-gray-700 mb-2">学费</div>
+                    <div className="text-3xl font-bold text-green-600">
+                      {statistics.schoolProjectStats.tuition}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">人参与</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 text-center">
+                    <div className="font-semibold text-gray-700 mb-2">午餐费</div>
+                    <div className="text-3xl font-bold text-orange-600">
+                      {statistics.schoolProjectStats.lunch}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">人参与</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 text-center">
+                    <div className="font-semibold text-gray-700 mb-2">午托费</div>
+                    <div className="text-3xl font-bold text-purple-600">
+                      {statistics.schoolProjectStats.nap}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">人参与</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 text-center">
+                    <div className="font-semibold text-gray-700 mb-2">课后服务</div>
+                    <div className="text-3xl font-bold text-teal-600">
+                      {statistics.schoolProjectStats.after_school}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">人参与</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 text-center">
+                    <div className="font-semibold text-gray-700 mb-2">社团费</div>
+                    <div className="text-3xl font-bold text-pink-600">
+                      {statistics.schoolProjectStats.club}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">人参与</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 text-center">
+                    <div className="font-semibold text-gray-700 mb-2">其他</div>
+                    <div className="text-3xl font-bold text-gray-600">
+                      {statistics.schoolProjectStats.other}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">人参与</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 各班级各项目参与人数统计 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-purple-600" />
+                  各班级各项目参与人数
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {statistics.classProjectStats.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">暂无数据</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-gray-50">
+                          <TableHead className="font-semibold">班级</TableHead>
+                          <TableHead className="font-semibold text-center">学生数</TableHead>
+                          <TableHead className="font-semibold text-center">学费</TableHead>
+                          <TableHead className="font-semibold text-center">午餐费</TableHead>
+                          <TableHead className="font-semibold text-center">午托费</TableHead>
+                          <TableHead className="font-semibold text-center">课后服务</TableHead>
+                          <TableHead className="font-semibold text-center">社团费</TableHead>
+                          <TableHead className="font-semibold text-center">其他</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {statistics.classProjectStats.map((stat) => (
+                          <TableRow key={stat.class_name} className="hover:bg-gray-50">
+                            <TableCell className="font-medium">{stat.class_name}</TableCell>
+                            <TableCell className="text-center font-semibold">{stat.total_students}</TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-green-600 font-medium">{stat.tuition_count}</span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-orange-600 font-medium">{stat.lunch_count}</span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-purple-600 font-medium">{stat.nap_count}</span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-teal-600 font-medium">{stat.after_school_count}</span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-pink-600 font-medium">{stat.club_count}</span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-gray-600 font-medium">{stat.other_count}</span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {/* 合计行 */}
+                        <TableRow className="bg-blue-50 font-semibold">
+                          <TableCell>全校合计</TableCell>
+                          <TableCell className="text-center">{statistics.schoolProjectStats.total_students}</TableCell>
+                          <TableCell className="text-center text-green-600">{statistics.schoolProjectStats.tuition}</TableCell>
+                          <TableCell className="text-center text-orange-600">{statistics.schoolProjectStats.lunch}</TableCell>
+                          <TableCell className="text-center text-purple-600">{statistics.schoolProjectStats.nap}</TableCell>
+                          <TableCell className="text-center text-teal-600">{statistics.schoolProjectStats.after_school}</TableCell>
+                          <TableCell className="text-center text-pink-600">{statistics.schoolProjectStats.club}</TableCell>
+                          <TableCell className="text-center text-gray-600">{statistics.schoolProjectStats.other}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

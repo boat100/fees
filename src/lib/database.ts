@@ -47,7 +47,6 @@ export function initDatabase() {
       student_name TEXT NOT NULL,
       gender TEXT DEFAULT '男',
       nap_status TEXT DEFAULT '走读',
-      enrollment_status TEXT DEFAULT '学籍',
       tuition_fee REAL DEFAULT 0,
       lunch_fee REAL DEFAULT 0,
       nap_fee REAL DEFAULT 0,
@@ -94,9 +93,49 @@ export function initDatabase() {
     db.exec('ALTER TABLE student_fees ADD COLUMN nap_status TEXT DEFAULT \'走读\'');
     console.log('Added nap_status column');
   }
-  if (!existingColumns.includes('enrollment_status')) {
-    db.exec('ALTER TABLE student_fees ADD COLUMN enrollment_status TEXT DEFAULT \'学籍\'');
-    console.log('Added enrollment_status column');
+
+  // 删除 enrollment_status 字段（需要重建表）
+  if (existingColumns.includes('enrollment_status')) {
+    console.log('Removing enrollment_status column...');
+    
+    // 创建临时表
+    db.exec(`
+      CREATE TABLE student_fees_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        class_name TEXT NOT NULL,
+        student_name TEXT NOT NULL,
+        gender TEXT DEFAULT '男',
+        nap_status TEXT DEFAULT '走读',
+        tuition_fee REAL DEFAULT 0,
+        lunch_fee REAL DEFAULT 0,
+        nap_fee REAL DEFAULT 0,
+        after_school_fee REAL DEFAULT 0,
+        club_fee REAL DEFAULT 0,
+        other_fee REAL DEFAULT 0,
+        remark TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME
+      )
+    `);
+    
+    // 复制数据（不包含 enrollment_status）
+    db.exec(`
+      INSERT INTO student_fees_new (id, class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark, created_at, updated_at)
+      SELECT id, class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark, created_at, updated_at
+      FROM student_fees
+    `);
+    
+    // 删除旧表
+    db.exec('DROP TABLE student_fees');
+    
+    // 重命名新表
+    db.exec('ALTER TABLE student_fees_new RENAME TO student_fees');
+    
+    // 重建索引
+    db.exec('CREATE INDEX IF NOT EXISTS idx_student_fees_class_name ON student_fees(class_name)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_student_fees_student_name ON student_fees(student_name)');
+    
+    console.log('Removed enrollment_status column successfully');
   }
 
   console.log('Database initialized successfully');

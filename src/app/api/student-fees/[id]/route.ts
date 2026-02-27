@@ -18,7 +18,6 @@ export async function GET(
       student_name: string;
       gender: string;
       nap_status: string;
-      enrollment_status: string;
       tuition_fee: number;
       lunch_fee: number;
       nap_fee: number;

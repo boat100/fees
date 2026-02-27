@@ -141,10 +141,100 @@ export async function GET() {
       schoolTotal.other_paid += c.other_paid || 0;
     });
 
+    // 4. 各费用项目缴费完成人数统计
+    // 获取每个学生每个费用项目的应交和已交金额
+    const studentPayments = db.prepare(`
+      SELECT 
+        sf.id,
+        sf.tuition_fee,
+        sf.lunch_fee,
+        sf.nap_fee,
+        sf.after_school_fee,
+        sf.club_fee,
+        sf.other_fee,
+        COALESCE(pm.tuition_paid, 0) as tuition_paid,
+        COALESCE(pm.lunch_paid, 0) as lunch_paid,
+        COALESCE(pm.nap_paid, 0) as nap_paid,
+        COALESCE(pm.after_school_paid, 0) as after_school_paid,
+        COALESCE(pm.club_paid, 0) as club_paid,
+        COALESCE(pm.other_paid, 0) as other_paid
+      FROM student_fees sf
+      LEFT JOIN (
+        SELECT 
+          student_id,
+          SUM(CASE WHEN fee_type = 'tuition' THEN amount ELSE 0 END) as tuition_paid,
+          SUM(CASE WHEN fee_type = 'lunch' THEN amount ELSE 0 END) as lunch_paid,
+          SUM(CASE WHEN fee_type = 'nap' THEN amount ELSE 0 END) as nap_paid,
+          SUM(CASE WHEN fee_type = 'after_school' THEN amount ELSE 0 END) as after_school_paid,
+          SUM(CASE WHEN fee_type = 'club' THEN amount ELSE 0 END) as club_paid,
+          SUM(CASE WHEN fee_type = 'other' THEN amount ELSE 0 END) as other_paid
+        FROM payment_records
+        GROUP BY student_id
+      ) pm ON sf.id = pm.student_id
+    `).all() as Array<{
+      id: number;
+      tuition_fee: number;
+      lunch_fee: number;
+      nap_fee: number;
+      after_school_fee: number;
+      club_fee: number;
+      other_fee: number;
+      tuition_paid: number;
+      lunch_paid: number;
+      nap_paid: number;
+      after_school_paid: number;
+      club_paid: number;
+      other_paid: number;
+    }>;
+
+    // 计算各费用项目的完成人数
+    const completionStats = {
+      tuition: { total: 0, completed: 0 },      // 学费
+      lunch: { total: 0, completed: 0 },        // 午餐费
+      nap: { total: 0, completed: 0 },          // 午托费
+      after_school: { total: 0, completed: 0 }, // 课后服务
+      club: { total: 0, completed: 0 },         // 社团费
+      other: { total: 0, completed: 0 },        // 其他
+    };
+
+    studentPayments.forEach(s => {
+      // 学费：有应交金额的学生才计入
+      if (s.tuition_fee > 0) {
+        completionStats.tuition.total++;
+        if (s.tuition_paid >= s.tuition_fee) completionStats.tuition.completed++;
+      }
+      // 午餐费
+      if (s.lunch_fee > 0) {
+        completionStats.lunch.total++;
+        if (s.lunch_paid >= s.lunch_fee) completionStats.lunch.completed++;
+      }
+      // 午托费
+      if (s.nap_fee > 0) {
+        completionStats.nap.total++;
+        if (s.nap_paid >= s.nap_fee) completionStats.nap.completed++;
+      }
+      // 课后服务
+      if (s.after_school_fee > 0) {
+        completionStats.after_school.total++;
+        if (s.after_school_paid >= s.after_school_fee) completionStats.after_school.completed++;
+      }
+      // 社团费
+      if (s.club_fee > 0) {
+        completionStats.club.total++;
+        if (s.club_paid >= s.club_fee) completionStats.club.completed++;
+      }
+      // 其他
+      if (s.other_fee > 0) {
+        completionStats.other.total++;
+        if (s.other_paid >= s.other_fee) completionStats.other.completed++;
+      }
+    });
+
     return NextResponse.json({
       classStats: classStatsWithTotals,
       monthlyStats: Object.values(monthlyData).sort((a, b) => b.month.localeCompare(a.month)),
       schoolTotal,
+      completionStats,
     });
   } catch (error) {
     console.error('Error fetching statistics:', error);

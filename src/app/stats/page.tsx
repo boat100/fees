@@ -66,10 +66,20 @@ interface SchoolTotal {
   other_paid: number;
 }
 
+interface CompletionStats {
+  tuition: { total: number; completed: number };
+  lunch: { total: number; completed: number };
+  nap: { total: number; completed: number };
+  after_school: { total: number; completed: number };
+  club: { total: number; completed: number };
+  other: { total: number; completed: number };
+}
+
 interface Statistics {
   classStats: ClassStat[];
   monthlyStats: MonthlyStat[];
   schoolTotal: SchoolTotal;
+  completionStats: CompletionStats;
 }
 
 export default function StatsPage() {
@@ -282,6 +292,47 @@ export default function StatsPage() {
                       <div className="text-xs text-gray-400">/ {statistics.schoolTotal.other_fee.toLocaleString()}</div>
                     </div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 各费用项目缴费完成人数统计 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-green-600" />
+                  各费用项目缴费完成人数
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  {[
+                    { key: 'tuition', label: '学费', color: 'blue' },
+                    { key: 'lunch', label: '午餐费', color: 'orange' },
+                    { key: 'nap', label: '午托费', color: 'purple' },
+                    { key: 'after_school', label: '课后服务', color: 'teal' },
+                    { key: 'club', label: '社团费', color: 'pink' },
+                    { key: 'other', label: '其他', color: 'gray' },
+                  ].map(item => {
+                    const stat = statistics.completionStats[item.key as keyof CompletionStats];
+                    const percentage = stat.total > 0 ? ((stat.completed / stat.total) * 100).toFixed(1) : '0';
+                    return (
+                      <div key={item.key} className="bg-gray-50 rounded-lg p-4 text-center">
+                        <div className="font-semibold text-gray-700 mb-2">{item.label}</div>
+                        <div className="text-2xl font-bold text-green-600 mb-1">
+                          {stat.completed}/{stat.total}
+                        </div>
+                        <div className="text-xs text-gray-500 mb-2">完成人数/应交人数</div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                        <div className="text-sm font-medium text-green-600 mt-1">{percentage}%</div>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>

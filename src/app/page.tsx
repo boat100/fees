@@ -50,7 +50,8 @@ import {
   CreditCard,
   Settings,
   BarChart3,
-  LogOut
+  LogOut,
+  Download
 } from 'lucide-react';
 import { FEE_ITEMS } from '@/lib/constants';
 
@@ -121,6 +122,9 @@ export default function Home() {
     paymentDate: '',
     remark: '',
   });
+  
+  // 导出状态
+  const [exporting, setExporting] = useState(false);
   
   // 表单数据
   const [formData, setFormData] = useState({
@@ -338,6 +342,51 @@ export default function Home() {
     }
   };
 
+  // 导出班级数据
+  const handleExportClass = async () => {
+    if (!selectedClass) return;
+    
+    setExporting(true);
+    try {
+      const url = `/api/export/stats?type=class_detail&class_name=${encodeURIComponent(selectedClass)}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error('导出失败');
+      }
+      
+      // 获取文件 blob
+      const blob = await response.blob();
+      
+      // 从响应头获取文件名
+      const disposition = response.headers.get('Content-Disposition');
+      let filename = `${selectedClass}班级明细.xlsx`;
+      if (disposition) {
+        const filenameMatch = disposition.match(/filename\*?=['"]?(?:UTF-\d['"]*)?([^;\r\n"']*)['"]?;?/i);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = decodeURIComponent(filenameMatch[1]);
+        }
+      }
+      
+      // 创建下载链接
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      
+      // 清理
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('导出失败，请重试');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // 退出登录
   const handleLogout = async () => {
     try {
@@ -462,6 +511,22 @@ export default function Home() {
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </Button>
+              
+              {selectedClass && students.length > 0 && (
+                <Button
+                  onClick={handleExportClass}
+                  variant="outline"
+                  disabled={exporting}
+                  className="border-green-600 text-green-600 hover:bg-green-50"
+                >
+                  {exporting ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  导出班级数据
+                </Button>
+              )}
               
               {selectedClass && (
                 <div className="text-sm text-gray-500">

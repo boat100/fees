@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { authFetch, isAuthenticated, clearAuthToken, addTokenToUrl } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -148,10 +149,17 @@ export default function Home() {
   // 表单校验警告
   const [formWarnings, setFormWarnings] = useState<Record<string, string>>({});
 
+  // 检查登录状态
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      router.push('/login');
+    }
+  }, [router]);
+
   // 获取班级列表
   const fetchClasses = async () => {
     try {
-      const response = await fetch('/api/student-fees?action=classes');
+      const response = await authFetch('/api/student-fees?action=classes');
       const result = await response.json();
       if (result.data) {
         setClasses(result.data);
@@ -170,7 +178,7 @@ export default function Home() {
     
     setLoading(true);
     try {
-      const response = await fetch(`/api/student-fees?className=${encodeURIComponent(selectedClass)}`);
+      const response = await authFetch(`/api/student-fees?className=${encodeURIComponent(selectedClass)}`);
       const result = await response.json();
       if (result.data) {
         setStudents(result.data);
@@ -336,7 +344,7 @@ export default function Home() {
         : '/api/student-fees';
       const method = selectedStudent ? 'PUT' : 'POST';
       
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -405,7 +413,7 @@ export default function Home() {
     toast.loading('正在删除...', { id: 'delete-student' });
     
     try {
-      const response = await fetch(`/api/student-fees/${selectedStudent.id}`, {
+      const response = await authFetch(`/api/student-fees/${selectedStudent.id}`, {
         method: 'DELETE',
       });
       
@@ -434,7 +442,7 @@ export default function Home() {
     setExporting(true);
     try {
       const url = `/api/export/stats?type=class_detail&class_name=${encodeURIComponent(selectedClass)}`;
-      const response = await fetch(url);
+      const response = await authFetch(url);
       
       if (!response.ok) {
         throw new Error('导出失败');
@@ -475,7 +483,8 @@ export default function Home() {
   // 退出登录
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await authFetch('/api/auth/logout', { method: 'POST' });
+      clearAuthToken();
       router.push('/login');
     } catch (error) {
       console.error('Failed to logout:', error);
@@ -1107,7 +1116,7 @@ export default function Home() {
                 );
                 
                 try {
-                  const response = await fetch('/api/payments/batch', {
+                  const response = await authFetch('/api/payments/batch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

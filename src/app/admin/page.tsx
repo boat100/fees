@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,6 +42,13 @@ import {
 
 export default function AdminPage() {
   const router = useRouter();
+  
+  // 检查登录状态
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      router.push('/login');
+    }
+  }, [router]);
   
   // 对话框状态
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -161,7 +169,7 @@ export default function AdminPage() {
     });
     
     try {
-      const response = await fetch('/api/student-fees', {
+      const response = await authFetch('/api/student-fees', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -187,7 +195,7 @@ export default function AdminPage() {
   // 导出所有数据
   const exportAllData = async () => {
     try {
-      const response = await fetch('/api/student-fees?all=true');
+      const response = await authFetch('/api/student-fees?all=true');
       const result = await response.json();
       
       if (!result.data || result.data.length === 0) {
@@ -289,7 +297,7 @@ export default function AdminPage() {
   // 备份数据库
   const backupDatabase = async () => {
     try {
-      const response = await fetch('/api/backup');
+      const response = await authFetch('/api/backup');
       
       if (!response.ok) {
         const error = await response.json();
@@ -351,7 +359,7 @@ export default function AdminPage() {
       const formData = new FormData();
       formData.append('file', restoreFile);
       
-      const response = await fetch('/api/backup', {
+      const response = await authFetch('/api/backup', {
         method: 'POST',
         body: formData,
       });
@@ -377,7 +385,8 @@ export default function AdminPage() {
   // 退出登录
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await authFetch('/api/auth/logout', { method: 'POST' });
+      clearAuthToken();
       router.push('/login');
     } catch (error) {
       console.error('Failed to logout:', error);
@@ -800,7 +809,7 @@ export default function AdminPage() {
                 }
                 
                 try {
-                  const response = await fetch('/api/student-fees/all', {
+                  const response = await authFetch('/api/student-fees/all', {
                     method: 'DELETE',
                   });
                   

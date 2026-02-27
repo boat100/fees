@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -132,7 +133,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const fetchStudent = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/student-fees/${resolvedParams.id}`);
+      const response = await authFetch(`/api/student-fees/${resolvedParams.id}`);
       const result = await response.json();
       if (result.data) {
         setStudent(result.data);
@@ -153,7 +154,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   // 获取代办费扣除项目
   const fetchAgencyFeeItems = async () => {
     try {
-      const response = await fetch(`/api/agency-fee-items?studentId=${resolvedParams.id}`);
+      const response = await authFetch(`/api/agency-fee-items?studentId=${resolvedParams.id}`);
       const result = await response.json();
       if (result.data) {
         setAgencyFeeItems(result.data);
@@ -164,8 +165,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   };
 
   useEffect(() => {
+    // 检查登录状态
+    if (!isAuthenticated()) {
+      router.push('/login');
+      return;
+    }
     fetchStudent();
-  }, [resolvedParams.id]);
+  }, [resolvedParams.id, router]);
 
   // 获取今天的日期
   const getTodayString = (): string => {
@@ -245,7 +251,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     toast.loading('正在提交...', { id: 'submit-payment' });
     
     try {
-      const response = await fetch('/api/payments', {
+      const response = await authFetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -308,7 +314,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     toast.loading('正在删除...', { id: 'delete-payment' });
     
     try {
-      const response = await fetch(`/api/payments/${recordId}`, {
+      const response = await authFetch(`/api/payments/${recordId}`, {
         method: 'DELETE',
       });
       
@@ -371,7 +377,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     toast.loading('正在提交...', { id: 'submit-agency' });
     
     try {
-      const response = await fetch('/api/agency-fee-items', {
+      const response = await authFetch('/api/agency-fee-items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -437,7 +443,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     toast.loading('正在删除...', { id: 'delete-agency' });
     
     try {
-      const response = await fetch(`/api/agency-fee-items?id=${id}`, {
+      const response = await authFetch(`/api/agency-fee-items?id=${id}`, {
         method: 'DELETE',
       });
       
@@ -511,7 +517,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 variant="ghost"
                 size="sm"
                 onClick={async () => {
-                  await fetch('/api/auth/logout', { method: 'POST' });
+                  await authFetch('/api/auth/logout', { method: 'POST' });
+                  clearAuthToken();
                   router.push('/login');
                 }}
                 className="text-gray-500 hover:text-gray-700"
@@ -991,7 +998,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 }
                 
                 try {
-                  const response = await fetch('/api/payments/batch', {
+                  const response = await authFetch('/api/payments/batch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

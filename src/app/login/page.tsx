@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { School, Lock, User, Eye, EyeOff } from 'lucide-react';
+
+// 存储 token 的 key
+const AUTH_TOKEN_KEY = 'school_fees_auth_token';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +18,14 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // 检查是否已登录
+  useEffect(() => {
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (token === 'authenticated') {
+      router.push('/');
+    }
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +44,9 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok && data.success) {
+        // 存储 token 到 localStorage
+        localStorage.setItem(AUTH_TOKEN_KEY, 'authenticated');
         // 使用 window.location.href 强制刷新页面跳转
-        // 确保 cookie 被正确设置和读取
         window.location.href = '/';
       } else {
         setError(data.error || '登录失败');

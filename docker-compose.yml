@@ -1,30 +1,22 @@
-version: '3.8'
-
 services:
-  school-fee-system:
+  school-fees:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: school-fee-system
+    container_name: school-fees-app
     restart: unless-stopped
     ports:
       - "5000:5000"
     volumes:
-      # 持久化数据库文件
+      # 数据持久化：将 SQLite 数据库文件映射到宿主机
       - ./data:/app/data
-      # 持久化 SQLite 数据库（如果数据库在根目录）
-      - ./school_fees.db:/app/school_fees.db
     environment:
       - NODE_ENV=production
-      - PORT=5000
-      - HOSTNAME=0.0.0.0
+      # 如果需要设置登录密码，取消下面的注释
+      # - LOGIN_PASSWORD=your_password_here
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-
-# 数据卷定义
-volumes:
-  data:
+      start_period: 10s

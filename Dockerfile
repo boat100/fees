@@ -1,44 +1,57 @@
-# 学校费用统计系统 Dockerfile
-# 使用 Node.js 20 Alpine 版本
+# 使用 Node.js 20 LTS 作为基础镜像
+FROM node:20-alpine AS base
 
-FROM node:20-alpine
-
-# 设置工作目录
+# 安装依赖阶段
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# 安装系统依赖（better-sqlite3 编译需要）
-RUN apk add --no-cache python3 make g++ git bash
-
-# 安装 pnpm
-RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
-
 # 复制 package.json 和 lock 文件
-COPY package.json pnpm-lock.yaml* ./
+COPY package.json pnpm-lock.yaml ./
 
-# 安装依赖
-RUN pnpm install --frozen-lockfile
+# 安装 pnpm 并安装依赖
+RUN corepack enable pnpm && pnpm install --frozen-lockfile
 
-# 复制项目文件
+# 构建阶段
+FROM base AS builder
+WORKDIR /app
+
+# 复制依赖
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # 设置环境变量
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+# 构建
+RUN corepack enable pnpm && pnpm run build
+
+# 运行阶段
+FROM base AS runner
+WORKDIR /app
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# 创建非 root 用户
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# 复制构建产物
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+# 创建数据目录并设置权限
+RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
+
+# 切换用户
+USER nextjs
+
+EXPOSE 5000
+
 ENV PORT=5000
 ENV HOSTNAME="0.0.0.0"
 
-# 构建项目
-RUN pnpm run build
-
-# 创建数据目录
-RUN mkdir -p /app/data
-
-# 暴露端口
-EXPOSE 5000
-
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:5000 || exit 1
-
-# 启动服务
-CMD ["pnpm", "start"]
+CMD ["node", "server.js"]

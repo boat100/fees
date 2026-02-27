@@ -1,203 +1,252 @@
-# 学校费用统计系统 - Docker 部署指南
+# Docker 部署教程
 
-## 环境要求
+本文档介绍如何将学校费用统计系统部署到个人服务器上。
 
-- Docker 20.10+
-- Docker Compose 2.0+（可选）
-- 至少 1GB 可用内存
-- 至少 2GB 可用磁盘空间
+## 前提条件
 
-## 快速部署
+- 服务器已安装 Docker
+- 服务器已安装 Docker Compose（可选，但推荐）
+- 服务器防火墙已开放 5000 端口
 
-### 方式一：使用 Docker Compose（推荐）
+## 方式一：使用 Docker Compose（推荐）
 
-1. **上传项目文件**
+### 1. 上传项目文件
 
-   将整个项目文件夹上传到服务器，例如：`/opt/school-fee-system`
+将整个项目上传到服务器，例如 `/opt/school-fees` 目录：
 
-2. **进入项目目录**
-   ```bash
-   cd /opt/school-fee-system
-   ```
+```bash
+# 在服务器上创建目录
+mkdir -p /opt/school-fees
+cd /opt/school-fees
 
-3. **启动服务**
-   ```bash
-   docker-compose up -d --build
-   ```
+# 方式1：使用 scp 上传（在本地执行）
+scp -r ./* user@your-server:/opt/school-fees/
 
-4. **查看运行状态**
-   ```bash
-   docker-compose ps
-   docker-compose logs -f
-   ```
+# 方式2：使用 git clone（如果项目在 Git 仓库）
+git clone <your-repo-url> .
+```
 
-5. **访问系统**
-   
-   打开浏览器访问：`http://你的服务器IP:5000`
+### 2. 构建并启动
 
-### 方式二：使用 Docker 命令
+```bash
+cd /opt/school-fees
 
-1. **构建镜像**
-   ```bash
-   docker build -t school-fee-system:latest .
-   ```
+# 构建镜像并启动容器
+docker compose up -d --build
+```
 
-2. **运行容器**
-   ```bash
-   docker run -d \
-     --name school-fee-system \
-     --restart unless-stopped \
-     -p 5000:5000 \
-     -v $(pwd)/data:/app/data \
-     -v $(pwd)/school_fees.db:/app/school_fees.db \
-     school-fee-system:latest
-   ```
+### 3. 查看状态
 
-3. **查看日志**
-   ```bash
-   docker logs -f school-fee-system
-   ```
+```bash
+# 查看容器状态
+docker compose ps
+
+# 查看日志
+docker compose logs -f
+```
+
+### 4. 访问应用
+
+打开浏览器访问：`http://your-server-ip:5000`
+
+## 方式二：使用 Docker 命令
+
+### 1. 构建镜像
+
+```bash
+cd /opt/school-fees
+docker build -t school-fees:latest .
+```
+
+### 2. 启动容器
+
+```bash
+# 创建数据目录
+mkdir -p ./data
+
+# 启动容器
+docker run -d \
+  --name school-fees-app \
+  --restart unless-stopped \
+  -p 5000:5000 \
+  -v $(pwd)/data:/app/data \
+  school-fees:latest
+```
+
+### 3. 查看日志
+
+```bash
+docker logs -f school-fees-app
+```
 
 ## 数据持久化
 
-系统使用 SQLite 数据库存储数据，默认数据库文件为 `school_fees.db`。
+SQLite 数据库文件存储在 `./data/school_fees.db`，通过 Docker Volume 映射到宿主机，确保数据不会因容器删除而丢失。
 
-### 重要：数据备份
+### 备份数据
 
 ```bash
-# 备份数据库
-cp school_fees.db school_fees.db.backup.$(date +%Y%m%d_%H%M%S)
+# 备份数据库文件
+cp ./data/school_fees.db ./data/school_fees_$(date +%Y%m%d_%H%M%S).db
 
-# 或者导出数据（进入容器执行）
-docker exec -it school-fee-system sh
-sqlite3 school_fees.db ".backup 'backup.db'"
+# 或导出到其他位置
+docker cp school-fees-app:/app/data/school_fees.db ./backup/
+```
+
+### 恢复数据
+
+```bash
+# 停止容器
+docker compose down
+
+# 替换数据库文件
+cp your_backup.db ./data/school_fees.db
+
+# 重新启动
+docker compose up -d
+```
+
+## 更新应用
+
+### 方式一：Docker Compose
+
+```bash
+cd /opt/school-fees
+
+# 拉取最新代码（如果使用 git）
+git pull
+
+# 重新构建并启动
+docker compose up -d --build
+```
+
+### 方式二：手动更新
+
+```bash
+# 停止并删除旧容器
+docker stop school-fees-app
+docker rm school-fees-app
+
+# 构建新镜像
+docker build -t school-fees:latest .
+
+# 启动新容器
+docker run -d \
+  --name school-fees-app \
+  --restart unless-stopped \
+  -p 5000:5000 \
+  -v $(pwd)/data:/app/data \
+  school-fees:latest
+```
+
+## 环境变量配置
+
+可在 `docker-compose.yml` 中添加环境变量：
+
+```yaml
+environment:
+  - NODE_ENV=production
+  - LOGIN_PASSWORD=your_password_here  # 设置登录密码
+```
+
+或在启动命令中添加：
+
+```bash
+docker run -d \
+  --name school-fees-app \
+  -p 5000:5000 \
+  -v $(pwd)/data:/app/data \
+  -e LOGIN_PASSWORD=your_password_here \
+  school-fees:latest
 ```
 
 ## 常用命令
 
-### 服务管理
-
 ```bash
 # 启动服务
-docker-compose up -d
+docker compose up -d
 
 # 停止服务
-docker-compose down
+docker compose down
 
 # 重启服务
-docker-compose restart
+docker compose restart
 
 # 查看日志
-docker-compose logs -f
+docker compose logs -f
 
-# 重新构建并启动
-docker-compose up -d --build
-```
+# 进入容器
+docker exec -it school-fees-app sh
 
-### 进入容器
+# 查看容器状态
+docker compose ps
 
-```bash
-# 进入容器 shell
-docker exec -it school-fee-system sh
-
-# 查看数据库
-docker exec -it school-fee-system sqlite3 school_fees.db
-```
-
-## 更新部署
-
-当代码有更新时：
-
-```bash
-# 1. 停止旧容器
-docker-compose down
-
-# 2. 拉取最新代码（如果使用 Git）
-git pull
-
-# 3. 重新构建并启动
-docker-compose up -d --build
-
-# 4. 查看日志确认启动成功
-docker-compose logs -f
-```
-
-## 系统配置
-
-### 修改端口
-
-编辑 `docker-compose.yml`，修改端口映射：
-
-```yaml
-ports:
-  - "8080:5000"  # 将 5000 改为其他端口，如 8080
-```
-
-### 登录凭证
-
-- 用户名：`admin`
-- 密码：`adminFF`
-
-⚠️ **安全建议**：生产环境建议修改默认密码，修改 `src/lib/auth.ts` 中的用户名和密码。
-
-## 反向代理配置（可选）
-
-如果需要通过域名访问，可以配置 Nginx 反向代理：
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
+# 清理未使用的镜像
+docker image prune -f
 ```
 
 ## 故障排查
 
-### 容器无法启动
+### 1. 容器无法启动
 
 ```bash
 # 查看详细日志
-docker-compose logs --tail=100
+docker compose logs
 
 # 检查端口占用
 netstat -tlnp | grep 5000
 ```
 
-### 数据库连接问题
+### 2. 数据库文件权限问题
 
 ```bash
-# 检查数据库文件权限
-ls -la school_fees.db
-
-# 修复权限
-chmod 644 school_fees.db
+# 修改数据目录权限
+sudo chown -R 1001:1001 ./data
 ```
 
-### 内存不足
+### 3. 无法访问应用
 
-```bash
-# 查看容器资源使用
-docker stats school-fee-system
-```
+- 检查防火墙是否开放 5000 端口
+- 检查容器是否正常运行：`docker compose ps`
+- 检查日志是否有错误：`docker compose logs`
 
 ## 安全建议
 
-1. **修改默认密码**：编辑 `src/lib/auth.ts` 修改登录凭证
-2. **使用 HTTPS**：配置 SSL 证书
-3. **限制访问**：使用防火墙限制访问 IP
-4. **定期备份**：设置定时任务备份数据库
+1. **修改默认端口**：在 `docker-compose.yml` 中修改端口映射，如 `"8080:5000"`
 
-## 技术支持
+2. **设置登录密码**：通过环境变量 `LOGIN_PASSWORD` 设置访问密码
 
-如有问题，请检查：
-1. Docker 服务是否正常运行
-2. 端口 5000 是否被占用
-3. 日志中是否有错误信息
+3. **配置 HTTPS**：推荐使用 Nginx 反向代理配置 SSL 证书
+
+4. **定期备份**：定期备份 `./data/school_fees.db` 文件
+
+## Nginx 反向代理配置（可选）
+
+如果需要配置域名访问和 HTTPS，可使用 Nginx：
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    
+    # 强制 HTTPS
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name your-domain.com;
+    
+    ssl_certificate /path/to/your/cert.pem;
+    ssl_certificate_key /path/to/your/key.pem;
+    
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```

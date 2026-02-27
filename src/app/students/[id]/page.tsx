@@ -39,7 +39,8 @@ import {
   Users,
   AlertCircle,
   CheckCircle,
-  CreditCard
+  CreditCard,
+  LogOut
 } from 'lucide-react';
 import { FEE_TYPE_MAP, FEE_ITEMS } from '@/lib/constants';
 
@@ -247,6 +248,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <Users className="h-4 w-4" />
               <span>{student.class_name}</span>
+              <div className="h-4 w-px bg-gray-300 mx-2" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  await fetch('/api/auth/logout', { method: 'POST' });
+                  router.push('/login');
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <LogOut className="h-4 w-4 mr-1" />
+                退出
+              </Button>
             </div>
           </div>
         </div>

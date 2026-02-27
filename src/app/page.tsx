@@ -49,7 +49,8 @@ import {
   ExternalLink,
   CreditCard,
   Settings,
-  BarChart3
+  BarChart3,
+  LogOut
 } from 'lucide-react';
 import { FEE_ITEMS } from '@/lib/constants';
 
@@ -337,6 +338,16 @@ export default function Home() {
     }
   };
 
+  // 退出登录
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+    } catch (error) {
+      console.error('Failed to logout:', error);
+    }
+  };
+
   const totals = calculateTotals();
 
   // 渲染费用单元格（应交/已交格式）
@@ -401,6 +412,15 @@ export default function Home() {
               >
                 <Settings className="h-4 w-4 mr-2" />
                 后台管理
+              </Button>
+              
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                className="border-gray-400 text-gray-600 hover:bg-gray-100"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                退出
               </Button>
             </nav>
           </div>

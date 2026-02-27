@@ -35,7 +35,8 @@ import {
   Database,
   HardDriveDownload,
   HardDriveUpload,
-  RefreshCw
+  RefreshCw,
+  LogOut
 } from 'lucide-react';
 
 export default function AdminPage() {
@@ -340,6 +341,16 @@ export default function AdminPage() {
     }
   };
 
+  // 退出登录
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+    } catch (error) {
+      console.error('Failed to logout:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* 顶部导航栏 */}
@@ -353,13 +364,23 @@ export default function AdminPage() {
               </h1>
             </div>
             
-            <Button
-              onClick={() => router.push('/')}
-              variant="outline"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              返回首页
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => router.push('/')}
+                variant="outline"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                返回首页
+              </Button>
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                className="border-gray-400 text-gray-600 hover:bg-gray-100"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                退出
+              </Button>
+            </div>
           </div>
         </div>
       </header>

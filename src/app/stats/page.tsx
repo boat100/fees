@@ -19,7 +19,8 @@ import {
   RefreshCw,
   Users,
   DollarSign,
-  Download
+  Download,
+  LogOut
 } from 'lucide-react';
 
 // 类型定义
@@ -135,6 +136,16 @@ export default function StatsPage() {
     }
   };
 
+  // 退出登录
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+    } catch (error) {
+      console.error('Failed to logout:', error);
+    }
+  };
+
   // 初始化加载
   useEffect(() => {
     fetchStatistics();
@@ -192,6 +203,14 @@ export default function StatsPage() {
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 返回首页
+              </Button>
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                className="border-gray-400 text-gray-600 hover:bg-gray-100"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                退出
               </Button>
             </div>
           </div>

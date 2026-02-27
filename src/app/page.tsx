@@ -73,6 +73,7 @@ interface StudentFee {
   club_fee: number;
   club_paid: number;
   agency_fee: number;
+  agency_balance: number;
   remark: string | null;
   created_at: string;
   updated_at: string | null;
@@ -84,7 +85,7 @@ interface FeeTotals {
   nap_fee: number; nap_paid: number;
   after_school_fee: number; after_school_paid: number;
   club_fee: number; club_paid: number;
-  agency_fee: number; agency_used: number;
+  agency_fee: number; agency_balance: number;
   total_fee: number; total_paid: number;
 }
 
@@ -194,7 +195,7 @@ export default function Home() {
       nap_fee: 0, nap_paid: 0,
       after_school_fee: 0, after_school_paid: 0,
       club_fee: 0, club_paid: 0,
-      agency_fee: 0, agency_used: 0,
+      agency_fee: 0, agency_balance: 0,
       total_fee: 0, total_paid: 0,
     };
     
@@ -210,10 +211,8 @@ export default function Home() {
       totals.club_fee += student.club_fee || 0;
       totals.club_paid += student.club_paid || 0;
       totals.agency_fee += student.agency_fee || 0;
+      totals.agency_balance += student.agency_balance ?? student.agency_fee ?? 600;
     });
-    
-    // 代办费显示：总额/余额（余额在详情页扣除）
-    totals.agency_used = 0; // 扣除项目在详情页管理，这里显示总额
     
     totals.total_fee = 
       totals.tuition_fee + totals.lunch_fee + totals.nap_fee + 
@@ -574,7 +573,7 @@ export default function Home() {
                       <TableHead className="font-semibold text-right">午托费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
                       <TableHead className="font-semibold text-right">课后服务费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
                       <TableHead className="font-semibold text-right">社团费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
-                      <TableHead className="font-semibold text-right">代办费<br/><span className="font-normal text-xs text-gray-400">总额</span></TableHead>
+                      <TableHead className="font-semibold text-right">代办费<br/><span className="font-normal text-xs text-gray-400">应交/剩余</span></TableHead>
                       <TableHead className="font-semibold text-right">合计<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
                       <TableHead className="font-semibold">备注</TableHead>
                       <TableHead className="font-semibold text-right">操作</TableHead>
@@ -607,7 +606,9 @@ export default function Home() {
                           <TableCell>{renderFeeCell(student.after_school_fee, student.after_school_paid)}</TableCell>
                           <TableCell>{renderFeeCell(student.club_fee, student.club_paid)}</TableCell>
                           <TableCell className="text-right">
-                            <span className="text-green-600 font-medium">{student.agency_fee || 600}</span>
+                            <span className="text-purple-600 font-medium">
+                              {student.agency_fee || 600}/{student.agency_balance ?? 600}
+                            </span>
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             <div className={totalPaid >= totalFee && totalFee > 0 ? 'text-green-600' : 'text-blue-600'}>
@@ -655,7 +656,7 @@ export default function Home() {
                         <div>{totals.club_fee.toFixed(0)}/{totals.club_paid.toFixed(0)}</div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="text-green-600">{totals.agency_fee.toFixed(0)}</div>
+                        <div className="text-purple-600">{totals.agency_fee.toFixed(0)}/{totals.agency_balance.toFixed(0)}</div>
                       </TableCell>
                       <TableCell className="text-right text-lg text-blue-700">
                         {totals.total_fee.toFixed(0)}/{totals.total_paid.toFixed(0)}

@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       updated_at: string | null;
     }>;
     
-    // 获取每个学生的已交费汇总
+    // 获取每个学生的已交费汇总和代办费余额
     const studentsWithPayments = students.map(student => {
       const payments = db.prepare(`
         SELECT fee_type, SUM(amount) as total_paid
@@ -71,6 +71,11 @@ export async function GET(request: NextRequest) {
         paymentMap[p.fee_type] = p.total_paid;
       });
       
+      // 计算代办费余额
+      const agencyUsed = db.prepare(`
+        SELECT COALESCE(SUM(amount), 0) as total FROM agency_fee_items WHERE student_id = ?
+      `).get(student.id) as { total: number };
+      
       return {
         ...student,
         tuition_paid: paymentMap['tuition'] || 0,
@@ -78,7 +83,7 @@ export async function GET(request: NextRequest) {
         nap_paid: paymentMap['nap'] || 0,
         after_school_paid: paymentMap['after_school'] || 0,
         club_paid: paymentMap['club'] || 0,
-        // 代办费不需要 paid，因为是一次性收齐
+        agency_balance: (student.agency_fee || 600) - agencyUsed.total,
       };
     });
     

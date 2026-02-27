@@ -12,7 +12,7 @@ const feeTypeMap: Record<string, string> = {
   'nap': '午托费',
   'after_school': '课后服务',
   'club': '社团费',
-  'other': '其他'
+  'agency': '代办费'
 };
 
 // 导出统计数据的 API
@@ -113,7 +113,7 @@ async function exportSchoolSummary(workbook: XLSX.WorkBook, students: any[], pay
   const totalStudents = students.length;
   const totalFee = students.reduce((sum, s) => {
     return sum + (s.tuition_fee || 0) + (s.lunch_fee || 0) + (s.nap_fee || 0) +
-           (s.after_school_fee || 0) + (s.club_fee || 0) + (s.other_fee || 0);
+           (s.after_school_fee || 0) + (s.club_fee || 0) + (s.agency_fee || 0);
   }, 0);
   const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
@@ -201,7 +201,7 @@ async function exportProjectStats(workbook: XLSX.WorkBook, students: any[]) {
     { 项目: '午托费', 参与人数: students.filter(s => (s.nap_fee || 0) > 0).length },
     { 项目: '课后服务', 参与人数: students.filter(s => (s.after_school_fee || 0) > 0).length },
     { 项目: '社团费', 参与人数: students.filter(s => (s.club_fee || 0) > 0).length },
-    { 项目: '其他', 参与人数: students.filter(s => (s.other_fee || 0) > 0).length },
+    { 项目: '代办费', 参与人数: students.filter(s => (s.agency_fee || 0) > 0).length },
   ];
 
   const ws = XLSX.utils.json_to_sheet(stats);
@@ -226,7 +226,7 @@ async function exportClassProjectStats(workbook: XLSX.WorkBook, students: any[])
       午托费: classStudents.filter(s => (s.nap_fee || 0) > 0).length,
       课后服务: classStudents.filter(s => (s.after_school_fee || 0) > 0).length,
       社团费: classStudents.filter(s => (s.club_fee || 0) > 0).length,
-      其他: classStudents.filter(s => (s.other_fee || 0) > 0).length,
+      代办费: classStudents.filter(s => (s.agency_fee || 0) > 0).length,
     };
   });
 
@@ -239,7 +239,7 @@ async function exportClassProjectStats(workbook: XLSX.WorkBook, students: any[])
     午托费: students.filter(s => (s.nap_fee || 0) > 0).length,
     课后服务: students.filter(s => (s.after_school_fee || 0) > 0).length,
     社团费: students.filter(s => (s.club_fee || 0) > 0).length,
-    其他: students.filter(s => (s.other_fee || 0) > 0).length,
+    代办费: students.filter(s => (s.agency_fee || 0) > 0).length,
   };
 
   const sheetData = [...stats, totalRow];
@@ -253,7 +253,7 @@ async function exportClassProjectStats(workbook: XLSX.WorkBook, students: any[])
     { wch: 10 }, // 午托费
     { wch: 12 }, // 课后服务
     { wch: 10 }, // 社团费
-    { wch: 8 },  // 其他
+    { wch: 8 },  // 代办费
   ];
   XLSX.utils.book_append_sheet(workbook, ws, '班级项目参与人数');
 }
@@ -275,7 +275,7 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: any[], payme
     });
 
     const totalFee = (s.tuition_fee || 0) + (s.lunch_fee || 0) + (s.nap_fee || 0) +
-                     (s.after_school_fee || 0) + (s.club_fee || 0) + (s.other_fee || 0);
+                     (s.after_school_fee || 0) + (s.club_fee || 0) + (s.agency_fee || 0);
     const totalPaid = Object.values(paidByType).reduce((a, b) => a + b, 0);
 
     return {
@@ -290,8 +290,8 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: any[], payme
       课后服务已交: paidByType['after_school'],
       社团费应交: s.club_fee || 0,
       社团费已交: paidByType['club'],
-      其他应交: s.other_fee || 0,
-      其他已交: paidByType['other'],
+      代办费应交: s.agency_fee || 0,
+      代办费已交: paidByType['other'],
       合计应交: totalFee,
       合计已交: totalPaid,
       待收金额: totalFee - totalPaid,
@@ -312,8 +312,8 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: any[], payme
     课后服务已交: studentDetails.reduce((sum, s) => sum + s.课后服务已交, 0),
     社团费应交: classStudents.reduce((sum, s) => sum + (s.club_fee || 0), 0),
     社团费已交: studentDetails.reduce((sum, s) => sum + s.社团费已交, 0),
-    其他应交: classStudents.reduce((sum, s) => sum + (s.other_fee || 0), 0),
-    其他已交: studentDetails.reduce((sum, s) => sum + s.其他已交, 0),
+    代办费应交: classStudents.reduce((sum, s) => sum + (s.agency_fee || 0), 0),
+    代办费已交: studentDetails.reduce((sum, s) => sum + s.代办费已交, 0),
     合计应交: studentDetails.reduce((sum, s) => sum + s.合计应交, 0),
     合计已交: studentDetails.reduce((sum, s) => sum + s.合计已交, 0),
     待收金额: studentDetails.reduce((sum, s) => sum + s.待收金额, 0),
@@ -334,7 +334,7 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: any[], payme
     { wch: 10 }, { wch: 10 }, // 午托费
     { wch: 12 }, { wch: 12 }, // 课后服务
     { wch: 10 }, { wch: 10 }, // 社团费
-    { wch: 10 }, { wch: 10 }, // 其他
+    { wch: 10 }, { wch: 10 }, // 代办费
     { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, // 合计
   ];
   XLSX.utils.book_append_sheet(workbook, ws, '学生费用明细');
@@ -397,7 +397,7 @@ async function exportByClass(workbook: XLSX.WorkBook, students: any[], payments:
       .filter(p => p.fee_type === 'club')
       .reduce((sum, p) => sum + (p.amount || 0), 0);
 
-    const otherFee = classStudents.reduce((sum, s) => sum + (s.other_fee || 0), 0);
+    const otherFee = classStudents.reduce((sum, s) => sum + (s.agency_fee || 0), 0);
     const otherPaid = classPayments
       .filter(p => p.fee_type === 'other')
       .reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -418,8 +418,8 @@ async function exportByClass(workbook: XLSX.WorkBook, students: any[], payments:
       课后服务已交: afterSchoolPaid,
       社团费应交: clubFee,
       社团费已交: clubPaid,
-      其他应交: otherFee,
-      其他已交: otherPaid,
+      代办费应交: otherFee,
+      代办费已交: otherPaid,
       合计应交: totalFee,
       合计已交: totalPaid,
       待收金额: totalFee - totalPaid,
@@ -441,8 +441,8 @@ async function exportByClass(workbook: XLSX.WorkBook, students: any[], payments:
     课后服务已交: classStats.reduce((sum, s) => sum + s.课后服务已交, 0),
     社团费应交: classStats.reduce((sum, s) => sum + s.社团费应交, 0),
     社团费已交: classStats.reduce((sum, s) => sum + s.社团费已交, 0),
-    其他应交: classStats.reduce((sum, s) => sum + s.其他应交, 0),
-    其他已交: classStats.reduce((sum, s) => sum + s.其他已交, 0),
+    代办费应交: classStats.reduce((sum, s) => sum + s.代办费应交, 0),
+    代办费已交: classStats.reduce((sum, s) => sum + s.代办费已交, 0),
     合计应交: classStats.reduce((sum, s) => sum + s.合计应交, 0),
     合计已交: classStats.reduce((sum, s) => sum + s.合计已交, 0),
     待收金额: classStats.reduce((sum, s) => sum + s.待收金额, 0),
@@ -472,8 +472,8 @@ async function exportByClass(workbook: XLSX.WorkBook, students: any[], payments:
     { wch: 14 }, // 课后服务已交
     { wch: 12 }, // 社团费应交
     { wch: 12 }, // 社团费已交
-    { wch: 12 }, // 其他应交
-    { wch: 12 }, // 其他已交
+    { wch: 12 }, // 代办费应交
+    { wch: 12 }, // 代办费已交
     { wch: 12 }, // 合计应交
     { wch: 12 }, // 合计已交
     { wch: 12 }, // 待收金额
@@ -537,7 +537,7 @@ async function exportByMonth(workbook: XLSX.WorkBook, students: any[], payments:
     { wch: 12 }, // 午托费
     { wch: 12 }, // 课后服务
     { wch: 12 }, // 社团费
-    { wch: 12 }, // 其他
+    { wch: 12 }, // 代办费
     { wch: 12 }, // 月度合计
     { wch: 10 }, // 交费笔数
   ];

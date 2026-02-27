@@ -40,9 +40,10 @@ import {
   AlertCircle,
   CheckCircle,
   CreditCard,
-  LogOut
+  LogOut,
+  FileText
 } from 'lucide-react';
-import { FEE_TYPE_MAP, FEE_ITEMS } from '@/lib/constants';
+import { FEE_TYPE_MAP, FEE_ITEMS, AGENCY_FEE_ITEMS, AGENCY_FEE_ITEM_TYPE_MAP } from '@/lib/constants';
 
 interface StudentDetail {
   id: number;
@@ -55,12 +56,25 @@ interface StudentDetail {
   nap_fee: number;
   after_school_fee: number;
   club_fee: number;
-  other_fee: number;
+  agency_fee: number;
   remark: string | null;
   created_at: string;
   updated_at: string | null;
   paymentsByType: Record<string, { records: PaymentRecord[]; total: number }>;
   paymentRecords: PaymentRecord[];
+  agencyFeeItems: AgencyFeeItem[];
+  agencyUsed: number;
+  agencyBalance: number;
+}
+
+interface AgencyFeeItem {
+  id: number;
+  student_id: number;
+  item_type: string;
+  amount: number;
+  item_date: string;
+  remark: string | null;
+  created_at: string;
 }
 
 interface PaymentRecord {
@@ -93,6 +107,21 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   const [batchPaymentDate, setBatchPaymentDate] = useState<string>('');
   const [batchPaymentRemark, setBatchPaymentRemark] = useState<string>('');
   
+  // 代办费扣除对话框状态
+  const [agencyFeeDialogOpen, setAgencyFeeDialogOpen] = useState(false);
+  const [agencyFeeItems, setAgencyFeeItems] = useState<Array<{
+    id: number;
+    student_id: number;
+    item_type: string;
+    amount: number;
+    deduct_date: string;
+    remark: string | null;
+  }>>([]);
+  const [agencyFeeItemType, setAgencyFeeItemType] = useState<string>('');
+  const [agencyFeeAmount, setAgencyFeeAmount] = useState<number>(0);
+  const [agencyFeeDate, setAgencyFeeDate] = useState<string>('');
+  const [agencyFeeRemark, setAgencyFeeRemark] = useState<string>('');
+  
   // 获取学生详情
   const fetchStudent = async () => {
     setLoading(true);
@@ -101,6 +130,8 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       const result = await response.json();
       if (result.data) {
         setStudent(result.data);
+        // 同时获取代办费扣除项目
+        fetchAgencyFeeItems();
       } else {
         alert('学生不存在');
         router.push('/');
@@ -109,6 +140,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       console.error('Failed to fetch student:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 获取代办费扣除项目
+  const fetchAgencyFeeItems = async () => {
+    try {
+      const response = await fetch(`/api/agency-fee-items?studentId=${resolvedParams.id}`);
+      const result = await response.json();
+      if (result.data) {
+        setAgencyFeeItems(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch agency fee items:', error);
     }
   };
 
@@ -202,6 +246,70 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       }
     } catch (error) {
       console.error('Failed to delete payment:', error);
+      alert('删除失败');
+    }
+  };
+
+  // 提交代办费扣除
+  const submitAgencyFeeItem = async () => {
+    if (!agencyFeeItemType || agencyFeeAmount <= 0 || !agencyFeeDate) {
+      alert('请填写完整信息');
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/agency-fee-items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: student?.id,
+          itemType: agencyFeeItemType,
+          amount: agencyFeeAmount,
+          deductDate: agencyFeeDate,
+          remark: agencyFeeRemark || null,
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert(result.message);
+        setAgencyFeeDialogOpen(false);
+        setAgencyFeeItemType('');
+        setAgencyFeeAmount(0);
+        setAgencyFeeDate('');
+        setAgencyFeeRemark('');
+        fetchStudent();
+        fetchAgencyFeeItems();
+      } else {
+        alert(result.error || '添加失败');
+      }
+    } catch (error) {
+      console.error('Failed to add agency fee item:', error);
+      alert('添加失败');
+    }
+  };
+
+  // 删除代办费扣除
+  const deleteAgencyFeeItem = async (id: number) => {
+    if (!confirm('确定要删除这条扣除记录吗？')) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/agency-fee-items?id=${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        fetchStudent();
+        fetchAgencyFeeItems();
+      } else {
+        const result = await response.json();
+        alert(result.error || '删除失败');
+      }
+    } catch (error) {
+      console.error('Failed to delete agency fee item:', error);
       alert('删除失败');
     }
   };
@@ -345,7 +453,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {FEE_ITEMS.map(item => {
+                  {FEE_ITEMS.filter(item => item.key !== 'agency').map(item => {
                     const expected = student[item.field] as number;
                     const paid = student.paymentsByType[item.key]?.total || 0;
                     const remaining = expected - paid;
@@ -391,17 +499,45 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                       </TableRow>
                     );
                   })}
+                  {/* 代办费行（特殊处理） */}
+                  <TableRow className="bg-purple-50">
+                    <TableCell className="font-medium">代办费</TableCell>
+                    <TableCell className="text-right">{(student.agency_fee || 600).toFixed(2)}</TableCell>
+                    <TableCell className="text-right text-purple-600 font-semibold">
+                      已扣除: {(student.agencyUsed || 0).toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right text-purple-600">
+                      余额: {(student.agencyBalance || student.agency_fee || 600).toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="inline-flex items-center gap-1 text-green-600">
+                        <CheckCircle className="h-4 w-4" />
+                        一次性收齐
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-purple-600 text-purple-600 hover:bg-purple-100"
+                        onClick={() => setAgencyFeeDialogOpen(true)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        添加扣除
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                   {/* 合计行 */}
                   <TableRow className="bg-blue-50 font-semibold">
                     <TableCell>合计</TableCell>
                     <TableCell className="text-right text-blue-700">
-                      {FEE_ITEMS.reduce((sum, item) => sum + (student[item.field] as number), 0).toFixed(2)}
+                      {(FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => sum + (student[item.field] as number), 0) + (student.agency_fee || 600)).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right text-green-600">
-                      {FEE_ITEMS.reduce((sum, item) => sum + (student.paymentsByType[item.key]?.total || 0), 0).toFixed(2)}
+                      {FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => sum + (student.paymentsByType[item.key]?.total || 0), 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right text-red-600">
-                      {FEE_ITEMS.reduce((sum, item) => {
+                      {FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => {
                         const expected = student[item.field] as number;
                         const paid = student.paymentsByType[item.key]?.total || 0;
                         return sum + Math.max(0, expected - paid);
@@ -460,6 +596,58 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 ))}
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 代办费扣除记录 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              代办费扣除记录
+            </CardTitle>
+            <CardDescription>
+              代办费余额: {(student.agencyBalance || student.agency_fee || 600).toFixed(2)} 元
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {agencyFeeItems.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                暂无扣除记录
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>日期</TableHead>
+                    <TableHead>项目</TableHead>
+                    <TableHead className="text-right">金额</TableHead>
+                    <TableHead>备注</TableHead>
+                    <TableHead className="text-center">操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {agencyFeeItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="text-gray-500">{formatDate(item.deduct_date)}</TableCell>
+                      <TableCell className="font-medium">{AGENCY_FEE_ITEM_TYPE_MAP[item.item_type]}</TableCell>
+                      <TableCell className="text-right text-red-600 font-semibold">-{item.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-gray-500">{item.remark || '-'}</TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => deleteAgencyFeeItem(item.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
@@ -683,6 +871,76 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               disabled={batchPayments.filter(p => p.amount > 0).length === 0 || !batchPaymentDate}
             >
               确认录入
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 添加代办费扣除对话框 */}
+      <Dialog open={agencyFeeDialogOpen} onOpenChange={setAgencyFeeDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              添加代办费扣除
+            </DialogTitle>
+            <DialogDescription>
+              当前余额: {(student.agencyBalance || student.agency_fee || 600).toFixed(2)} 元
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">扣除项目 *</Label>
+              <select
+                value={agencyFeeItemType}
+                onChange={(e) => setAgencyFeeItemType(e.target.value)}
+                className="col-span-3 p-2 border rounded-md"
+              >
+                <option value="">请选择项目</option>
+                {AGENCY_FEE_ITEMS.map((type) => (
+                  <option key={type.key} value={type.key}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">扣除金额 *</Label>
+              <Input
+                type="number"
+                value={agencyFeeAmount || ''}
+                onChange={(e) => setAgencyFeeAmount(Number(e.target.value))}
+                className="col-span-3"
+                placeholder="请输入扣除金额"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">扣除日期 *</Label>
+              <Input
+                type="date"
+                value={agencyFeeDate}
+                onChange={(e) => setAgencyFeeDate(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">备注</Label>
+              <Input
+                value={agencyFeeRemark}
+                onChange={(e) => setAgencyFeeRemark(e.target.value)}
+                className="col-span-3"
+                placeholder="备注信息（选填）"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAgencyFeeDialogOpen(false)}>
+              取消
+            </Button>
+            <Button 
+              onClick={submitAgencyFeeItem}
+              disabled={!agencyFeeItemType || agencyFeeAmount <= 0 || !agencyFeeDate}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              确认扣除
             </Button>
           </DialogFooter>
         </DialogContent>

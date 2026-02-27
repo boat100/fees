@@ -52,7 +52,7 @@ export function initDatabase() {
       nap_fee REAL DEFAULT 0,
       after_school_fee REAL DEFAULT 0,
       club_fee REAL DEFAULT 0,
-      other_fee REAL DEFAULT 0,
+      agency_fee REAL DEFAULT 600,
       remark TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME
@@ -73,12 +73,27 @@ export function initDatabase() {
     )
   `);
 
+  // 创建代办费扣除项目表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agency_fee_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER NOT NULL,
+      item_type TEXT NOT NULL,
+      amount REAL NOT NULL,
+      item_date TEXT NOT NULL,
+      remark TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (student_id) REFERENCES student_fees(id) ON DELETE CASCADE
+    )
+  `);
+
   // 创建索引
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_student_fees_class_name ON student_fees(class_name);
     CREATE INDEX IF NOT EXISTS idx_student_fees_student_name ON student_fees(student_name);
     CREATE INDEX IF NOT EXISTS idx_payment_records_student_id ON payment_records(student_id);
     CREATE INDEX IF NOT EXISTS idx_payment_records_fee_type ON payment_records(fee_type);
+    CREATE INDEX IF NOT EXISTS idx_agency_fee_items_student_id ON agency_fee_items(student_id);
   `);
 
   // 检查并添加新字段（兼容旧数据库）
@@ -93,10 +108,26 @@ export function initDatabase() {
     db.exec('ALTER TABLE student_fees ADD COLUMN nap_status TEXT DEFAULT \'走读\'');
     console.log('Added nap_status column');
   }
+  
+  // 将 other_fee 改为 agency_fee（代办费）
+  if (existingColumns.includes('other_fee') && !existingColumns.includes('agency_fee')) {
+    db.exec('ALTER TABLE student_fees ADD COLUMN agency_fee REAL DEFAULT 600');
+    // 迁移数据：将 other_fee 的值复制到 agency_fee，如果 other_fee > 0 则保留，否则设为 600
+    db.exec(`
+      UPDATE student_fees SET agency_fee = CASE 
+        WHEN other_fee > 0 THEN other_fee 
+        ELSE 600 
+      END
+    `);
+    console.log('Added agency_fee column and migrated from other_fee');
+  }
 
-  // 删除 enrollment_status 字段（需要重建表）
-  if (existingColumns.includes('enrollment_status')) {
-    console.log('Removing enrollment_status column...');
+  // 删除不需要的字段（需要重建表）
+  const columnsToRemove = ['enrollment_status', 'other_fee'];
+  const needsRebuild = columnsToRemove.some(col => existingColumns.includes(col));
+  
+  if (needsRebuild) {
+    console.log('Rebuilding table to remove old columns...');
     
     // 创建临时表
     db.exec(`
@@ -111,19 +142,35 @@ export function initDatabase() {
         nap_fee REAL DEFAULT 0,
         after_school_fee REAL DEFAULT 0,
         club_fee REAL DEFAULT 0,
-        other_fee REAL DEFAULT 0,
+        agency_fee REAL DEFAULT 600,
         remark TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME
       )
     `);
     
-    // 复制数据（不包含 enrollment_status）
-    db.exec(`
-      INSERT INTO student_fees_new (id, class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark, created_at, updated_at)
-      SELECT id, class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark, created_at, updated_at
-      FROM student_fees
-    `);
+    // 复制数据
+    const columnsToCopy = ['id', 'class_name', 'student_name', 'gender', 'nap_status', 
+                          'tuition_fee', 'lunch_fee', 'nap_fee', 'after_school_fee', 'club_fee', 
+                          'agency_fee', 'remark', 'created_at', 'updated_at'];
+    const availableColumns = columnsToCopy.filter(col => 
+      col === 'agency_fee' || existingColumns.includes(col) || col === 'id' || col === 'created_at' || col === 'updated_at'
+    );
+    
+    // 如果 agency_fee 不存在，使用默认值
+    if (!existingColumns.includes('agency_fee')) {
+      db.exec(`
+        INSERT INTO student_fees_new (id, class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, agency_fee, remark, created_at, updated_at)
+        SELECT id, class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, 600, remark, created_at, updated_at
+        FROM student_fees
+      `);
+    } else {
+      db.exec(`
+        INSERT INTO student_fees_new (id, class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, agency_fee, remark, created_at, updated_at)
+        SELECT id, class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, agency_fee, remark, created_at, updated_at
+        FROM student_fees
+      `);
+    }
     
     // 删除旧表
     db.exec('DROP TABLE student_fees');
@@ -135,8 +182,11 @@ export function initDatabase() {
     db.exec('CREATE INDEX IF NOT EXISTS idx_student_fees_class_name ON student_fees(class_name)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_student_fees_student_name ON student_fees(student_name)');
     
-    console.log('Removed enrollment_status column successfully');
+    console.log('Table rebuilt successfully');
   }
+
+  // 删除 other 类型的交费记录（已改为代办费，不需要交费记录）
+  db.exec(`DELETE FROM payment_records WHERE fee_type = 'other'`);
 
   console.log('Database initialized successfully');
 }
@@ -154,4 +204,4 @@ export const db = new Proxy({} as Database.Database, {
 });
 
 // 费用类型映射（从常量文件重新导出，方便后端使用）
-export { FEE_TYPE_MAP, FEE_TYPE_REVERSE_MAP } from './constants';
+export { FEE_TYPE_MAP, FEE_TYPE_REVERSE_MAP, AGENCY_FEE_ITEM_TYPES } from './constants';

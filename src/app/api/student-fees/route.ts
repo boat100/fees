@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       nap_fee: number;
       after_school_fee: number;
       club_fee: number;
-      other_fee: number;
+      agency_fee: number;
       remark: string | null;
       created_at: string;
       updated_at: string | null;
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
         nap_paid: paymentMap['nap'] || 0,
         after_school_paid: paymentMap['after_school'] || 0,
         club_paid: paymentMap['club'] || 0,
-        other_paid: paymentMap['other'] || 0,
+        // 代办费不需要 paid，因为是一次性收齐
       };
     });
     
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       napFee = 0,
       afterSchoolFee = 0,
       clubFee = 0,
-      otherFee = 0,
+      agencyFee = 600, // 默认代办费600元
       remark = null,
     } = body;
     
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     
     const stmt = db.prepare(`
       INSERT INTO student_fees 
-      (class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
+      (class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, agency_fee, remark)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
       napFee,
       afterSchoolFee,
       clubFee,
-      otherFee,
+      agencyFee,
       remark
     );
     
@@ -171,7 +171,7 @@ export async function PUT(request: NextRequest) {
     
     const insertStmt = db.prepare(`
       INSERT INTO student_fees 
-      (class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, other_fee, remark)
+      (class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, agency_fee, remark)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
@@ -179,7 +179,7 @@ export async function PUT(request: NextRequest) {
       UPDATE student_fees 
       SET gender = ?, nap_status = ?, 
           tuition_fee = ?, lunch_fee = ?, nap_fee = ?, 
-          after_school_fee = ?, club_fee = ?, other_fee = ?, remark = ?, updated_at = CURRENT_TIMESTAMP
+          after_school_fee = ?, club_fee = ?, agency_fee = ?, remark = ?, updated_at = CURRENT_TIMESTAMP
       WHERE class_name = ? AND student_name = ?
     `);
     
@@ -206,8 +206,7 @@ export async function PUT(request: NextRequest) {
       afterSchoolPaid?: number;
       clubFee?: number;
       clubPaid?: number;
-      otherFee?: number;
-      otherPaid?: number;
+      agencyFee?: number;
       remark?: string;
     }>) => {
       for (const student of students) {
@@ -233,7 +232,7 @@ export async function PUT(request: NextRequest) {
             student.napFee || 0,
             student.afterSchoolFee || 0,
             student.clubFee || 0,
-            student.otherFee || 0,
+            student.agencyFee || 600,
             student.remark || null,
             student.className,
             student.studentName
@@ -252,7 +251,7 @@ export async function PUT(request: NextRequest) {
             student.napFee || 0,
             student.afterSchoolFee || 0,
             student.clubFee || 0,
-            student.otherFee || 0,
+            student.agencyFee || 600,
             student.remark || null
           );
           studentId = result.lastInsertRowid as number;
@@ -265,8 +264,7 @@ export async function PUT(request: NextRequest) {
           (student.lunchPaid || 0) > 0 ||
           (student.napPaid || 0) > 0 ||
           (student.afterSchoolPaid || 0) > 0 ||
-          (student.clubPaid || 0) > 0 ||
-          (student.otherPaid || 0) > 0;
+          (student.clubPaid || 0) > 0;
         
         if (hasPaidAmounts) {
           // 删除该学生之前的所有交费记录
@@ -295,10 +293,6 @@ export async function PUT(request: NextRequest) {
             insertPaymentStmt.run(studentId, 'club', student.clubPaid, paymentDate, '批量导入');
             paymentCount++;
           }
-          if ((student.otherPaid || 0) > 0) {
-            insertPaymentStmt.run(studentId, 'other', student.otherPaid, paymentDate, '批量导入');
-            paymentCount++;
-          }
         }
       }
     });
@@ -306,13 +300,16 @@ export async function PUT(request: NextRequest) {
     importMany(data);
     
     return NextResponse.json({ 
-      success: true,
-      message: `导入完成：新增 ${insertCount} 条学生，更新 ${updateCount} 条学生，导入 ${paymentCount} 条交费记录`
+      success: true, 
+      insertCount, 
+      updateCount,
+      paymentCount,
+      total: insertCount + updateCount 
     });
   } catch (error) {
     console.error('Error importing data:', error);
     return NextResponse.json(
-      { error: '导入失败' },
+      { error: 'Failed to import data' },
       { status: 500 }
     );
   }

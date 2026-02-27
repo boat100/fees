@@ -4,7 +4,7 @@ import { db, initDatabase, FEE_TYPE_MAP } from '@/lib/database';
 // 初始化数据库
 initDatabase();
 
-// GET - 获取单个学生详情（包含所有交费记录）
+// GET - 获取单个学生详情（包含所有交费记录和代办费扣除项目）
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -23,7 +23,7 @@ export async function GET(
       nap_fee: number;
       after_school_fee: number;
       club_fee: number;
-      other_fee: number;
+      agency_fee: number;
       remark: string | null;
       created_at: string;
       updated_at: string | null;
@@ -61,11 +61,33 @@ export async function GET(
       }
     });
     
+    // 获取代办费扣除项目
+    const agencyFeeItems = db.prepare(`
+      SELECT * FROM agency_fee_items 
+      WHERE student_id = ? 
+      ORDER BY item_date DESC, created_at DESC
+    `).all(id) as Array<{
+      id: number;
+      student_id: number;
+      item_type: string;
+      amount: number;
+      item_date: string;
+      remark: string | null;
+      created_at: string;
+    }>;
+    
+    // 计算代办费余额
+    const agencyUsed = agencyFeeItems.reduce((sum, item) => sum + item.amount, 0);
+    const agencyBalance = (student.agency_fee || 600) - agencyUsed;
+    
     return NextResponse.json({ 
       data: {
         ...student,
         paymentsByType,
         paymentRecords,
+        agencyFeeItems,
+        agencyUsed,
+        agencyBalance,
       }
     });
   } catch (error) {
@@ -95,7 +117,7 @@ export async function PUT(
       napFee,
       afterSchoolFee,
       clubFee,
-      otherFee,
+      agencyFee,
       remark,
     } = body;
     
@@ -106,7 +128,7 @@ export async function PUT(
       UPDATE student_fees 
       SET class_name = ?, student_name = ?, gender = ?, nap_status = ?,
           tuition_fee = ?, lunch_fee = ?, nap_fee = ?, 
-          after_school_fee = ?, club_fee = ?, other_fee = ?,
+          after_school_fee = ?, club_fee = ?, agency_fee = ?,
           remark = ?, updated_at = ?
       WHERE id = ?
     `);
@@ -121,7 +143,7 @@ export async function PUT(
       napFee ?? 0,
       afterSchoolFee ?? 0,
       clubFee ?? 0,
-      otherFee ?? 0,
+      agencyFee ?? 600,
       remark || null,
       new Date().toISOString(),
       id
@@ -153,6 +175,9 @@ export async function DELETE(
     
     // 先删除交费记录
     db.prepare('DELETE FROM payment_records WHERE student_id = ?').run(id);
+    
+    // 删除代办费扣除项目
+    db.prepare('DELETE FROM agency_fee_items WHERE student_id = ?').run(id);
     
     // 再删除学生
     const result = db.prepare('DELETE FROM student_fees WHERE id = ?').run(id);

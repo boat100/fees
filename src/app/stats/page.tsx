@@ -38,8 +38,7 @@ interface ClassStat {
   after_school_paid: number;
   club_fee: number;
   club_paid: number;
-  other_fee: number;
-  other_paid: number;
+  agency_fee: number;
   total_fee: number;
   total_paid: number;
 }
@@ -64,8 +63,7 @@ interface SchoolTotal {
   after_school_paid: number;
   club_fee: number;
   club_paid: number;
-  other_fee: number;
-  other_paid: number;
+  agency_fee: number;
 }
 
 interface CompletionStats {
@@ -74,7 +72,7 @@ interface CompletionStats {
   nap: { total: number; completed: number };
   after_school: { total: number; completed: number };
   club: { total: number; completed: number };
-  other: { total: number; completed: number };
+  agency: { total: number; completed: number };
 }
 
 interface ClassProjectStats {
@@ -85,7 +83,7 @@ interface ClassProjectStats {
   nap_count: number;
   after_school_count: number;
   club_count: number;
-  other_count: number;
+  agency_count: number;
 }
 
 interface SchoolProjectStats {
@@ -95,7 +93,7 @@ interface SchoolProjectStats {
   nap: number;
   after_school: number;
   club: number;
-  other: number;
+  agency: number;
 }
 
 interface Statistics {
@@ -336,9 +334,9 @@ export default function StatsPage() {
                       <div className="text-xs text-gray-400">/ {statistics.schoolTotal.club_fee.toLocaleString()}</div>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-3 text-center">
-                      <div className="font-semibold text-gray-700">其他</div>
-                      <div className="text-lg text-green-600 font-medium">{statistics.schoolTotal.other_paid.toLocaleString()}</div>
-                      <div className="text-xs text-gray-400">/ {statistics.schoolTotal.other_fee.toLocaleString()}</div>
+                      <div className="font-semibold text-gray-700">代办费</div>
+                      <div className="text-lg text-green-600 font-medium">{statistics.schoolTotal.agency_fee.toLocaleString()}</div>
+                      <div className="text-xs text-gray-400">一次性收齐</div>
                     </div>
                   </div>
                 </div>
@@ -376,7 +374,7 @@ export default function StatsPage() {
                     { key: 'nap', label: '午托费', color: 'purple' },
                     { key: 'after_school', label: '课后服务', color: 'teal' },
                     { key: 'club', label: '社团费', color: 'pink' },
-                    { key: 'other', label: '其他', color: 'gray' },
+                    { key: 'agency', label: '代办费', color: 'gray' },
                   ].map(item => {
                     const stat = statistics.completionStats[item.key as keyof CompletionStats];
                     const percentage = stat.total > 0 ? ((stat.completed / stat.total) * 100).toFixed(1) : '0';
@@ -469,9 +467,9 @@ export default function StatsPage() {
                     <div className="text-xs text-gray-500 mt-1">人参与</div>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-4 text-center">
-                    <div className="font-semibold text-gray-700 mb-2">其他</div>
+                    <div className="font-semibold text-gray-700 mb-2">代办费</div>
                     <div className="text-3xl font-bold text-gray-600">
-                      {statistics.schoolProjectStats.other}
+                      {statistics.schoolProjectStats.agency}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">人参与</div>
                   </div>
@@ -517,7 +515,7 @@ export default function StatsPage() {
                           <TableHead className="font-semibold text-center">午托费</TableHead>
                           <TableHead className="font-semibold text-center">课后服务</TableHead>
                           <TableHead className="font-semibold text-center">社团费</TableHead>
-                          <TableHead className="font-semibold text-center">其他</TableHead>
+                          <TableHead className="font-semibold text-center">代办费</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -541,7 +539,7 @@ export default function StatsPage() {
                               <span className="text-pink-600 font-medium">{stat.club_count}</span>
                             </TableCell>
                             <TableCell className="text-center">
-                              <span className="text-gray-600 font-medium">{stat.other_count}</span>
+                              <span className="text-gray-600 font-medium">{stat.agency_count}</span>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -554,7 +552,7 @@ export default function StatsPage() {
                           <TableCell className="text-center text-purple-600">{statistics.schoolProjectStats.nap}</TableCell>
                           <TableCell className="text-center text-teal-600">{statistics.schoolProjectStats.after_school}</TableCell>
                           <TableCell className="text-center text-pink-600">{statistics.schoolProjectStats.club}</TableCell>
-                          <TableCell className="text-center text-gray-600">{statistics.schoolProjectStats.other}</TableCell>
+                          <TableCell className="text-center text-gray-600">{statistics.schoolProjectStats.agency}</TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -601,7 +599,7 @@ export default function StatsPage() {
                           <TableHead className="font-semibold text-right">午托费<br/><span className="font-normal text-xs text-gray-400">已交/应交</span></TableHead>
                           <TableHead className="font-semibold text-right">课后服务<br/><span className="font-normal text-xs text-gray-400">已交/应交</span></TableHead>
                           <TableHead className="font-semibold text-right">社团费<br/><span className="font-normal text-xs text-gray-400">已交/应交</span></TableHead>
-                          <TableHead className="font-semibold text-right">其他<br/><span className="font-normal text-xs text-gray-400">已交/应交</span></TableHead>
+                          <TableHead className="font-semibold text-right">代办费<br/><span className="font-normal text-xs text-gray-400">总额</span></TableHead>
                           <TableHead className="font-semibold text-right">合计<br/><span className="font-normal text-xs text-gray-400">已交/应交</span></TableHead>
                           <TableHead className="font-semibold text-right">收缴率</TableHead>
                           <TableHead className="font-semibold text-center">操作</TableHead>
@@ -633,8 +631,7 @@ export default function StatsPage() {
                               <span className="text-gray-400"> / {stat.club_fee.toLocaleString()}</span>
                             </TableCell>
                             <TableCell className="text-right">
-                              <span className="text-green-600">{stat.other_paid.toLocaleString()}</span>
-                              <span className="text-gray-400"> / {stat.other_fee.toLocaleString()}</span>
+                              <span className="text-green-600">{stat.agency_fee.toLocaleString()}</span>
                             </TableCell>
                             <TableCell className="text-right">
                               <span className="text-green-600 font-semibold">{stat.total_paid.toLocaleString()}</span>
@@ -688,8 +685,7 @@ export default function StatsPage() {
                             <span className="text-gray-500"> / {statistics.schoolTotal.club_fee.toLocaleString()}</span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="text-green-600">{statistics.schoolTotal.other_paid.toLocaleString()}</span>
-                            <span className="text-gray-500"> / {statistics.schoolTotal.other_fee.toLocaleString()}</span>
+                            <span className="text-green-600">{statistics.schoolTotal.agency_fee.toLocaleString()}</span>
                           </TableCell>
                           <TableCell className="text-right">
                             <span className="text-green-600">{statistics.schoolTotal.total_paid.toLocaleString()}</span>
@@ -748,7 +744,7 @@ export default function StatsPage() {
                           <TableHead className="font-semibold text-right">午托费</TableHead>
                           <TableHead className="font-semibold text-right">课后服务</TableHead>
                           <TableHead className="font-semibold text-right">社团费</TableHead>
-                          <TableHead className="font-semibold text-right">其他</TableHead>
+                          <TableHead className="font-semibold text-right">代办费</TableHead>
                           <TableHead className="font-semibold text-right">月度合计</TableHead>
                           <TableHead className="font-semibold text-right">交费笔数</TableHead>
                         </TableRow>
@@ -762,7 +758,7 @@ export default function StatsPage() {
                             <TableCell className="text-right">{stat.payments.nap?.amount?.toLocaleString() || 0}</TableCell>
                             <TableCell className="text-right">{stat.payments.after_school?.amount?.toLocaleString() || 0}</TableCell>
                             <TableCell className="text-right">{stat.payments.club?.amount?.toLocaleString() || 0}</TableCell>
-                            <TableCell className="text-right">{stat.payments.other?.amount?.toLocaleString() || 0}</TableCell>
+                            <TableCell className="text-right text-gray-400">-</TableCell>
                             <TableCell className="text-right font-semibold text-green-600">{stat.total.toLocaleString()}</TableCell>
                             <TableCell className="text-right">
                               {Object.values(stat.payments).reduce((sum: number, p: any) => sum + (p.count || 0), 0)}

@@ -33,8 +33,9 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        router.push('/');
-        router.refresh();
+        // 使用 window.location.href 强制刷新页面跳转
+        // 确保 cookie 被正确设置和读取
+        window.location.href = '/';
       } else {
         setError(data.error || '登录失败');
       }

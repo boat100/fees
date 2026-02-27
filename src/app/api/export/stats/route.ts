@@ -5,11 +5,22 @@ import { db, initDatabase } from '@/lib/database';
 // 初始化数据库
 initDatabase();
 
+// 费用类型映射
+const feeTypeMap: Record<string, string> = {
+  'tuition': '学费',
+  'lunch': '午餐费',
+  'nap': '午托费',
+  'after_school': '课后服务',
+  'club': '社团费',
+  'other': '其他'
+};
+
 // 导出统计数据的 API
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type') || 'class'; // 'class' 或 'month'
+    const type = searchParams.get('type') || 'class';
+    const className = searchParams.get('class_name'); // 用于导出单个班级数据
 
     // 获取学生数据
     const students = db.prepare(`
@@ -19,6 +30,7 @@ export async function GET(request: NextRequest) {
       FROM student_fees sf
       LEFT JOIN payment_records pr ON sf.id = pr.student_id
       GROUP BY sf.id
+      ORDER BY sf.class_name, sf.student_name
     `).all() as any[];
 
     // 获取交费记录
@@ -35,16 +47,45 @@ export async function GET(request: NextRequest) {
     // 创建工作簿
     const workbook = XLSX.utils.book_new();
 
-    if (type === 'class') {
-      // 按班级导出
-      await exportByClass(workbook, students, payments);
-    } else if (type === 'month') {
-      // 按月导出
-      await exportByMonth(workbook, students, payments);
+    switch (type) {
+      case 'school_summary':
+        await exportSchoolSummary(workbook, students, payments);
+        break;
+      case 'completion_stats':
+        await exportCompletionStats(workbook, students, payments);
+        break;
+      case 'project_stats':
+        await exportProjectStats(workbook, students);
+        break;
+      case 'class_project_stats':
+        await exportClassProjectStats(workbook, students);
+        break;
+      case 'class_detail':
+        if (!className) {
+          return NextResponse.json({ error: '缺少班级参数' }, { status: 400 });
+        }
+        await exportClassDetail(workbook, students, payments, className);
+        break;
+      case 'month':
+        await exportByMonth(workbook, students, payments);
+        break;
+      case 'class':
+      default:
+        await exportByClass(workbook, students, payments);
+        break;
     }
 
     // 生成文件名
-    const filename = type === 'class' ? '班级费用统计.xlsx' : '月度费用统计.xlsx';
+    const filenameMap: Record<string, string> = {
+      'school_summary': '全校汇总统计.xlsx',
+      'completion_stats': '缴费完成人数统计.xlsx',
+      'project_stats': '全校项目参与人数.xlsx',
+      'class_project_stats': '班级项目参与人数.xlsx',
+      'class_detail': `${className}班级明细.xlsx`,
+      'month': '月度费用统计.xlsx',
+      'class': '班级费用统计.xlsx'
+    };
+    const filename = filenameMap[type] || '统计数据.xlsx';
 
     // 生成 buffer
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
@@ -66,7 +107,261 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// 按班级导出
+// 导出全校汇总
+async function exportSchoolSummary(workbook: XLSX.WorkBook, students: any[], payments: any[]) {
+  // 计算全校汇总数据
+  const totalStudents = students.length;
+  const totalFee = students.reduce((sum, s) => {
+    return sum + (s.tuition_fee || 0) + (s.lunch_fee || 0) + (s.nap_fee || 0) +
+           (s.after_school_fee || 0) + (s.club_fee || 0) + (s.other_fee || 0);
+  }, 0);
+  const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+  // 各费用项目统计
+  const feeItems = ['tuition', 'lunch', 'nap', 'after_school', 'club', 'other'];
+  const feeStats = feeItems.map(item => {
+    const fee = students.reduce((sum, s) => sum + (s[`${item}_fee`] || 0), 0);
+    const paid = payments
+      .filter(p => p.fee_type === item)
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
+    return {
+      项目: feeTypeMap[item],
+      应交金额: fee,
+      已交金额: paid,
+      待收金额: fee - paid,
+      收缴率: fee > 0 ? ((paid / fee) * 100).toFixed(1) + '%' : '0%'
+    };
+  });
+
+  // 创建汇总表
+  const summaryData = [
+    { 项目: '学生总数', 数值: totalStudents, 单位: '人' },
+    { 项目: '应交总额', 数值: totalFee, 单位: '元' },
+    { 项目: '已收总额', 数值: totalPaid, 单位: '元' },
+    { 项目: '待收总额', 数值: totalFee - totalPaid, 单位: '元' },
+    { 项目: '总体收缴率', 数值: totalFee > 0 ? ((totalPaid / totalFee) * 100).toFixed(1) + '%' : '0%', 单位: '' },
+  ];
+
+  const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+  XLSX.utils.book_append_sheet(workbook, summaryWs, '全校汇总');
+
+  // 创建各项目明细表
+  const itemWs = XLSX.utils.json_to_sheet(feeStats);
+  XLSX.utils.book_append_sheet(workbook, itemWs, '各费用项目明细');
+}
+
+// 导出缴费完成人数统计
+async function exportCompletionStats(workbook: XLSX.WorkBook, students: any[], payments: any[]) {
+  const feeItems = ['tuition', 'lunch', 'nap', 'after_school', 'club', 'other'];
+  
+  const stats = feeItems.map(item => {
+    // 应交人数（费用 > 0 的学生数）
+    const totalStudents = students.filter(s => (s[`${item}_fee`] || 0) > 0).length;
+    
+    // 已完成人数（已交金额 >= 应交金额的学生数）
+    const completedStudents = students.filter(s => {
+      const fee = s[`${item}_fee`] || 0;
+      if (fee === 0) return false;
+      const paid = payments
+        .filter(p => p.student_id === s.id && p.fee_type === item)
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+      return paid >= fee;
+    }).length;
+
+    const percentage = totalStudents > 0 ? ((completedStudents / totalStudents) * 100).toFixed(1) : '0';
+
+    return {
+      费用项目: feeTypeMap[item],
+      应交人数: totalStudents,
+      已完成人数: completedStudents,
+      未完成人数: totalStudents - completedStudents,
+      完成率: percentage + '%'
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(stats);
+  ws['!cols'] = [
+    { wch: 12 }, // 费用项目
+    { wch: 12 }, // 应交人数
+    { wch: 14 }, // 已完成人数
+    { wch: 14 }, // 未完成人数
+    { wch: 10 }, // 完成率
+  ];
+  XLSX.utils.book_append_sheet(workbook, ws, '缴费完成人数统计');
+}
+
+// 导出全校项目参与人数统计
+async function exportProjectStats(workbook: XLSX.WorkBook, students: any[]) {
+  const totalStudents = students.length;
+  
+  const stats = [
+    { 项目: '学生总数', 参与人数: totalStudents },
+    { 项目: '学费', 参与人数: students.filter(s => (s.tuition_fee || 0) > 0).length },
+    { 项目: '午餐费', 参与人数: students.filter(s => (s.lunch_fee || 0) > 0).length },
+    { 项目: '午托费', 参与人数: students.filter(s => (s.nap_fee || 0) > 0).length },
+    { 项目: '课后服务', 参与人数: students.filter(s => (s.after_school_fee || 0) > 0).length },
+    { 项目: '社团费', 参与人数: students.filter(s => (s.club_fee || 0) > 0).length },
+    { 项目: '其他', 参与人数: students.filter(s => (s.other_fee || 0) > 0).length },
+  ];
+
+  const ws = XLSX.utils.json_to_sheet(stats);
+  ws['!cols'] = [
+    { wch: 12 }, // 项目
+    { wch: 12 }, // 参与人数
+  ];
+  XLSX.utils.book_append_sheet(workbook, ws, '全校项目参与人数');
+}
+
+// 导出班级项目参与人数统计
+async function exportClassProjectStats(workbook: XLSX.WorkBook, students: any[]) {
+  const classes = [...new Set(students.map(s => s.class_name))].sort();
+
+  const stats = classes.map(className => {
+    const classStudents = students.filter(s => s.class_name === className);
+    return {
+      班级: className,
+      学生数: classStudents.length,
+      学费: classStudents.filter(s => (s.tuition_fee || 0) > 0).length,
+      午餐费: classStudents.filter(s => (s.lunch_fee || 0) > 0).length,
+      午托费: classStudents.filter(s => (s.nap_fee || 0) > 0).length,
+      课后服务: classStudents.filter(s => (s.after_school_fee || 0) > 0).length,
+      社团费: classStudents.filter(s => (s.club_fee || 0) > 0).length,
+      其他: classStudents.filter(s => (s.other_fee || 0) > 0).length,
+    };
+  });
+
+  // 添加合计行
+  const totalRow = {
+    班级: '全校合计',
+    学生数: students.length,
+    学费: students.filter(s => (s.tuition_fee || 0) > 0).length,
+    午餐费: students.filter(s => (s.lunch_fee || 0) > 0).length,
+    午托费: students.filter(s => (s.nap_fee || 0) > 0).length,
+    课后服务: students.filter(s => (s.after_school_fee || 0) > 0).length,
+    社团费: students.filter(s => (s.club_fee || 0) > 0).length,
+    其他: students.filter(s => (s.other_fee || 0) > 0).length,
+  };
+
+  const sheetData = [...stats, totalRow];
+
+  const ws = XLSX.utils.json_to_sheet(sheetData);
+  ws['!cols'] = [
+    { wch: 12 }, // 班级
+    { wch: 10 }, // 学生数
+    { wch: 8 },  // 学费
+    { wch: 10 }, // 午餐费
+    { wch: 10 }, // 午托费
+    { wch: 12 }, // 课后服务
+    { wch: 10 }, // 社团费
+    { wch: 8 },  // 其他
+  ];
+  XLSX.utils.book_append_sheet(workbook, ws, '班级项目参与人数');
+}
+
+// 导出单个班级详细数据
+async function exportClassDetail(workbook: XLSX.WorkBook, students: any[], payments: any[], className: string) {
+  const classStudents = students.filter(s => s.class_name === className);
+  const classPayments = payments.filter(p => p.student_class === className);
+
+  // 学生费用明细
+  const studentDetails = classStudents.map(s => {
+    const studentPayments = classPayments.filter(p => p.student_id === s.id);
+    
+    const paidByType: Record<string, number> = {};
+    ['tuition', 'lunch', 'nap', 'after_school', 'club', 'other'].forEach(type => {
+      paidByType[type] = studentPayments
+        .filter(p => p.fee_type === type)
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+    });
+
+    const totalFee = (s.tuition_fee || 0) + (s.lunch_fee || 0) + (s.nap_fee || 0) +
+                     (s.after_school_fee || 0) + (s.club_fee || 0) + (s.other_fee || 0);
+    const totalPaid = Object.values(paidByType).reduce((a, b) => a + b, 0);
+
+    return {
+      学生姓名: s.student_name,
+      学费应交: s.tuition_fee || 0,
+      学费已交: paidByType['tuition'],
+      午餐费应交: s.lunch_fee || 0,
+      午餐费已交: paidByType['lunch'],
+      午托费应交: s.nap_fee || 0,
+      午托费已交: paidByType['nap'],
+      课后服务应交: s.after_school_fee || 0,
+      课后服务已交: paidByType['after_school'],
+      社团费应交: s.club_fee || 0,
+      社团费已交: paidByType['club'],
+      其他应交: s.other_fee || 0,
+      其他已交: paidByType['other'],
+      合计应交: totalFee,
+      合计已交: totalPaid,
+      待收金额: totalFee - totalPaid,
+      收缴率: totalFee > 0 ? ((totalPaid / totalFee) * 100).toFixed(1) + '%' : '0%'
+    };
+  });
+
+  // 添加汇总行
+  const totalRow = {
+    学生姓名: '班级合计',
+    学费应交: classStudents.reduce((sum, s) => sum + (s.tuition_fee || 0), 0),
+    学费已交: studentDetails.reduce((sum, s) => sum + s.学费已交, 0),
+    午餐费应交: classStudents.reduce((sum, s) => sum + (s.lunch_fee || 0), 0),
+    午餐费已交: studentDetails.reduce((sum, s) => sum + s.午餐费已交, 0),
+    午托费应交: classStudents.reduce((sum, s) => sum + (s.nap_fee || 0), 0),
+    午托费已交: studentDetails.reduce((sum, s) => sum + s.午托费已交, 0),
+    课后服务应交: classStudents.reduce((sum, s) => sum + (s.after_school_fee || 0), 0),
+    课后服务已交: studentDetails.reduce((sum, s) => sum + s.课后服务已交, 0),
+    社团费应交: classStudents.reduce((sum, s) => sum + (s.club_fee || 0), 0),
+    社团费已交: studentDetails.reduce((sum, s) => sum + s.社团费已交, 0),
+    其他应交: classStudents.reduce((sum, s) => sum + (s.other_fee || 0), 0),
+    其他已交: studentDetails.reduce((sum, s) => sum + s.其他已交, 0),
+    合计应交: studentDetails.reduce((sum, s) => sum + s.合计应交, 0),
+    合计已交: studentDetails.reduce((sum, s) => sum + s.合计已交, 0),
+    待收金额: studentDetails.reduce((sum, s) => sum + s.待收金额, 0),
+    收缴率: (() => {
+      const total = studentDetails.reduce((sum, s) => sum + s.合计应交, 0);
+      const paid = studentDetails.reduce((sum, s) => sum + s.合计已交, 0);
+      return total > 0 ? ((paid / total) * 100).toFixed(1) + '%' : '0%';
+    })()
+  };
+
+  const sheetData = [...studentDetails, totalRow];
+
+  const ws = XLSX.utils.json_to_sheet(sheetData);
+  ws['!cols'] = [
+    { wch: 12 }, // 学生姓名
+    { wch: 10 }, { wch: 10 }, // 学费
+    { wch: 10 }, { wch: 10 }, // 午餐费
+    { wch: 10 }, { wch: 10 }, // 午托费
+    { wch: 12 }, { wch: 12 }, // 课后服务
+    { wch: 10 }, { wch: 10 }, // 社团费
+    { wch: 10 }, { wch: 10 }, // 其他
+    { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, // 合计
+  ];
+  XLSX.utils.book_append_sheet(workbook, ws, '学生费用明细');
+
+  // 交费记录
+  const paymentRecords = classPayments.map(p => ({
+    交费日期: p.payment_date,
+    学生姓名: p.student_name,
+    费用类型: feeTypeMap[p.fee_type] || p.fee_type,
+    金额: p.amount,
+    备注: p.remarks || ''
+  }));
+
+  if (paymentRecords.length > 0) {
+    const paymentWs = XLSX.utils.json_to_sheet(paymentRecords);
+    paymentWs['!cols'] = [
+      { wch: 12 }, // 交费日期
+      { wch: 12 }, // 学生姓名
+      { wch: 10 }, // 费用类型
+      { wch: 10 }, // 金额
+      { wch: 20 }, // 备注
+    ];
+    XLSX.utils.book_append_sheet(workbook, paymentWs, '交费记录');
+  }
+}
+
+// 按班级导出（原有功能）
 async function exportByClass(workbook: XLSX.WorkBook, students: any[], payments: any[]) {
   // 获取所有班级
   const classes = [...new Set(students.map(s => s.class_name))].sort();
@@ -188,22 +483,12 @@ async function exportByClass(workbook: XLSX.WorkBook, students: any[], payments:
   XLSX.utils.book_append_sheet(workbook, ws, '班级费用统计');
 }
 
-// 按月导出
+// 按月导出（原有功能）
 async function exportByMonth(workbook: XLSX.WorkBook, students: any[], payments: any[]) {
   // 获取所有月份
   const months = [...new Set(
     payments.map(p => p.payment_date?.substring(0, 7)).filter(Boolean)
   )].sort();
-
-  // 费用类型映射
-  const feeTypeMap: Record<string, string> = {
-    'tuition': '学费',
-    'lunch': '午餐费',
-    'nap': '午托费',
-    'after_school': '课后服务',
-    'club': '社团费',
-    'other': '其他'
-  };
 
   // 计算各月统计数据
   const monthlyStats = months.map(month => {

@@ -20,7 +20,8 @@ import {
   Users,
   DollarSign,
   Download,
-  LogOut
+  LogOut,
+  FileSpreadsheet
 } from 'lucide-react';
 
 // 类型定义
@@ -129,10 +130,15 @@ export default function StatsPage() {
   };
 
   // 导出统计数据
-  const handleExport = async (type: 'class' | 'month') => {
+  const handleExport = async (type: string, className?: string) => {
     setExporting(type);
     try {
-      const response = await fetch(`/api/export/stats?type=${type}`);
+      let url = `/api/export/stats?type=${type}`;
+      if (className) {
+        url += `&class_name=${encodeURIComponent(className)}`;
+      }
+      
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error('导出失败');
       }
@@ -140,17 +146,27 @@ export default function StatsPage() {
       // 获取文件 blob
       const blob = await response.blob();
       
+      // 从响应头获取文件名
+      const disposition = response.headers.get('Content-Disposition');
+      let filename = '统计数据.xlsx';
+      if (disposition) {
+        const filenameMatch = disposition.match(/filename\*?=['"]?(?:UTF-\d['"]*)?([^;\r\n"']*)['"]?;?/i);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = decodeURIComponent(filenameMatch[1]);
+        }
+      }
+      
       // 创建下载链接
-      const url = window.URL.createObjectURL(blob);
+      const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
-      link.download = type === 'class' ? '班级费用统计.xlsx' : '月度费用统计.xlsx';
+      link.href = blobUrl;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       
       // 清理
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error('Export error:', error);
       alert('导出失败，请重试');
@@ -197,30 +213,6 @@ export default function StatsPage() {
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </Button>
               <Button
-                onClick={() => handleExport('class')}
-                variant="outline"
-                disabled={exporting !== null || loading}
-              >
-                {exporting === 'class' ? (
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                导出班级统计
-              </Button>
-              <Button
-                onClick={() => handleExport('month')}
-                variant="outline"
-                disabled={exporting !== null || loading}
-              >
-                {exporting === 'month' ? (
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                导出月度统计
-              </Button>
-              <Button
                 onClick={() => router.push('/')}
                 variant="outline"
               >
@@ -252,10 +244,25 @@ export default function StatsPage() {
             {/* 全校汇总卡片 */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-blue-600" />
-                  全校汇总
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-blue-600" />
+                    全校汇总
+                  </CardTitle>
+                  <Button
+                    onClick={() => handleExport('school_summary')}
+                    variant="outline"
+                    size="sm"
+                    disabled={exporting !== null}
+                  >
+                    {exporting === 'school_summary' ? (
+                      <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-1" />
+                    )}
+                    导出
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -341,10 +348,25 @@ export default function StatsPage() {
             {/* 各费用项目缴费完成人数统计 */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-green-600" />
-                  各费用项目缴费完成人数
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-green-600" />
+                    各费用项目缴费完成人数
+                  </CardTitle>
+                  <Button
+                    onClick={() => handleExport('completion_stats')}
+                    variant="outline"
+                    size="sm"
+                    disabled={exporting !== null}
+                  >
+                    {exporting === 'completion_stats' ? (
+                      <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-1" />
+                    )}
+                    导出
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -382,10 +404,25 @@ export default function StatsPage() {
             {/* 全校各项目参与人数统计 */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-600" />
-                  全校各项目参与人数
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-blue-600" />
+                    全校各项目参与人数
+                  </CardTitle>
+                  <Button
+                    onClick={() => handleExport('project_stats')}
+                    variant="outline"
+                    size="sm"
+                    disabled={exporting !== null}
+                  >
+                    {exporting === 'project_stats' ? (
+                      <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-1" />
+                    )}
+                    导出
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
@@ -445,10 +482,25 @@ export default function StatsPage() {
             {/* 各班级各项目参与人数统计 */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-purple-600" />
-                  各班级各项目参与人数
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-purple-600" />
+                    各班级各项目参与人数
+                  </CardTitle>
+                  <Button
+                    onClick={() => handleExport('class_project_stats')}
+                    variant="outline"
+                    size="sm"
+                    disabled={exporting !== null}
+                  >
+                    {exporting === 'class_project_stats' ? (
+                      <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-1" />
+                    )}
+                    导出
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {statistics.classProjectStats.length === 0 ? (
@@ -514,10 +566,25 @@ export default function StatsPage() {
             {/* 各班级交费情况 */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-600" />
-                  各班级交费情况
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-blue-600" />
+                    各班级交费情况
+                  </CardTitle>
+                  <Button
+                    onClick={() => handleExport('class')}
+                    variant="outline"
+                    size="sm"
+                    disabled={exporting !== null}
+                  >
+                    {exporting === 'class' ? (
+                      <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-1" />
+                    )}
+                    导出全部
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {statistics.classStats.length === 0 ? (
@@ -537,6 +604,7 @@ export default function StatsPage() {
                           <TableHead className="font-semibold text-right">其他<br/><span className="font-normal text-xs text-gray-400">已交/应交</span></TableHead>
                           <TableHead className="font-semibold text-right">合计<br/><span className="font-normal text-xs text-gray-400">已交/应交</span></TableHead>
                           <TableHead className="font-semibold text-right">收缴率</TableHead>
+                          <TableHead className="font-semibold text-center">操作</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -544,39 +612,54 @@ export default function StatsPage() {
                           <TableRow key={stat.class_name} className="hover:bg-gray-50">
                             <TableCell className="font-medium">{stat.class_name}</TableCell>
                             <TableCell className="text-center">{stat.student_count}</TableCell>
-                            <TableCell className="text-right text-sm">
-                              <span className="text-green-600">{stat.tuition_paid.toLocaleString()}</span>/<span>{stat.tuition_fee.toLocaleString()}</span>
-                            </TableCell>
-                            <TableCell className="text-right text-sm">
-                              <span className="text-green-600">{stat.lunch_paid.toLocaleString()}</span>/<span>{stat.lunch_fee.toLocaleString()}</span>
-                            </TableCell>
-                            <TableCell className="text-right text-sm">
-                              <span className="text-green-600">{stat.nap_paid.toLocaleString()}</span>/<span>{stat.nap_fee.toLocaleString()}</span>
-                            </TableCell>
-                            <TableCell className="text-right text-sm">
-                              <span className="text-green-600">{stat.after_school_paid.toLocaleString()}</span>/<span>{stat.after_school_fee.toLocaleString()}</span>
-                            </TableCell>
-                            <TableCell className="text-right text-sm">
-                              <span className="text-green-600">{stat.club_paid.toLocaleString()}</span>/<span>{stat.club_fee.toLocaleString()}</span>
-                            </TableCell>
-                            <TableCell className="text-right text-sm">
-                              <span className="text-green-600">{stat.other_paid.toLocaleString()}</span>/<span>{stat.other_fee.toLocaleString()}</span>
-                            </TableCell>
-                            <TableCell className="text-right font-semibold">
-                              <span className="text-green-600">{stat.total_paid.toLocaleString()}</span>/<span>{stat.total_fee.toLocaleString()}</span>
+                            <TableCell className="text-right">
+                              <span className="text-green-600">{stat.tuition_paid.toLocaleString()}</span>
+                              <span className="text-gray-400"> / {stat.tuition_fee.toLocaleString()}</span>
                             </TableCell>
                             <TableCell className="text-right">
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                stat.total_fee > 0 && stat.total_paid >= stat.total_fee 
-                                  ? 'bg-green-100 text-green-700' 
-                                  : stat.total_paid / stat.total_fee >= 0.8
-                                  ? 'bg-blue-100 text-blue-700'
-                                  : stat.total_paid / stat.total_fee >= 0.5
-                                  ? 'bg-yellow-100 text-yellow-700'
-                                  : 'bg-red-100 text-red-700'
-                              }`}>
-                                {stat.total_fee > 0 ? ((stat.total_paid / stat.total_fee) * 100).toFixed(1) : 0}%
-                              </span>
+                              <span className="text-green-600">{stat.lunch_paid.toLocaleString()}</span>
+                              <span className="text-gray-400"> / {stat.lunch_fee.toLocaleString()}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-green-600">{stat.nap_paid.toLocaleString()}</span>
+                              <span className="text-gray-400"> / {stat.nap_fee.toLocaleString()}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-green-600">{stat.after_school_paid.toLocaleString()}</span>
+                              <span className="text-gray-400"> / {stat.after_school_fee.toLocaleString()}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-green-600">{stat.club_paid.toLocaleString()}</span>
+                              <span className="text-gray-400"> / {stat.club_fee.toLocaleString()}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-green-600">{stat.other_paid.toLocaleString()}</span>
+                              <span className="text-gray-400"> / {stat.other_fee.toLocaleString()}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-green-600 font-semibold">{stat.total_paid.toLocaleString()}</span>
+                              <span className="text-gray-400"> / {stat.total_fee.toLocaleString()}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {stat.total_fee > 0 ? (
+                                <span className={`font-semibold ${((stat.total_paid / stat.total_fee) * 100) >= 90 ? 'text-green-600' : ((stat.total_paid / stat.total_fee) * 100) >= 70 ? 'text-blue-600' : ((stat.total_paid / stat.total_fee) * 100) >= 50 ? 'text-orange-600' : 'text-red-600'}`}>
+                                  {((stat.total_paid / stat.total_fee) * 100).toFixed(1)}%
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button
+                                onClick={() => handleExport('class_detail', stat.class_name)}
+                                variant="ghost"
+                                size="sm"
+                                disabled={exporting !== null}
+                                className="h-8 px-2"
+                              >
+                                <FileSpreadsheet className="h-4 w-4 mr-1" />
+                                导出
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -585,33 +668,43 @@ export default function StatsPage() {
                           <TableCell>全校合计</TableCell>
                           <TableCell className="text-center">{statistics.schoolTotal.student_count}</TableCell>
                           <TableCell className="text-right">
-                            <span className="text-green-600">{statistics.schoolTotal.tuition_paid.toLocaleString()}</span>/{statistics.schoolTotal.tuition_fee.toLocaleString()}
+                            <span className="text-green-600">{statistics.schoolTotal.tuition_paid.toLocaleString()}</span>
+                            <span className="text-gray-500"> / {statistics.schoolTotal.tuition_fee.toLocaleString()}</span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="text-green-600">{statistics.schoolTotal.lunch_paid.toLocaleString()}</span>/{statistics.schoolTotal.lunch_fee.toLocaleString()}
+                            <span className="text-green-600">{statistics.schoolTotal.lunch_paid.toLocaleString()}</span>
+                            <span className="text-gray-500"> / {statistics.schoolTotal.lunch_fee.toLocaleString()}</span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="text-green-600">{statistics.schoolTotal.nap_paid.toLocaleString()}</span>/{statistics.schoolTotal.nap_fee.toLocaleString()}
+                            <span className="text-green-600">{statistics.schoolTotal.nap_paid.toLocaleString()}</span>
+                            <span className="text-gray-500"> / {statistics.schoolTotal.nap_fee.toLocaleString()}</span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="text-green-600">{statistics.schoolTotal.after_school_paid.toLocaleString()}</span>/{statistics.schoolTotal.after_school_fee.toLocaleString()}
+                            <span className="text-green-600">{statistics.schoolTotal.after_school_paid.toLocaleString()}</span>
+                            <span className="text-gray-500"> / {statistics.schoolTotal.after_school_fee.toLocaleString()}</span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="text-green-600">{statistics.schoolTotal.club_paid.toLocaleString()}</span>/{statistics.schoolTotal.club_fee.toLocaleString()}
+                            <span className="text-green-600">{statistics.schoolTotal.club_paid.toLocaleString()}</span>
+                            <span className="text-gray-500"> / {statistics.schoolTotal.club_fee.toLocaleString()}</span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="text-green-600">{statistics.schoolTotal.other_paid.toLocaleString()}</span>/{statistics.schoolTotal.other_fee.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right text-lg">
-                            <span className="text-green-600">{statistics.schoolTotal.total_paid.toLocaleString()}</span>/{statistics.schoolTotal.total_fee.toLocaleString()}
+                            <span className="text-green-600">{statistics.schoolTotal.other_paid.toLocaleString()}</span>
+                            <span className="text-gray-500"> / {statistics.schoolTotal.other_fee.toLocaleString()}</span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                              {statistics.schoolTotal.total_fee > 0 
-                                ? ((statistics.schoolTotal.total_paid / statistics.schoolTotal.total_fee) * 100).toFixed(1) 
-                                : 0}%
-                            </span>
+                            <span className="text-green-600">{statistics.schoolTotal.total_paid.toLocaleString()}</span>
+                            <span className="text-gray-500"> / {statistics.schoolTotal.total_fee.toLocaleString()}</span>
                           </TableCell>
+                          <TableCell className="text-right">
+                            {statistics.schoolTotal.total_fee > 0 ? (
+                              <span className="text-green-600">
+                                {((statistics.schoolTotal.total_paid / statistics.schoolTotal.total_fee) * 100).toFixed(1)}%
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">-</TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -620,18 +713,31 @@ export default function StatsPage() {
               </CardContent>
             </Card>
 
-            {/* 每月交费情况 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-green-600" />
-                  每月交费情况
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {statistics.monthlyStats.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">暂无交费记录</div>
-                ) : (
+            {/* 月度交费统计 */}
+            {statistics.monthlyStats.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-orange-600" />
+                      月度交费统计
+                    </CardTitle>
+                    <Button
+                      onClick={() => handleExport('month')}
+                      variant="outline"
+                      size="sm"
+                      disabled={exporting !== null}
+                    >
+                      {exporting === 'month' ? (
+                        <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-1" />
+                      )}
+                      导出
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -644,56 +750,34 @@ export default function StatsPage() {
                           <TableHead className="font-semibold text-right">社团费</TableHead>
                           <TableHead className="font-semibold text-right">其他</TableHead>
                           <TableHead className="font-semibold text-right">月度合计</TableHead>
+                          <TableHead className="font-semibold text-right">交费笔数</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {statistics.monthlyStats.map((stat) => (
                           <TableRow key={stat.month} className="hover:bg-gray-50">
                             <TableCell className="font-medium">{stat.month}</TableCell>
+                            <TableCell className="text-right">{stat.payments.tuition?.amount?.toLocaleString() || 0}</TableCell>
+                            <TableCell className="text-right">{stat.payments.lunch?.amount?.toLocaleString() || 0}</TableCell>
+                            <TableCell className="text-right">{stat.payments.nap?.amount?.toLocaleString() || 0}</TableCell>
+                            <TableCell className="text-right">{stat.payments.after_school?.amount?.toLocaleString() || 0}</TableCell>
+                            <TableCell className="text-right">{stat.payments.club?.amount?.toLocaleString() || 0}</TableCell>
+                            <TableCell className="text-right">{stat.payments.other?.amount?.toLocaleString() || 0}</TableCell>
+                            <TableCell className="text-right font-semibold text-green-600">{stat.total.toLocaleString()}</TableCell>
                             <TableCell className="text-right">
-                              {stat.payments['tuition'] ? (
-                                <span className="text-green-600">¥{stat.payments['tuition'].amount.toLocaleString()}</span>
-                              ) : <span className="text-gray-300">-</span>}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {stat.payments['lunch'] ? (
-                                <span className="text-green-600">¥{stat.payments['lunch'].amount.toLocaleString()}</span>
-                              ) : <span className="text-gray-300">-</span>}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {stat.payments['nap'] ? (
-                                <span className="text-green-600">¥{stat.payments['nap'].amount.toLocaleString()}</span>
-                              ) : <span className="text-gray-300">-</span>}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {stat.payments['after_school'] ? (
-                                <span className="text-green-600">¥{stat.payments['after_school'].amount.toLocaleString()}</span>
-                              ) : <span className="text-gray-300">-</span>}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {stat.payments['club'] ? (
-                                <span className="text-green-600">¥{stat.payments['club'].amount.toLocaleString()}</span>
-                              ) : <span className="text-gray-300">-</span>}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {stat.payments['other'] ? (
-                                <span className="text-green-600">¥{stat.payments['other'].amount.toLocaleString()}</span>
-                              ) : <span className="text-gray-300">-</span>}
-                            </TableCell>
-                            <TableCell className="text-right font-semibold text-green-600">
-                              ¥{stat.total.toLocaleString()}
+                              {Object.values(stat.payments).reduce((sum: number, p: any) => sum + (p.count || 0), 0)}
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </div>
         ) : (
-          <div className="text-center py-20 text-gray-500">加载失败，请刷新重试</div>
+          <div className="text-center py-20 text-gray-500">暂无统计数据</div>
         )}
       </main>
     </div>

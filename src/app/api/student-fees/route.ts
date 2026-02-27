@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - 批量导入数据（覆盖重复学生）
+// PUT - 批量导入数据（覆盖重复学生，支持已交费用）
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
@@ -167,6 +167,7 @@ export async function PUT(request: NextRequest) {
     
     let insertCount = 0;
     let updateCount = 0;
+    let paymentCount = 0;
     
     const insertStmt = db.prepare(`
       INSERT INTO student_fees 
@@ -182,16 +183,31 @@ export async function PUT(request: NextRequest) {
       WHERE class_name = ? AND student_name = ?
     `);
     
+    const insertPaymentStmt = db.prepare(`
+      INSERT INTO payment_records (student_id, fee_type, amount, payment_date, remark)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    
+    const deletePaymentsStmt = db.prepare(`
+      DELETE FROM payment_records WHERE student_id = ?
+    `);
+    
     const importMany = db.transaction((students: Array<{
       className: string;
       studentName: string;
       gender?: string;
       tuitionFee?: number;
+      tuitionPaid?: number;
       lunchFee?: number;
+      lunchPaid?: number;
       napFee?: number;
+      napPaid?: number;
       afterSchoolFee?: number;
+      afterSchoolPaid?: number;
       clubFee?: number;
+      clubPaid?: number;
       otherFee?: number;
+      otherPaid?: number;
       remark?: string;
     }>) => {
       for (const student of students) {
@@ -203,7 +219,9 @@ export async function PUT(request: NextRequest) {
         // 检查学生是否已存在
         const existing = db.prepare(
           'SELECT id FROM student_fees WHERE class_name = ? AND student_name = ?'
-        ).get(student.className, student.studentName);
+        ).get(student.className, student.studentName) as { id: number } | undefined;
+        
+        let studentId: number;
         
         if (existing) {
           // 更新已存在学生
@@ -220,10 +238,11 @@ export async function PUT(request: NextRequest) {
             student.className,
             student.studentName
           );
+          studentId = existing.id;
           updateCount++;
         } else {
           // 新增学生
-          insertStmt.run(
+          const result = insertStmt.run(
             student.className,
             student.studentName,
             student.gender || '男',
@@ -236,7 +255,50 @@ export async function PUT(request: NextRequest) {
             student.otherFee || 0,
             student.remark || null
           );
+          studentId = result.lastInsertRowid as number;
           insertCount++;
+        }
+        
+        // 处理已交费用（如果有任何已交金额）
+        const hasPaidAmounts = 
+          (student.tuitionPaid || 0) > 0 ||
+          (student.lunchPaid || 0) > 0 ||
+          (student.napPaid || 0) > 0 ||
+          (student.afterSchoolPaid || 0) > 0 ||
+          (student.clubPaid || 0) > 0 ||
+          (student.otherPaid || 0) > 0;
+        
+        if (hasPaidAmounts) {
+          // 删除该学生之前的所有交费记录
+          deletePaymentsStmt.run(studentId);
+          
+          // 插入新的交费记录
+          const paymentDate = new Date().toISOString().split('T')[0];
+          
+          if ((student.tuitionPaid || 0) > 0) {
+            insertPaymentStmt.run(studentId, 'tuition', student.tuitionPaid, paymentDate, '批量导入');
+            paymentCount++;
+          }
+          if ((student.lunchPaid || 0) > 0) {
+            insertPaymentStmt.run(studentId, 'lunch', student.lunchPaid, paymentDate, '批量导入');
+            paymentCount++;
+          }
+          if ((student.napPaid || 0) > 0) {
+            insertPaymentStmt.run(studentId, 'nap', student.napPaid, paymentDate, '批量导入');
+            paymentCount++;
+          }
+          if ((student.afterSchoolPaid || 0) > 0) {
+            insertPaymentStmt.run(studentId, 'after_school', student.afterSchoolPaid, paymentDate, '批量导入');
+            paymentCount++;
+          }
+          if ((student.clubPaid || 0) > 0) {
+            insertPaymentStmt.run(studentId, 'club', student.clubPaid, paymentDate, '批量导入');
+            paymentCount++;
+          }
+          if ((student.otherPaid || 0) > 0) {
+            insertPaymentStmt.run(studentId, 'other', student.otherPaid, paymentDate, '批量导入');
+            paymentCount++;
+          }
         }
       }
     });
@@ -245,7 +307,7 @@ export async function PUT(request: NextRequest) {
     
     return NextResponse.json({ 
       success: true,
-      message: `导入完成：新增 ${insertCount} 条，更新 ${updateCount} 条`
+      message: `导入完成：新增 ${insertCount} 条学生，更新 ${updateCount} 条学生，导入 ${paymentCount} 条交费记录`
     });
   } catch (error) {
     console.error('Error importing data:', error);

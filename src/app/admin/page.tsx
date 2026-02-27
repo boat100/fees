@@ -60,7 +60,16 @@ export default function AdminPage() {
 
   // 下载导入模板
   const downloadTemplate = () => {
-    const headers = ['班级', '姓名', '性别', '学费', '午餐费', '午托费', '课后服务费', '社团费', '其他费用', '备注'];
+    const headers = [
+      '班级', '姓名', '性别',
+      '学费应交', '学费已交',
+      '午餐费应交', '午餐费已交',
+      '午托费应交', '午托费已交',
+      '课后服务费应交', '课后服务费已交',
+      '社团费应交', '社团费已交',
+      '其他费用应交', '其他费用已交',
+      '备注'
+    ];
     const csvContent = headers.join(',') + '\n';
     
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' });
@@ -114,18 +123,42 @@ export default function AdminPage() {
   const confirmImport = async () => {
     if (importData.length === 0) return;
     
-    const formattedData = importData.map(row => ({
-      className: String(row['班级'] || ''),
-      studentName: String(row['姓名'] || ''),
-      gender: String(row['性别'] || '男'),
-      tuitionFee: Number(row['学费'] || 0),
-      lunchFee: Number(row['午餐费'] || 0),
-      napFee: Number(row['午托费'] || 0),
-      afterSchoolFee: Number(row['课后服务费'] || 0),
-      clubFee: Number(row['社团费'] || 0),
-      otherFee: Number(row['其他费用'] || 0),
-      remark: String(row['备注'] || ''),
-    }));
+    const formattedData = importData.map(row => {
+      // 兼容新旧格式
+      // 新格式：学费应交, 学费已交
+      // 旧格式：学费 (只有应交)
+      const tuitionFee = Number(row['学费应交'] || row['学费'] || 0);
+      const tuitionPaid = Number(row['学费已交'] || 0);
+      const lunchFee = Number(row['午餐费应交'] || row['午餐费'] || 0);
+      const lunchPaid = Number(row['午餐费已交'] || 0);
+      const napFee = Number(row['午托费应交'] || row['午托费'] || 0);
+      const napPaid = Number(row['午托费已交'] || 0);
+      const afterSchoolFee = Number(row['课后服务费应交'] || row['课后服务费'] || 0);
+      const afterSchoolPaid = Number(row['课后服务费已交'] || 0);
+      const clubFee = Number(row['社团费应交'] || row['社团费'] || 0);
+      const clubPaid = Number(row['社团费已交'] || 0);
+      const otherFee = Number(row['其他费用应交'] || row['其他费用'] || 0);
+      const otherPaid = Number(row['其他费用已交'] || 0);
+      
+      return {
+        className: String(row['班级'] || ''),
+        studentName: String(row['姓名'] || ''),
+        gender: String(row['性别'] || '男'),
+        tuitionFee,
+        tuitionPaid,
+        lunchFee,
+        lunchPaid,
+        napFee,
+        napPaid,
+        afterSchoolFee,
+        afterSchoolPaid,
+        clubFee,
+        clubPaid,
+        otherFee,
+        otherPaid,
+        remark: String(row['备注'] || ''),
+      };
+    });
     
     try {
       const response = await fetch('/api/student-fees', {
@@ -567,6 +600,9 @@ export default function AdminPage() {
                   <li>点击"选择文件批量导入"上传</li>
                   <li>预览数据无误后确认导入</li>
                 </ol>
+                <div className="mt-3 p-2 bg-blue-50 rounded text-xs text-blue-700">
+                  <strong>提示：</strong>模板包含"应交"和"已交"两列，可同时导入应交费用和已交费用
+                </div>
               </div>
               <div>
                 <h4 className="font-semibold text-gray-900 mb-2">💾 数据库备份恢复</h4>
@@ -585,7 +621,7 @@ export default function AdminPage() {
 
       {/* 导入预览对话框 */}
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>导入预览</DialogTitle>
             <DialogDescription>

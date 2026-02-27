@@ -114,7 +114,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     student_id: number;
     item_type: string;
     amount: number;
-    deduct_date: string;
+    item_date: string;
     remark: string | null;
   }>>([]);
   const [agencyFeeItemType, setAgencyFeeItemType] = useState<string>('');
@@ -630,7 +630,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 <TableBody>
                   {agencyFeeItems.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell className="text-gray-500">{formatDate(item.deduct_date)}</TableCell>
+                      <TableCell className="text-gray-500">{formatDate(item.item_date)}</TableCell>
                       <TableCell className="font-medium">{AGENCY_FEE_ITEM_TYPE_MAP[item.item_type]}</TableCell>
                       <TableCell className="text-right text-red-600 font-semibold">-{item.amount.toFixed(2)}</TableCell>
                       <TableCell className="text-gray-500">{item.remark || '-'}</TableCell>

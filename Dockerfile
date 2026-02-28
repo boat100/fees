@@ -16,7 +16,8 @@ RUN apk add --no-cache \
     make \
     g++ \
     git \
-    sqlite
+    sqlite \
+    libc6-compat
 
 # 安装 pnpm
 RUN npm install -g pnpm@9.0.0
@@ -27,14 +28,14 @@ RUN pnpm config set registry https://registry.npmmirror.com
 # 复制 package.json 和 lock 文件
 COPY package.json pnpm-lock.yaml ./
 
-# 安装依赖
-RUN pnpm install --frozen-lockfile
+# 安装依赖（增加内存限制）
+RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm install --frozen-lockfile
 
 # 复制项目文件
 COPY . .
 
-# 构建项目
-RUN pnpm run build
+# 构建项目（增加内存限制）
+RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm run build
 
 # ==================== 运行阶段 ====================
 FROM node:20-alpine AS runner
@@ -48,7 +49,8 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 # 安装运行时依赖
 RUN apk add --no-cache \
     sqlite \
-    curl
+    curl \
+    libc6-compat
 
 # 安装 pnpm
 RUN npm install -g pnpm@9.0.0

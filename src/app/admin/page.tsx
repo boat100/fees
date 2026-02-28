@@ -89,16 +89,48 @@ export default function AdminPage() {
     window.URL.revokeObjectURL(url);
   };
 
+  // 解析CSV行（处理引号包裹的字段）
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          // 转义的引号
+          current += '"';
+          i++;
+        } else {
+          // 切换引号状态
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        // 字段分隔符
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    
+    // 添加最后一个字段
+    result.push(current.trim());
+    return result;
+  };
+
   // 解析CSV文件
   const parseCSV = (text: string): Array<Record<string, unknown>> => {
     const lines = text.split('\n').filter(line => line.trim());
     if (lines.length < 2) return [];
     
-    const headers = lines[0].split(',').map(h => h.trim());
+    const headers = parseCSVLine(lines[0]);
     const data: Array<Record<string, unknown>> = [];
     
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',');
+      const values = parseCSVLine(lines[i]);
       if (values.length < 2) continue;
       
       const row: Record<string, unknown> = {};
@@ -112,15 +144,54 @@ export default function AdminPage() {
     return data;
   };
 
+  // 检测是否包含乱码（替换字符）
+  const hasGarbledText = (text: string): boolean => {
+    // 检测Unicode替换字符（�）或其他常见的乱码模式
+    return text.includes('\uFFFD') || /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(text);
+  };
+
   // 处理CSV文件上传
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     
-    const text = await file.text();
-    const data = parseCSV(text);
-    setImportData(data);
-    setImportDialogOpen(true);
+    try {
+      // 读取文件为ArrayBuffer以支持多种编码
+      const buffer = await file.arrayBuffer();
+      
+      // 先尝试UTF-8解码
+      const utf8Decoder = new TextDecoder('utf-8');
+      let text = utf8Decoder.decode(buffer);
+      
+      // 如果UTF-8解码出现乱码，尝试GBK解码
+      if (hasGarbledText(text)) {
+        try {
+          const gbkDecoder = new TextDecoder('gbk');
+          text = gbkDecoder.decode(buffer);
+        } catch {
+          // GBK解码失败，继续使用UTF-8结果
+          console.warn('GBK decode failed, using UTF-8');
+        }
+      }
+      
+      // 移除BOM标记（如果有）
+      if (text.charCodeAt(0) === 0xFEFF) {
+        text = text.slice(1);
+      }
+      
+      const data = parseCSV(text);
+      
+      if (data.length === 0) {
+        alert('未能解析到有效数据，请检查文件格式');
+        return;
+      }
+      
+      setImportData(data);
+      setImportDialogOpen(true);
+    } catch (error) {
+      console.error('Failed to parse file:', error);
+      alert('文件解析失败，请检查文件格式');
+    }
     
     if (fileInputRef.current) {
       fileInputRef.current.value = '';

@@ -624,7 +624,7 @@ export default function FeesPage() {
                   <SelectTrigger id="class-select" className="w-[200px]">
                     <SelectValue placeholder="请选择班级" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" className="max-h-[300px]">
                     {classes.map((className) => (
                       <SelectItem key={className} value={className}>
                         {className}
@@ -839,7 +839,7 @@ export default function FeesPage() {
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="请选择性别" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper">
                   <SelectItem value="男">男</SelectItem>
                   <SelectItem value="女">女</SelectItem>
                 </SelectContent>

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { authFetch, isAuthenticated, clearAuthToken, addTokenToUrl } from '@/lib/auth-client';
+import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,13 +50,9 @@ import {
   DollarSign,
   ExternalLink,
   CreditCard,
-  Settings,
-  BarChart3,
-  TrendingDown,
   LogOut,
   Download,
-  ArrowLeft,
-  Home
+  ArrowLeft
 } from 'lucide-react';
 import { FEE_ITEMS } from '@/lib/constants';
 
@@ -665,7 +661,7 @@ export default function FeesPage() {
               </div>
             ) : students.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                暂无数据，点击"新增学生"添加或"批量导入"数据
+                暂无数据，点击&ldquo;新增学生&rdquo;添加或&ldquo;批量导入&rdquo;数据
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -935,7 +931,7 @@ export default function FeesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除学生 "{selectedStudent?.student_name}" 的费用记录吗？此操作将同时删除所有交费记录，且无法撤销。
+              确定要删除学生 &ldquo;{selectedStudent?.student_name}&rdquo; 的费用记录吗？此操作将同时删除所有交费记录，且无法撤销。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -23,13 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   ArrowLeft, 
@@ -579,7 +572,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
               费用汇总
             </CardTitle>
             <div className="flex items-center justify-between">
-              <CardDescription>点击"添加交费"按钮记录交费，或使用"批量录入"一次录入多项费用</CardDescription>
+              <CardDescription>点击&ldquo;添加交费&rdquo;按钮记录交费，或使用&ldquo;批量录入&rdquo;一次录入多项费用</CardDescription>
               <Button
                 size="sm"
                 variant="outline"

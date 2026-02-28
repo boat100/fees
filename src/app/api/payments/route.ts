@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, initDatabase, FEE_TYPE_MAP } from '@/lib/database';
+import { db, initDatabase } from '@/lib/database';
 
 // 初始化数据库
 initDatabase();

@@ -45,13 +45,9 @@ import {
   Plus, 
   Pencil, 
   Trash2, 
-  Search,
   TrendingDown,
-  Calendar,
-  FileText,
   LogOut,
-  Download,
-  Home
+  Download
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 

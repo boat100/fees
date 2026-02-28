@@ -844,7 +844,7 @@ export default function StatsPage() {
                             <TableCell className="text-right text-gray-400">-</TableCell>
                             <TableCell className="text-right font-semibold text-green-600">{stat.total.toLocaleString()}</TableCell>
                             <TableCell className="text-right">
-                              {Object.values(stat.payments).reduce((sum: number, p: any) => sum + (p.count || 0), 0)}
+                              {Object.values(stat.payments).reduce((sum: number, p) => sum + (p.count || 0), 0)}
                             </TableCell>
                           </TableRow>
                         ))}

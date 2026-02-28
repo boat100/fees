@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated, clearAuthToken } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ export default function Home() {
   // 退出登录
   const handleLogout = async () => {
     try {
-      const response = await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { method: 'POST' });
       clearAuthToken();
       router.push('/login');
     } catch (error) {

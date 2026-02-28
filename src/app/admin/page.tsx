@@ -4,8 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -36,9 +34,7 @@ import {
   Database,
   HardDriveDownload,
   HardDriveUpload,
-  RefreshCw,
-  LogOut,
-  Home
+  LogOut
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -376,7 +372,7 @@ export default function AdminPage() {
         ];
         
         // 工作表名称（Excel工作表名最多31个字符，且不能包含特殊字符）
-        let sheetName = className.replace(/[\\\/\?\*\[\]]/g, '_').substring(0, 31);
+        const sheetName = className.replace(/[\\\/\?\*\[\]]/g, '_').substring(0, 31);
         XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
       });
       
@@ -740,14 +736,14 @@ export default function AdminPage() {
               <div>
                 <h4 className="font-semibold text-gray-900 mb-2">📥 数据导入流程</h4>
                 <ol className="list-decimal list-inside space-y-1">
-                  <li>点击"下载导入模板"获取CSV模板</li>
+                  <li>点击&ldquo;下载导入模板&rdquo;获取CSV模板</li>
                   <li>用Excel或WPS打开模板填写数据</li>
                   <li>保存为CSV格式（UTF-8编码）</li>
-                  <li>点击"选择文件批量导入"上传</li>
+                  <li>点击&ldquo;选择文件批量导入&rdquo;上传</li>
                   <li>预览数据无误后确认导入</li>
                 </ol>
                 <div className="mt-3 p-2 bg-blue-50 rounded text-xs text-blue-700">
-                  <strong>提示：</strong>模板包含"应交"和"已交"两列，可同时导入应交费用和已交费用
+                  <strong>提示：</strong>模板包含&ldquo;应交&rdquo;和&ldquo;已交&rdquo;两列，可同时导入应交费用和已交费用
                 </div>
               </div>
               <div>
@@ -925,7 +921,7 @@ export default function AdminPage() {
             {/* 备份提醒 */}
             <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
               <p className="text-yellow-800 font-medium">
-                📋 建议操作：请先使用"备份数据库"功能备份当前数据！
+                📋 建议操作：请先使用&ldquo;备份数据库&rdquo;功能备份当前数据！
               </p>
             </div>
           </div>

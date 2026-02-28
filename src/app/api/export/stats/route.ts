@@ -5,6 +5,33 @@ import { db, initDatabase } from '@/lib/database';
 // 初始化数据库
 initDatabase();
 
+// 学生数据类型
+interface StudentData {
+  id: number;
+  class_name: string;
+  student_name: string;
+  tuition_fee: number;
+  lunch_fee: number;
+  nap_fee: number;
+  after_school_fee: number;
+  club_fee: number;
+  agency_fee: number;
+  total_paid: number;
+  [key: string]: number | string;
+}
+
+// 交费记录类型
+interface PaymentData {
+  id: number;
+  student_id: number;
+  fee_type: string;
+  amount: number;
+  payment_date: string;
+  student_name: string;
+  student_class: string;
+  remarks?: string;
+}
+
 // 费用类型映射
 const feeTypeMap: Record<string, string> = {
   'tuition': '学费',
@@ -31,7 +58,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN payment_records pr ON sf.id = pr.student_id
       GROUP BY sf.id
       ORDER BY sf.class_name, sf.student_name
-    `).all() as any[];
+    `).all() as StudentData[];
 
     // 获取交费记录
     const payments = db.prepare(`
@@ -42,7 +69,7 @@ export async function GET(request: NextRequest) {
       FROM payment_records pr
       JOIN student_fees sf ON pr.student_id = sf.id
       ORDER BY pr.payment_date DESC
-    `).all() as any[];
+    `).all() as PaymentData[];
 
     // 创建工作簿
     const workbook = XLSX.utils.book_new();
@@ -108,7 +135,7 @@ export async function GET(request: NextRequest) {
 }
 
 // 导出全校汇总
-async function exportSchoolSummary(workbook: XLSX.WorkBook, students: any[], payments: any[]) {
+async function exportSchoolSummary(workbook: XLSX.WorkBook, students: StudentData[], payments: PaymentData[]) {
   // 计算全校汇总数据
   const totalStudents = students.length;
   const totalFee = students.reduce((sum, s) => {
@@ -120,7 +147,7 @@ async function exportSchoolSummary(workbook: XLSX.WorkBook, students: any[], pay
   // 各费用项目统计
   const feeItems = ['tuition', 'lunch', 'nap', 'after_school', 'club', 'other'];
   const feeStats = feeItems.map(item => {
-    const fee = students.reduce((sum, s) => sum + (s[`${item}_fee`] || 0), 0);
+    const fee = students.reduce((sum, s) => sum + (Number(s[`${item}_fee`]) || 0), 0);
     const paid = payments
       .filter(p => p.fee_type === item)
       .reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -151,16 +178,16 @@ async function exportSchoolSummary(workbook: XLSX.WorkBook, students: any[], pay
 }
 
 // 导出缴费完成人数统计
-async function exportCompletionStats(workbook: XLSX.WorkBook, students: any[], payments: any[]) {
+async function exportCompletionStats(workbook: XLSX.WorkBook, students: StudentData[], payments: PaymentData[]) {
   const feeItems = ['tuition', 'lunch', 'nap', 'after_school', 'club', 'other'];
   
   const stats = feeItems.map(item => {
     // 应交人数（费用 > 0 的学生数）
-    const totalStudents = students.filter(s => (s[`${item}_fee`] || 0) > 0).length;
+    const totalStudents = students.filter(s => (Number(s[`${item}_fee`]) || 0) > 0).length;
     
     // 已完成人数（已交金额 >= 应交金额的学生数）
     const completedStudents = students.filter(s => {
-      const fee = s[`${item}_fee`] || 0;
+      const fee = Number(s[`${item}_fee`]) || 0;
       if (fee === 0) return false;
       const paid = payments
         .filter(p => p.student_id === s.id && p.fee_type === item)
@@ -191,7 +218,7 @@ async function exportCompletionStats(workbook: XLSX.WorkBook, students: any[], p
 }
 
 // 导出全校项目参与人数统计
-async function exportProjectStats(workbook: XLSX.WorkBook, students: any[]) {
+async function exportProjectStats(workbook: XLSX.WorkBook, students: StudentData[]) {
   const totalStudents = students.length;
   
   const stats = [
@@ -213,7 +240,7 @@ async function exportProjectStats(workbook: XLSX.WorkBook, students: any[]) {
 }
 
 // 导出班级项目参与人数统计
-async function exportClassProjectStats(workbook: XLSX.WorkBook, students: any[]) {
+async function exportClassProjectStats(workbook: XLSX.WorkBook, students: StudentData[]) {
   const classes = [...new Set(students.map(s => s.class_name))].sort();
 
   const stats = classes.map(className => {
@@ -259,7 +286,7 @@ async function exportClassProjectStats(workbook: XLSX.WorkBook, students: any[])
 }
 
 // 导出单个班级详细数据
-async function exportClassDetail(workbook: XLSX.WorkBook, students: any[], payments: any[], className: string) {
+async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[], payments: PaymentData[], className: string) {
   const classStudents = students.filter(s => s.class_name === className);
   const classPayments = payments.filter(p => p.student_class === className);
 
@@ -362,7 +389,7 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: any[], payme
 }
 
 // 按班级导出（原有功能）
-async function exportByClass(workbook: XLSX.WorkBook, students: any[], payments: any[]) {
+async function exportByClass(workbook: XLSX.WorkBook, students: StudentData[], payments: PaymentData[]) {
   // 获取所有班级
   const classes = [...new Set(students.map(s => s.class_name))].sort();
 
@@ -484,17 +511,23 @@ async function exportByClass(workbook: XLSX.WorkBook, students: any[], payments:
 }
 
 // 按月导出（原有功能）
-async function exportByMonth(workbook: XLSX.WorkBook, students: any[], payments: any[]) {
+async function exportByMonth(workbook: XLSX.WorkBook, students: StudentData[], payments: PaymentData[]) {
   // 获取所有月份
   const months = [...new Set(
     payments.map(p => p.payment_date?.substring(0, 7)).filter(Boolean)
   )].sort();
 
+  // 月度统计类型
+  interface MonthlyStat {
+    月份: string;
+    [key: string]: string | number;
+  }
+
   // 计算各月统计数据
-  const monthlyStats = months.map(month => {
+  const monthlyStats: MonthlyStat[] = months.map(month => {
     const monthPayments = payments.filter(p => p.payment_date?.startsWith(month));
 
-    const result: Record<string, any> = {
+    const result: MonthlyStat = {
       月份: month
     };
 
@@ -514,15 +547,15 @@ async function exportByMonth(workbook: XLSX.WorkBook, students: any[], payments:
   });
 
   // 添加汇总行
-  const totalRow: Record<string, any> = {
+  const totalRow: MonthlyStat = {
     月份: '合计'
   };
 
   Object.keys(feeTypeMap).forEach(type => {
-    totalRow[feeTypeMap[type]] = monthlyStats.reduce((sum: number, s: any) => sum + (s[feeTypeMap[type]] || 0), 0);
+    totalRow[feeTypeMap[type]] = monthlyStats.reduce((sum, s) => sum + (Number(s[feeTypeMap[type]]) || 0), 0);
   });
-  totalRow['月度合计'] = monthlyStats.reduce((sum: number, s: any) => sum + (s['月度合计'] || 0), 0);
-  totalRow['交费笔数'] = monthlyStats.reduce((sum: number, s: any) => sum + (s['交费笔数'] || 0), 0);
+  totalRow['月度合计'] = monthlyStats.reduce((sum, s) => sum + (Number(s['月度合计']) || 0), 0);
+  totalRow['交费笔数'] = monthlyStats.reduce((sum, s) => sum + (Number(s['交费笔数']) || 0), 0);
 
   const sheetData = [...monthlyStats, totalRow];
 

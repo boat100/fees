@@ -1,14 +1,43 @@
+# Dependencies
 node_modules
+.pnpm-store
+
+# Build output
 .next
-.git
-.gitignore
-*.md
-.env*.local
-.vscode
-.idea
+out
+build
+dist
+
+# Development files
 *.log
 npm-debug.log*
-.pnpm-debug.log*
-data
-.coze
-.cozeproj
+pnpm-debug.log*
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Test
+coverage
+.nyc_output
+
+# Misc
+*.md
+!README.md
+.env.local
+.env.*.local

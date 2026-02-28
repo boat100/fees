@@ -1,29 +1,47 @@
-# projects
+# 学校费用管理系统
 
-这是一个基于 [Next.js 16](https://nextjs.org) + [shadcn/ui](https://ui.shadcn.com) 的全栈应用项目，由扣子编程 CLI 创建。
+一个基于 [Next.js 16](https://nextjs.org) + [shadcn/ui](https://ui.shadcn.com) 的学校费用管理系统，支持学生收费管理、学校支出管理、数据导入导出等功能。
+
+## 功能特性
+
+- 📊 **学生费用管理** - 学费、午餐费、午托费、课后服务费、社团费、代办费管理
+- 💰 **学校支出管理** - 日常公用支出、人员支出记录与统计
+- 📥 **数据导入导出** - CSV批量导入、Excel报表导出
+- 💾 **数据备份恢复** - 完整数据库备份与恢复
+- 🔐 **登录认证** - 安全的管理员登录系统
 
 ## 快速开始
 
-### 启动开发服务器
+### Docker 部署（推荐）
 
 ```bash
-coze dev
+# 1. 克隆项目
+git clone https://github.com/boat100/fees.git
+cd fees
+
+# 2. 启动服务
+docker-compose up -d
+
+# 3. 访问应用
+# 打开浏览器访问 http://localhost:5000
 ```
 
-启动后，在浏览器中打开 [http://localhost:5000](http://localhost:5000) 查看应用。
+详细部署说明请查看 [Docker 部署指南](./DOCKER_DEPLOY.md)
 
-开发服务器支持热更新，修改代码后页面会自动刷新。
-
-### 构建生产版本
+### 开发环境
 
 ```bash
-coze build
-```
+# 安装依赖
+pnpm install
 
-### 启动生产服务器
+# 启动开发服务器
+pnpm dev
 
-```bash
-coze start
+# 构建生产版本
+pnpm build
+
+# 启动生产服务器
+pnpm start
 ```
 
 ## 项目结构

@@ -645,7 +645,7 @@ export default function AdminPage() {
                 数据库备份
               </CardTitle>
               <CardDescription>
-                下载完整数据库文件，用于数据备份或迁移
+                下载完整数据库文件，用于数据备份或迁移（包含收费与支出数据）
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -657,7 +657,7 @@ export default function AdminPage() {
                 备份数据库
               </Button>
               <p className="text-xs text-gray-500">
-                * 备份文件为 .db 格式，包含所有学生信息和交费记录
+                * 备份文件为 .db 格式，包含所有收费和支出数据
               </p>
             </CardContent>
           </Card>
@@ -713,7 +713,7 @@ export default function AdminPage() {
                   <div className="flex-1">
                     <h4 className="font-semibold text-red-800">清空所有数据</h4>
                     <p className="text-sm text-red-700 mt-1">
-                      删除所有学生信息和交费记录，此操作不可恢复！
+                      删除所有收费和支出数据，此操作不可恢复！
                     </p>
                     <Button
                       onClick={() => setDeleteAllDialogOpen(true)}
@@ -845,8 +845,8 @@ export default function AdminPage() {
                     恢复操作将<strong>覆盖当前所有数据</strong>！
                   </p>
                   <ul className="mt-3 text-sm text-orange-700 space-y-1">
-                    <li>• 当前所有学生信息将被替换</li>
-                    <li>• 当前所有交费记录将被替换</li>
+                    <li>• 当前所有收费数据将被替换</li>
+                    <li>• 当前所有支出数据将被替换</li>
                     <li>• 此操作<strong>无法撤销</strong></li>
                   </ul>
                 </div>
@@ -899,7 +899,7 @@ export default function AdminPage() {
               ⚠️ 危险操作：清空所有数据
             </DialogTitle>
             <DialogDescription>
-              此操作将删除所有学生和交费记录，且无法恢复！
+              此操作将删除所有收费和支出数据，且无法恢复！
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -913,8 +913,8 @@ export default function AdminPage() {
                     您即将执行<strong>不可逆</strong>的操作！
                   </p>
                   <ul className="mt-3 text-sm text-red-700 space-y-1">
-                    <li>• 所有学生信息将被删除</li>
-                    <li>• 所有交费记录将被删除</li>
+                    <li>• 所有收费数据将被删除（学生、交费记录）</li>
+                    <li>• 所有支出数据将被删除</li>
                     <li>• 所有班级数据将被清空</li>
                     <li>• 此操作<strong>无法撤销</strong></li>
                   </ul>

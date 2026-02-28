@@ -17,6 +17,7 @@ import {
   ArrowLeft, 
   BarChart3, 
   TrendingUp, 
+  TrendingDown,
   RefreshCw,
   Users,
   DollarSign,
@@ -111,17 +112,32 @@ export default function StatsPage() {
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [expenseStats, setExpenseStats] = useState<{
+    total: number;
+    count: number;
+    categoryStats: { daily: number; personnel: number };
+  } | null>(null);
 
   // 获取统计数据
   const fetchStatistics = async () => {
     setLoading(true);
     try {
-      const response = await authFetch('/api/statistics');
-      const result = await response.json();
-      if (response.ok) {
-        setStatistics(result);
+      const [statsRes, expenseRes] = await Promise.all([
+        authFetch('/api/statistics'),
+        authFetch('/api/expenses/stats')
+      ]);
+      
+      const statsResult = await statsRes.json();
+      const expenseResult = await expenseRes.json();
+      
+      if (statsRes.ok) {
+        setStatistics(statsResult);
       } else {
-        console.error('Failed to fetch statistics:', result);
+        console.error('Failed to fetch statistics:', statsResult);
+      }
+      
+      if (expenseRes.ok) {
+        setExpenseStats(expenseResult);
       }
     } catch (error) {
       console.error('Failed to fetch statistics:', error);
@@ -349,6 +365,64 @@ export default function StatsPage() {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* 收支对比 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-indigo-600" />
+                  收支对比
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-green-50 rounded-lg p-4 text-center">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <TrendingUp className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div className="text-3xl font-bold text-green-600">
+                      ¥{statistics?.schoolTotal.total_paid.toLocaleString() || 0}
+                    </div>
+                    <div className="text-sm text-gray-500 mt-1">总收入（学生费用）</div>
+                  </div>
+                  <div className="bg-red-50 rounded-lg p-4 text-center">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <TrendingDown className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div className="text-3xl font-bold text-red-600">
+                      ¥{expenseStats?.total.toLocaleString() || 0}
+                    </div>
+                    <div className="text-sm text-gray-500 mt-1">总支出</div>
+                  </div>
+                  <div className="bg-indigo-50 rounded-lg p-4 text-center">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <DollarSign className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    <div className={`text-3xl font-bold ${
+                      (statistics?.schoolTotal.total_paid || 0) - (expenseStats?.total || 0) >= 0 
+                        ? 'text-indigo-600' 
+                        : 'text-red-600'
+                    }`}>
+                      ¥{((statistics?.schoolTotal.total_paid || 0) - (expenseStats?.total || 0)).toLocaleString()}
+                    </div>
+                    <div className="text-sm text-gray-500 mt-1">结余</div>
+                  </div>
+                </div>
+                
+                {expenseStats && (
+                  <div className="mt-4 grid grid-cols-2 gap-4">
+                    <div className="bg-gray-50 rounded-lg p-3 text-center">
+                      <div className="font-semibold text-gray-700">日常公用支出</div>
+                      <div className="text-lg text-red-500 font-medium">¥{expenseStats.categoryStats.daily.toLocaleString()}</div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3 text-center">
+                      <div className="font-semibold text-gray-700">人员支出</div>
+                      <div className="text-lg text-red-500 font-medium">¥{expenseStats.categoryStats.personnel.toLocaleString()}</div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

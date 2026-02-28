@@ -2,6 +2,72 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
+// 支出类别常量
+export const EXPENSE_CATEGORIES = {
+  DAILY: 'daily',      // 日常公用支出
+  PERSONNEL: 'personnel' // 人员支出
+} as const;
+
+export const EXPENSE_CATEGORY_NAMES: Record<string, string> = {
+  [EXPENSE_CATEGORIES.DAILY]: '日常公用支出',
+  [EXPENSE_CATEGORIES.PERSONNEL]: '人员支出'
+};
+
+// 日常公用支出子项目
+export const DAILY_EXPENSE_ITEMS = [
+  '办公费用',
+  '财务费',
+  '通讯费',
+  '交通费',
+  '交际费',
+  '学生用药（防控物资）',
+  '垃圾处理费',
+  '日常费用',
+  '水电费',
+  '固定资产',
+  '安保经费',
+  '装修费或工程',
+  '学生退费：包括膳食费',
+  '学生餐费',
+  '活动基金',
+  '教学业务费',
+  '代办费',
+  '社团',
+  '维修材料及维修费',
+  '校服、书包',
+  '租金'
+] as const;
+
+// 人员支出子项目
+export const PERSONNEL_EXPENSE_ITEMS = [
+  '教职工工资',
+  '课后服务、社团劳务费',
+  '福利费',
+  '医社保费',
+  '住房公积金',
+  '工作餐',
+  '工会经费',
+  '老师培训费',
+  '外聘老师工资',
+  '外教工资',
+  '晚托补贴及餐费',
+  '代理记账工资'
+] as const;
+
+// 所有支出子项目
+export const ALL_EXPENSE_ITEMS = [
+  ...DAILY_EXPENSE_ITEMS,
+  ...PERSONNEL_EXPENSE_ITEMS
+];
+
+// 根据子项目获取类别
+export function getExpenseCategory(item: string): string {
+  if (DAILY_EXPENSE_ITEMS.includes(item as typeof DAILY_EXPENSE_ITEMS[number])) {
+    return EXPENSE_CATEGORIES.DAILY;
+  }
+  return EXPENSE_CATEGORIES.PERSONNEL;
+}
+
 // 数据库文件路径
 const dbPath = path.join(process.cwd(), 'data', 'school_fees.db');
 
@@ -94,6 +160,31 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_payment_records_student_id ON payment_records(student_id);
     CREATE INDEX IF NOT EXISTS idx_payment_records_fee_type ON payment_records(fee_type);
     CREATE INDEX IF NOT EXISTS idx_agency_fee_items_student_id ON agency_fee_items(student_id);
+  `);
+
+  // 创建支出记录表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS expense_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL,
+      item TEXT NOT NULL,
+      report_date TEXT NOT NULL,
+      occur_date TEXT NOT NULL,
+      invoice_no TEXT,
+      amount REAL NOT NULL,
+      summary TEXT,
+      remark TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME
+    )
+  `);
+
+  // 创建支出记录索引
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_expense_records_category ON expense_records(category);
+    CREATE INDEX IF NOT EXISTS idx_expense_records_item ON expense_records(item);
+    CREATE INDEX IF NOT EXISTS idx_expense_records_report_date ON expense_records(report_date);
+    CREATE INDEX IF NOT EXISTS idx_expense_records_occur_date ON expense_records(occur_date);
   `);
 
   // 检查并添加新字段（兼容旧数据库）

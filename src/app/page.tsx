@@ -52,6 +52,7 @@ import {
   CreditCard,
   Settings,
   BarChart3,
+  TrendingDown,
   LogOut,
   Download
 } from 'lucide-react';
@@ -566,6 +567,15 @@ export default function Home() {
               >
                 <BarChart3 className="h-4 w-4 mr-2" />
                 统计
+              </Button>
+              
+              <Button
+                onClick={() => router.push('/expenses')}
+                variant="outline"
+                className="border-red-600 text-red-600 hover:bg-red-50"
+              >
+                <TrendingDown className="h-4 w-4 mr-2" />
+                支出
               </Button>
               
               <Button

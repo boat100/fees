@@ -677,7 +677,13 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                         size="sm"
                         variant="outline"
                         className="border-purple-600 text-purple-600 hover:bg-purple-100"
-                        onClick={() => setAgencyFeeDialogOpen(true)}
+                        onClick={() => {
+                          setAgencyFeeDate(getTodayString());
+                          setAgencyFeeItemType('');
+                          setAgencyFeeAmount(0);
+                          setAgencyFeeRemark('');
+                          setAgencyFeeDialogOpen(true);
+                        }}
                       >
                         <Plus className="h-3 w-3 mr-1" />
                         添加扣除

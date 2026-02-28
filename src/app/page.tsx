@@ -98,6 +98,12 @@ const formatDate = (dateStr: string | null): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+// 获取今天的日期字符串
+const getTodayString = (): string => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+};
+
 export default function Home() {
   const router = useRouter();
   // 状态管理
@@ -531,7 +537,21 @@ export default function Home() {
               </Button>
               
               <Button
-                onClick={() => setBatchPaymentDialogOpen(true)}
+                onClick={() => {
+                  setBatchPaymentData({
+                    selectedStudents: [],
+                    payments: [
+                      { feeType: 'tuition', amount: 0 },
+                      { feeType: 'lunch', amount: 0 },
+                      { feeType: 'nap', amount: 0 },
+                      { feeType: 'after_school', amount: 0 },
+                      { feeType: 'club', amount: 0 },
+                    ],
+                    paymentDate: getTodayString(),
+                    remark: '',
+                  });
+                  setBatchPaymentDialogOpen(true);
+                }}
                 variant="outline"
                 className="border-orange-600 text-orange-600 hover:bg-orange-50"
               >

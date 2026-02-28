@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
@@ -85,6 +85,11 @@ interface PaymentRecord {
 export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // 获取返回时要跳转的班级
+  const returnClass = searchParams.get('class');
+  
   const [student, setStudent] = useState<StudentDetail | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -492,7 +497,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={() => router.push('/fees')}>
+              <Button variant="ghost" onClick={() => router.push(returnClass ? `/fees?class=${encodeURIComponent(returnClass)}` : '/fees')}>
                 <ArrowLeft className="h-5 w-5 mr-2" />
                 返回
               </Button>

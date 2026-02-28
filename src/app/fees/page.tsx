@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
@@ -105,9 +105,14 @@ const getTodayString = (): string => {
 
 export default function FeesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // 从URL参数获取班级
+  const classFromUrl = searchParams.get('class');
+  
   // 状态管理
   const [classes, setClasses] = useState<string[]>([]);
-  const [selectedClass, setSelectedClass] = useState<string>('');
+  const [selectedClass, setSelectedClass] = useState<string>(classFromUrl || '');
   const [students, setStudents] = useState<StudentFee[]>([]);
   const [loading, setLoading] = useState(false);
   
@@ -168,7 +173,10 @@ export default function FeesPage() {
       const result = await response.json();
       if (result.data) {
         setClasses(result.data);
-        if (result.data.length > 0 && !selectedClass) {
+        // 优先使用URL参数中的班级，其次使用当前选中的班级，最后使用第一个班级
+        if (classFromUrl && result.data.includes(classFromUrl)) {
+          setSelectedClass(classFromUrl);
+        } else if (result.data.length > 0 && !selectedClass) {
           setSelectedClass(result.data[0]);
         }
       }
@@ -412,7 +420,9 @@ export default function FeesPage() {
     
     // 乐观更新：先从本地移除
     const previousStudents = [...students];
-    setStudents(prev => prev.filter(s => s.id !== selectedStudent.id));
+    const deletedStudentClass = selectedStudent.class_name;
+    const newStudentsList = students.filter(s => s.id !== selectedStudent.id);
+    setStudents(newStudentsList);
     setDeleteDialogOpen(false);
     
     toast.loading('正在删除...', { id: 'delete-student' });
@@ -424,6 +434,22 @@ export default function FeesPage() {
       
       if (response.ok) {
         toast.success('删除成功', { id: 'delete-student' });
+        
+        // 检查当前班级是否还有学生，如果没有则删除班级
+        if (newStudentsList.length === 0) {
+          // 从班级列表中移除当前班级
+          const newClasses = classes.filter(c => c !== deletedStudentClass);
+          setClasses(newClasses);
+          
+          // 选择另一个班级
+          if (newClasses.length > 0) {
+            setSelectedClass(newClasses[0]);
+          } else {
+            setSelectedClass('');
+          }
+          
+          toast.info(`${deletedStudentClass} 班级已无学生，已自动移除`, { duration: 3000 });
+        }
       } else {
         // 回滚
         const result = await response.json();
@@ -691,7 +717,7 @@ export default function FeesPage() {
                           <TableCell>{index + 1}</TableCell>
                           <TableCell>
                             <button
-                              onClick={() => router.push(`/students/${student.id}`)}
+                              onClick={() => router.push(`/students/${student.id}?class=${encodeURIComponent(selectedClass)}`)}
                               className="font-medium text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
                             >
                               {student.student_name}

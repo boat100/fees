@@ -3,17 +3,16 @@ version: '3.8'
 services:
   school-fees:
     # 使用本地构建的镜像
-    # 如需从 Docker Hub 拉取，改为：image: boat100/school-fees:latest
     image: school-fees:latest
     container_name: school-fees
     restart: unless-stopped
     
     # 端口映射：主机端口:容器端口
-    # 如需更改访问端口，修改左侧数字
     ports:
       - "5000:5000"
     
     # 数据卷映射：持久化数据库
+    # 请确保主机目录有写入权限
     volumes:
       - ./data:/app/data
     

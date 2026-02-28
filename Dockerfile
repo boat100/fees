@@ -35,7 +35,7 @@ RUN pnpm install --frozen-lockfile
 # 复制项目文件
 COPY . .
 
-# 构建项目（直接使用 next build）
+# 构建项目
 RUN npx next build
 
 # ==================== 运行阶段 ====================
@@ -53,10 +53,6 @@ RUN apk add --no-cache \
     curl \
     libc6-compat
 
-# 创建非 root 用户
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
-
 # 从构建阶段复制 standalone 输出
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
@@ -65,8 +61,8 @@ COPY --from=builder /app/public ./public
 # 复制 node_modules（包含 better-sqlite3 原生模块）
 COPY --from=builder /app/node_modules ./node_modules
 
-# 创建数据目录并设置权限
-RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
+# 创建数据目录并设置完全开放权限（确保可写入）
+RUN mkdir -p /app/data && chmod 777 /app/data
 
 # 设置环境变量
 ENV NODE_ENV=production
@@ -75,9 +71,6 @@ ENV COZE_WORKSPACE_PATH=/app
 
 # 暴露端口
 EXPOSE 5000
-
-# 切换到非 root 用户
-USER nextjs
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

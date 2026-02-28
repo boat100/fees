@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
@@ -103,7 +103,7 @@ const getTodayString = (): string => {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 };
 
-export default function FeesPage() {
+function FeesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -1191,5 +1191,18 @@ export default function FeesPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// 导出页面组件，用 Suspense 包裹
+export default function FeesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">加载中...</div>
+      </div>
+    }>
+      <FeesContent />
+    </Suspense>
   );
 }

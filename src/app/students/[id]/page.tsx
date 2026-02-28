@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
@@ -82,7 +82,7 @@ interface PaymentRecord {
   created_at: string;
 }
 
-export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1109,5 +1109,18 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// 导出页面组件，用 Suspense 包裹
+export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">加载中...</div>
+      </div>
+    }>
+      <StudentDetailContent params={params} />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
@@ -109,6 +109,13 @@ export default function ExpensesPage() {
   const [filterItem, setFilterItem] = useState<string>('');
   const [filterYearMonth, setFilterYearMonth] = useState<string>('');
   
+  // 根据筛选类别获取对应的子项目列表
+  const filterItems = filterCategory === EXPENSE_CATEGORIES.DAILY 
+    ? DAILY_ITEMS 
+    : filterCategory === EXPENSE_CATEGORIES.PERSONNEL 
+      ? PERSONNEL_ITEMS 
+      : [...DAILY_ITEMS, ...PERSONNEL_ITEMS];
+  
   // 对话框状态
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -135,6 +142,14 @@ export default function ExpensesPage() {
     remark: ''
   });
 
+  // 处理筛选类别变化 - 联动重置子项目
+  const handleFilterCategoryChange = (value: string) => {
+    const newCategory = value === 'all' ? '' : value;
+    setFilterCategory(newCategory);
+    // 重置子项目选择
+    setFilterItem('');
+  };
+
   // 获取今天的日期
   const getTodayString = (): string => {
     const today = new Date();
@@ -147,8 +162,8 @@ export default function ExpensesPage() {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   };
 
-  // 获取支出记录
-  const fetchRecords = async () => {
+  // 获取支出记录 - 使用 useCallback 确保函数引用稳定
+  const fetchRecords = useCallback(async () => {
     setLoading(true);
     try {
       let url = '/api/expenses?';
@@ -166,7 +181,7 @@ export default function ExpensesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterCategory, filterItem, filterYearMonth]);
 
   // 初始化
   useEffect(() => {
@@ -175,12 +190,7 @@ export default function ExpensesPage() {
       return;
     }
     fetchRecords();
-  }, [router]);
-
-  // 筛选变化时重新获取
-  useEffect(() => {
-    fetchRecords();
-  }, [filterCategory, filterItem, filterYearMonth]);
+  }, [router, fetchRecords]);
 
   // 打开新增对话框
   const openAddDialog = () => {
@@ -480,11 +490,11 @@ export default function ExpensesPage() {
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
                 <Label>类别：</Label>
-                <Select value={filterCategory || 'all'} onValueChange={(v) => setFilterCategory(v === 'all' ? '' : v)}>
+                <Select value={filterCategory || 'all'} onValueChange={handleFilterCategoryChange}>
                   <SelectTrigger className="w-36">
                     <SelectValue placeholder="全部" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper">
                     <SelectItem value="all">全部</SelectItem>
                     <SelectItem value={EXPENSE_CATEGORIES.DAILY}>日常公用支出</SelectItem>
                     <SelectItem value={EXPENSE_CATEGORIES.PERSONNEL}>人员支出</SelectItem>
@@ -496,16 +506,26 @@ export default function ExpensesPage() {
                 <Label>子项目：</Label>
                 <Select value={filterItem || 'all'} onValueChange={(v) => setFilterItem(v === 'all' ? '' : v)}>
                   <SelectTrigger className="w-48">
-                    <SelectValue placeholder="全部" />
+                    <SelectValue placeholder={filterCategory ? '请选择子项目' : '全部'} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper">
                     <SelectItem value="all">全部</SelectItem>
-                    <SelectItem value="__group_daily__" disabled>—— 日常公用支出 ——</SelectItem>
-                    {DAILY_ITEMS.map(item => (
+                    {!filterCategory && (
+                      <>
+                        <SelectItem value="__group_daily__" disabled>—— 日常公用支出 ——</SelectItem>
+                        {DAILY_ITEMS.map(item => (
+                          <SelectItem key={item} value={item}>{item}</SelectItem>
+                        ))}
+                        <SelectItem value="__group_personnel__" disabled>—— 人员支出 ——</SelectItem>
+                        {PERSONNEL_ITEMS.map(item => (
+                          <SelectItem key={item} value={item}>{item}</SelectItem>
+                        ))}
+                      </>
+                    )}
+                    {filterCategory === EXPENSE_CATEGORIES.DAILY && DAILY_ITEMS.map(item => (
                       <SelectItem key={item} value={item}>{item}</SelectItem>
                     ))}
-                    <SelectItem value="__group_personnel__" disabled>—— 人员支出 ——</SelectItem>
-                    {PERSONNEL_ITEMS.map(item => (
+                    {filterCategory === EXPENSE_CATEGORIES.PERSONNEL && PERSONNEL_ITEMS.map(item => (
                       <SelectItem key={item} value={item}>{item}</SelectItem>
                     ))}
                   </SelectContent>
@@ -615,7 +635,7 @@ export default function ExpensesPage() {
                 <SelectTrigger className="col-span-3">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper">
                   <SelectItem value={EXPENSE_CATEGORIES.DAILY}>日常公用支出</SelectItem>
                   <SelectItem value={EXPENSE_CATEGORIES.PERSONNEL}>人员支出</SelectItem>
                 </SelectContent>
@@ -628,7 +648,7 @@ export default function ExpensesPage() {
                 <SelectTrigger className="col-span-3">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper">
                   {currentItems.map(item => (
                     <SelectItem key={item} value={item}>{item}</SelectItem>
                   ))}

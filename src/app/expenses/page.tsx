@@ -533,7 +533,7 @@ export default function ExpensesPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                <Label>月份：</Label>
+                <Label>报账月份：</Label>
                 <Input
                   type="month"
                   value={filterYearMonth}

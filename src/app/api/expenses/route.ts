@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (yearMonth) {
-      sql += ' AND strftime("%Y-%m", occur_date) = ?';
+      sql += ' AND strftime("%Y-%m", report_date) = ?';
       params.push(yearMonth);
     }
 

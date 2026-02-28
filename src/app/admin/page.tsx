@@ -74,6 +74,7 @@ export default function AdminPage() {
       '课后服务费应交', '课后服务费已交',
       '社团费应交', '社团费已交',
       '代办费应交',
+      '缴费时间',
       '备注'
     ];
     const csvContent = headers.join(',') + '\n';
@@ -200,6 +201,9 @@ export default function AdminPage() {
   const confirmImport = async () => {
     if (importData.length === 0) return;
     
+    // 获取今天日期作为默认缴费时间
+    const today = new Date().toISOString().split('T')[0];
+    
     const formattedData = importData.map(row => {
       // 兼容新旧格式
       // 新格式：学费应交, 学费已交
@@ -216,6 +220,12 @@ export default function AdminPage() {
       const clubPaid = Number(row['社团费已交'] || 0);
       const agencyFee = Number(row['代办费应交'] || row['代办费'] || row['其他费用应交'] || row['其他费用'] || 600);
       
+      // 解析缴费时间，如果没有则使用今天日期
+      let paymentDate = String(row['缴费时间'] || '').trim();
+      if (!paymentDate || paymentDate === '') {
+        paymentDate = today;
+      }
+      
       return {
         className: String(row['班级'] || ''),
         studentName: String(row['姓名'] || ''),
@@ -231,6 +241,7 @@ export default function AdminPage() {
         clubFee,
         clubPaid,
         agencyFee,
+        paymentDate,
         remark: String(row['备注'] || ''),
       };
     });
@@ -745,7 +756,7 @@ export default function AdminPage() {
                   <li>预览数据无误后确认导入</li>
                 </ol>
                 <div className="mt-3 p-2 bg-blue-50 rounded text-xs text-blue-700">
-                  <strong>提示：</strong>模板包含&ldquo;应交&rdquo;和&ldquo;已交&rdquo;两列，可同时导入应交费用和已交费用
+                  <strong>提示：</strong>模板包含&ldquo;应交&rdquo;和&ldquo;已交&rdquo;两列，可同时导入应交费用和已交费用；&ldquo;缴费时间&rdquo;可指定已交费用的日期，留空则使用导入当天日期
                 </div>
               </div>
               <div>

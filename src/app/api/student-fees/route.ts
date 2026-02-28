@@ -212,6 +212,7 @@ export async function PUT(request: NextRequest) {
       clubFee?: number;
       clubPaid?: number;
       agencyFee?: number;
+      paymentDate?: string;
       remark?: string;
     }>) => {
       for (const student of students) {
@@ -275,8 +276,8 @@ export async function PUT(request: NextRequest) {
           // 删除该学生之前的所有交费记录
           deletePaymentsStmt.run(studentId);
           
-          // 插入新的交费记录
-          const paymentDate = new Date().toISOString().split('T')[0];
+          // 使用传入的缴费时间，如果没有则使用今天日期
+          const paymentDate = student.paymentDate || new Date().toISOString().split('T')[0];
           
           if ((student.tuitionPaid || 0) > 0) {
             insertPaymentStmt.run(studentId, 'tuition', student.tuitionPaid, paymentDate, '批量导入');

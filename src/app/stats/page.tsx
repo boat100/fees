@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -115,10 +116,12 @@ export default function StatsPage() {
   const fetchStatistics = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/statistics');
+      const response = await authFetch('/api/statistics');
       const result = await response.json();
       if (response.ok) {
         setStatistics(result);
+      } else {
+        console.error('Failed to fetch statistics:', result);
       }
     } catch (error) {
       console.error('Failed to fetch statistics:', error);
@@ -136,7 +139,7 @@ export default function StatsPage() {
         url += `&class_name=${encodeURIComponent(className)}`;
       }
       
-      const response = await fetch(url);
+      const response = await authFetch(url);
       if (!response.ok) {
         throw new Error('导出失败');
       }
@@ -176,7 +179,8 @@ export default function StatsPage() {
   // 退出登录
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await authFetch('/api/auth/logout', { method: 'POST' });
+      clearAuthToken();
       router.push('/login');
     } catch (error) {
       console.error('Failed to logout:', error);
@@ -185,6 +189,11 @@ export default function StatsPage() {
 
   // 初始化加载
   useEffect(() => {
+    // 检查登录状态
+    if (!isAuthenticated()) {
+      router.push('/login');
+      return;
+    }
     fetchStatistics();
   }, []);
 

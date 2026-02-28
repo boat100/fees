@@ -17,6 +17,7 @@ RUN apk add --no-cache \
     g++ \
     git \
     sqlite \
+    bash \
     libc6-compat
 
 # 安装 pnpm
@@ -28,14 +29,14 @@ RUN pnpm config set registry https://registry.npmmirror.com
 # 复制 package.json 和 lock 文件
 COPY package.json pnpm-lock.yaml ./
 
-# 安装依赖（增加内存限制）
-RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm install --frozen-lockfile
+# 安装依赖
+RUN pnpm install --frozen-lockfile
 
 # 复制项目文件
 COPY . .
 
-# 构建项目（增加内存限制）
-RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm run build
+# 构建项目（直接使用 next build）
+RUN npx next build
 
 # ==================== 运行阶段 ====================
 FROM node:20-alpine AS runner
@@ -51,12 +52,6 @@ RUN apk add --no-cache \
     sqlite \
     curl \
     libc6-compat
-
-# 安装 pnpm
-RUN npm install -g pnpm@9.0.0
-
-# 配置 pnpm 镜像源
-RUN pnpm config set registry https://registry.npmmirror.com
 
 # 创建非 root 用户
 RUN addgroup --system --gid 1001 nodejs && \

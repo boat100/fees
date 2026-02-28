@@ -22,10 +22,10 @@ export async function GET(request: NextRequest) {
     const params: (string | number)[] = [];
 
     if (yearMonth) {
-      dateFilter = ' AND strftime("%Y-%m", occur_date) = ?';
-      params.push(yearMonth);
+      dateFilter = ' AND report_date LIKE ?';
+      params.push(`${yearMonth}%`);
     } else if (startDate && endDate) {
-      dateFilter = ' AND occur_date >= ? AND occur_date <= ?';
+      dateFilter = ' AND report_date >= ? AND report_date <= ?';
       params.push(startDate, endDate);
     }
 

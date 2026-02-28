@@ -68,8 +68,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (yearMonth) {
-      sql += ' AND strftime("%Y-%m", report_date) = ?';
-      params.push(yearMonth);
+      sql += ' AND report_date LIKE ?';
+      params.push(`${yearMonth}%`);
     }
 
     sql += ' ORDER BY occur_date DESC, created_at DESC';

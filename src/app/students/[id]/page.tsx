@@ -499,7 +499,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={() => router.push('/')}>
+              <Button variant="ghost" onClick={() => router.push('/fees')}>
                 <ArrowLeft className="h-5 w-5 mr-2" />
                 返回
               </Button>

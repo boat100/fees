@@ -50,7 +50,8 @@ import {
   Calendar,
   FileText,
   LogOut,
-  Download
+  Download,
+  Home
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 

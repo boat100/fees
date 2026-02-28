@@ -533,6 +533,15 @@ export default function AdminPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
+              <Button
+                onClick={() => router.push('/')}
+                variant="ghost"
+                size="sm"
+                className="gap-1"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                返回首页
+              </Button>
               <Settings className="h-8 w-8 text-purple-600" />
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">
                 后台管理
@@ -540,13 +549,6 @@ export default function AdminPage() {
             </div>
             
             <div className="flex items-center gap-2">
-              <Button
-                onClick={() => router.push('/')}
-                variant="outline"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                返回首页
-              </Button>
               <Button
                 onClick={handleLogout}
                 variant="outline"

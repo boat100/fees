@@ -75,7 +75,7 @@ export default function AdminPage() {
       '午托费应交', '午托费已交',
       '课后服务费应交', '课后服务费已交',
       '社团费应交', '社团费已交',
-      '其他费用应交', '其他费用已交',
+      '代办费应交',
       '备注'
     ];
     const csvContent = headers.join(',') + '\n';
@@ -145,8 +145,7 @@ export default function AdminPage() {
       const afterSchoolPaid = Number(row['课后服务费已交'] || 0);
       const clubFee = Number(row['社团费应交'] || row['社团费'] || 0);
       const clubPaid = Number(row['社团费已交'] || 0);
-      const otherFee = Number(row['其他费用应交'] || row['其他费用'] || 0);
-      const otherPaid = Number(row['其他费用已交'] || 0);
+      const agencyFee = Number(row['代办费应交'] || row['代办费'] || row['其他费用应交'] || row['其他费用'] || 600);
       
       return {
         className: String(row['班级'] || ''),
@@ -162,8 +161,7 @@ export default function AdminPage() {
         afterSchoolPaid,
         clubFee,
         clubPaid,
-        otherFee,
-        otherPaid,
+        agencyFee,
         remark: String(row['备注'] || ''),
       };
     });
@@ -209,10 +207,10 @@ export default function AdminPage() {
       const calculateStudentTotals = (student: typeof students[0]) => {
         const totalFee = 
           (student.tuition_fee || 0) + (student.lunch_fee || 0) + (student.nap_fee || 0) +
-          (student.after_school_fee || 0) + (student.club_fee || 0) + (student.other_fee || 0);
+          (student.after_school_fee || 0) + (student.club_fee || 0) + (student.agency_fee || 0);
         const totalPaid = 
           (student.tuition_paid || 0) + (student.lunch_paid || 0) + (student.nap_paid || 0) +
-          (student.after_school_paid || 0) + (student.club_paid || 0) + (student.other_paid || 0);
+          (student.after_school_paid || 0) + (student.club_paid || 0) + (student.agency_fee || 0); // 代办费视为已收
         return { totalFee, totalPaid };
       };
       
@@ -234,7 +232,7 @@ export default function AdminPage() {
       });
       
       // 生成CSV
-      const headers = ['班级', '姓名', '性别', '午托状态', '学费应交', '学费已交', '午餐费应交', '午餐费已交', '午托费应交', '午托费已交', '课后服务费应交', '课后服务费已交', '社团费应交', '社团费已交', '其他费用应交', '其他费用已交', '应交合计', '已交合计', '备注'];
+      const headers = ['班级', '姓名', '性别', '午托状态', '学费应交', '学费已交', '午餐费应交', '午餐费已交', '午托费应交', '午托费已交', '课后服务费应交', '课后服务费已交', '社团费应交', '社团费已交', '代办费', '代办费余额', '应交合计', '已交合计', '备注'];
       
       const rows: string[][] = [];
       
@@ -259,8 +257,8 @@ export default function AdminPage() {
             String(student.after_school_paid || 0),
             String(student.club_fee || 0),
             String(student.club_paid || 0),
-            String(student.other_fee || 0),
-            String(student.other_paid || 0),
+            String(student.agency_fee || 600),
+            String(student.agency_balance || student.agency_fee || 600),
             String(totalFee),
             String(totalPaid),
             student.remark || '',

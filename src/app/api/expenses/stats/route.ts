@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/database';
+import { db, initDatabase, EXPENSE_CATEGORIES, DAILY_EXPENSE_ITEMS, PERSONNEL_EXPENSE_ITEMS } from '@/lib/database';
 import { isAuthenticated } from '@/lib/auth';
-import { EXPENSE_CATEGORIES, DAILY_EXPENSE_ITEMS, PERSONNEL_EXPENSE_ITEMS } from '@/lib/database';
+
+// 初始化数据库
+initDatabase();
 
 // GET - 获取支出统计
 export async function GET(request: NextRequest) {

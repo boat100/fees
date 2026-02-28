@@ -480,12 +480,12 @@ export default function ExpensesPage() {
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
                 <Label>类别：</Label>
-                <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <Select value={filterCategory || 'all'} onValueChange={(v) => setFilterCategory(v === 'all' ? '' : v)}>
                   <SelectTrigger className="w-36">
                     <SelectValue placeholder="全部" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部</SelectItem>
+                    <SelectItem value="all">全部</SelectItem>
                     <SelectItem value={EXPENSE_CATEGORIES.DAILY}>日常公用支出</SelectItem>
                     <SelectItem value={EXPENSE_CATEGORIES.PERSONNEL}>人员支出</SelectItem>
                   </SelectContent>
@@ -494,12 +494,12 @@ export default function ExpensesPage() {
 
               <div className="flex items-center gap-2">
                 <Label>子项目：</Label>
-                <Select value={filterItem} onValueChange={setFilterItem}>
+                <Select value={filterItem || 'all'} onValueChange={(v) => setFilterItem(v === 'all' ? '' : v)}>
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="全部" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部</SelectItem>
+                    <SelectItem value="all">全部</SelectItem>
                     <SelectItem value="__group_daily__" disabled>—— 日常公用支出 ——</SelectItem>
                     {DAILY_ITEMS.map(item => (
                       <SelectItem key={item} value={item}>{item}</SelectItem>

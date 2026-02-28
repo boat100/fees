@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/database';
+import { db, initDatabase } from '@/lib/database';
 import { isAuthenticated } from '@/lib/auth';
+
+// 初始化数据库
+initDatabase();
 
 // GET - 获取支出记录列表
 export async function GET(request: NextRequest) {

@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  school-fees:
+    # 使用本地构建的镜像
+    # 如需从 Docker Hub 拉取，改为：image: boat100/school-fees:latest
+    image: school-fees:latest
+    container_name: school-fees
+    restart: unless-stopped
+    
+    # 端口映射：主机端口:容器端口
+    # 如需更改访问端口，修改左侧数字
+    ports:
+      - "5000:5000"
+    
+    # 数据卷映射：持久化数据库
+    volumes:
+      - ./data:/app/data
+    
+    # 环境变量
+    environment:
+      - NODE_ENV=production
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

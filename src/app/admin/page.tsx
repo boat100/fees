@@ -249,7 +249,9 @@ export default function AdminPage() {
       const result = await response.json();
       
       if (response.ok) {
-        alert(result.message);
+        // 生成友好的成功消息
+        const successMsg = `导入成功！新增 ${result.insertCount || 0} 条，更新 ${result.updateCount || 0} 条，共处理 ${result.total || 0} 条数据`;
+        alert(successMsg);
         setImportDialogOpen(false);
         setImportData([]);
       } else {

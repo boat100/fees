@@ -39,6 +39,7 @@ import {
   RefreshCw,
   LogOut
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -263,7 +264,7 @@ export default function AdminPage() {
     }
   };
 
-  // 导出所有数据
+  // 导出所有数据（Excel格式，每个班级一个工作表）
   const exportAllData = async () => {
     try {
       const response = await authFetch('/api/student-fees?all=true');
@@ -283,7 +284,7 @@ export default function AdminPage() {
           (student.after_school_fee || 0) + (student.club_fee || 0) + (student.agency_fee || 0);
         const totalPaid = 
           (student.tuition_paid || 0) + (student.lunch_paid || 0) + (student.nap_paid || 0) +
-          (student.after_school_paid || 0) + (student.club_paid || 0) + (student.agency_fee || 0); // 代办费视为已收
+          (student.after_school_paid || 0) + (student.club_paid || 0) + (student.agency_fee || 0);
         return { totalFee, totalPaid };
       };
       
@@ -296,69 +297,133 @@ export default function AdminPage() {
         classGroups[student.class_name].push(student);
       });
       
-      // 计算总合计
-      let grandTotalFee = 0, grandTotalPaid = 0;
-      students.forEach((student: typeof students[0]) => {
-        const { totalFee, totalPaid } = calculateStudentTotals(student);
-        grandTotalFee += totalFee;
-        grandTotalPaid += totalPaid;
-      });
+      // 创建工作簿
+      const workbook = XLSX.utils.book_new();
       
-      // 生成CSV
+      // 表头
       const headers = ['班级', '姓名', '性别', '午托状态', '学费应交', '学费已交', '午餐费应交', '午餐费已交', '午托费应交', '午托费已交', '课后服务费应交', '课后服务费已交', '社团费应交', '社团费已交', '代办费', '代办费余额', '应交合计', '已交合计', '备注'];
       
-      const rows: string[][] = [];
+      // 计算总合计
+      let grandTotalFee = 0, grandTotalPaid = 0;
       
-      // 按班级输出
-      Object.keys(classGroups).sort().forEach(className => {
-        rows.push([`【${className}】`]);
+      // 按班级创建工作表
+      const sortedClasses = Object.keys(classGroups).sort();
+      
+      sortedClasses.forEach(className => {
+        const classStudents = classGroups[className];
+        const sheetData: (string | number)[][] = [headers];
+        let classTotalFee = 0, classTotalPaid = 0;
         
-        classGroups[className].forEach((student: typeof students[0]) => {
+        classStudents.forEach((student: typeof students[0]) => {
           const { totalFee, totalPaid } = calculateStudentTotals(student);
-          rows.push([
+          classTotalFee += totalFee;
+          classTotalPaid += totalPaid;
+          grandTotalFee += totalFee;
+          grandTotalPaid += totalPaid;
+          
+          sheetData.push([
             student.class_name,
             student.student_name,
             student.gender || '男',
             (student.nap_fee || 0) > 0 ? '午托' : '走读',
-            String(student.tuition_fee || 0),
-            String(student.tuition_paid || 0),
-            String(student.lunch_fee || 0),
-            String(student.lunch_paid || 0),
-            String(student.nap_fee || 0),
-            String(student.nap_paid || 0),
-            String(student.after_school_fee || 0),
-            String(student.after_school_paid || 0),
-            String(student.club_fee || 0),
-            String(student.club_paid || 0),
-            String(student.agency_fee || 600),
-            String(student.agency_balance || student.agency_fee || 600),
-            String(totalFee),
-            String(totalPaid),
+            student.tuition_fee || 0,
+            student.tuition_paid || 0,
+            student.lunch_fee || 0,
+            student.lunch_paid || 0,
+            student.nap_fee || 0,
+            student.nap_paid || 0,
+            student.after_school_fee || 0,
+            student.after_school_paid || 0,
+            student.club_fee || 0,
+            student.club_paid || 0,
+            student.agency_fee || 600,
+            student.agency_balance || student.agency_fee || 600,
+            totalFee,
+            totalPaid,
             student.remark || '',
           ]);
         });
         
+        // 添加班级小计
+        sheetData.push([]);
+        sheetData.push(['小计', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', classTotalFee, classTotalPaid, '']);
+        
+        // 创建工作表
+        const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+        
+        // 设置列宽
+        worksheet['!cols'] = [
+          { wch: 10 },  // 班级
+          { wch: 10 },  // 姓名
+          { wch: 6 },   // 性别
+          { wch: 8 },   // 午托状态
+          { wch: 10 },  // 学费应交
+          { wch: 10 },  // 学费已交
+          { wch: 10 },  // 午餐费应交
+          { wch: 10 },  // 午餐费已交
+          { wch: 10 },  // 午托费应交
+          { wch: 10 },  // 午托费已交
+          { wch: 12 },  // 课后服务费应交
+          { wch: 12 },  // 课后服务费已交
+          { wch: 10 },  // 社团费应交
+          { wch: 10 },  // 社团费已交
+          { wch: 10 },  // 代办费
+          { wch: 10 },  // 代办费余额
+          { wch: 10 },  // 应交合计
+          { wch: 10 },  // 已交合计
+          { wch: 15 },  // 备注
+        ];
+        
+        // 工作表名称（Excel工作表名最多31个字符，且不能包含特殊字符）
+        let sheetName = className.replace(/[\\\/\?\*\[\]]/g, '_').substring(0, 31);
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      });
+      
+      // 添加汇总工作表
+      const summaryData: (string | number)[][] = [
+        ['全校费用汇总'],
+        [],
+        ['班级', '学生人数', '应交合计', '已交合计', '欠费合计'],
+      ];
+      
+      let totalStudents = 0;
+      sortedClasses.forEach(className => {
+        const classStudents = classGroups[className];
         let classTotalFee = 0, classTotalPaid = 0;
-        classGroups[className].forEach((student: typeof students[0]) => {
+        classStudents.forEach((student: typeof students[0]) => {
           const { totalFee, totalPaid } = calculateStudentTotals(student);
           classTotalFee += totalFee;
           classTotalPaid += totalPaid;
         });
-        rows.push(['小计', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', String(classTotalFee), String(classTotalPaid), '']);
-        rows.push([]);
+        totalStudents += classStudents.length;
+        summaryData.push([
+          className,
+          classStudents.length,
+          classTotalFee,
+          classTotalPaid,
+          classTotalFee - classTotalPaid,
+        ]);
       });
       
-      rows.push(['总合计', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', String(grandTotalFee), String(grandTotalPaid), '']);
+      summaryData.push([]);
+      summaryData.push(['全校合计', totalStudents, grandTotalFee, grandTotalPaid, grandTotalFee - grandTotalPaid]);
       
-      const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+      const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+      summarySheet['!cols'] = [
+        { wch: 12 },  // 班级
+        { wch: 10 },  // 学生人数
+        { wch: 12 },  // 应交合计
+        { wch: 12 },  // 已交合计
+        { wch: 12 },  // 欠费合计
+      ];
       
-      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `全部费用明细_${new Date().toISOString().split('T')[0]}.csv`;
-      link.click();
-      window.URL.revokeObjectURL(url);
+      // 将汇总表放在最前面
+      XLSX.utils.book_append_sheet(workbook, summarySheet, '汇总', true);
+      
+      // 导出文件
+      const fileName = `学生费用明细_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      
     } catch (error) {
       console.error('Failed to export data:', error);
       alert('导出失败');

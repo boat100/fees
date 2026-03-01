@@ -298,15 +298,13 @@ export default function ExpensesPage() {
     }
   };
 
-  // 导出Excel
+  // 导出Excel - 根据当前筛选结果导出
   const handleExport = async () => {
     try {
-      // 获取所有数据
-      const response = await authFetch('/api/expenses?');
-      const result = await response.json();
-      const allRecords = result.data || [];
+      // 使用当前筛选后的数据
+      const exportRecords = records;
 
-      if (allRecords.length === 0) {
+      if (exportRecords.length === 0) {
         alert('没有数据可导出');
         return;
       }
@@ -314,46 +312,30 @@ export default function ExpensesPage() {
       // 创建工作簿
       const workbook = XLSX.utils.book_new();
 
-      // 按类别分组
-      const dailyRecords = allRecords.filter((r: ExpenseRecord) => r.category === EXPENSE_CATEGORIES.DAILY);
-      const personnelRecords = allRecords.filter((r: ExpenseRecord) => r.category === EXPENSE_CATEGORIES.PERSONNEL);
-
       // 表头
       const headers = ['类别', '子项目', '报账时间', '发生时间', '发票号', '金额', '摘要', '备注'];
 
-      // 日常公用支出工作表
-      if (dailyRecords.length > 0) {
-        const dailyData: (string | number)[][] = [headers];
-        dailyRecords.forEach((r: ExpenseRecord) => {
-          dailyData.push([
-            CATEGORY_NAMES[r.category],
-            r.item,
-            r.report_date,
-            r.occur_date,
-            r.invoice_no || '',
-            r.amount,
-            r.summary || '',
-            r.remark || ''
-          ]);
-        });
-        // 添加合计
-        const dailyTotal = dailyRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
-        dailyData.push([]);
-        dailyData.push(['合计', '', '', '', '', dailyTotal, '', '']);
-
-        const dailySheet = XLSX.utils.aoa_to_sheet(dailyData);
-        dailySheet['!cols'] = [
-          { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
-          { wch: 15 }, { wch: 12 }, { wch: 30 }, { wch: 20 }
-        ];
-        XLSX.utils.book_append_sheet(workbook, dailySheet, '日常公用支出');
+      // 生成文件名后缀
+      let fileNameSuffix = '';
+      if (filterCategory) {
+        fileNameSuffix += `_${CATEGORY_NAMES[filterCategory]}`;
+      }
+      if (filterItem) {
+        fileNameSuffix += `_${filterItem}`;
+      }
+      if (filterYearMonth) {
+        fileNameSuffix += `_${filterYearMonth}`;
+      }
+      if (!fileNameSuffix) {
+        fileNameSuffix = '_全部';
       }
 
-      // 人员支出工作表
-      if (personnelRecords.length > 0) {
-        const personnelData: (string | number)[][] = [headers];
-        personnelRecords.forEach((r: ExpenseRecord) => {
-          personnelData.push([
+      // 如果筛选了特定类别，只生成该类别的工作表
+      if (filterCategory) {
+        const categoryRecords = exportRecords.filter((r: ExpenseRecord) => r.category === filterCategory);
+        const data: (string | number)[][] = [headers];
+        categoryRecords.forEach((r: ExpenseRecord) => {
+          data.push([
             CATEGORY_NAMES[r.category],
             r.item,
             r.report_date,
@@ -365,37 +347,109 @@ export default function ExpensesPage() {
           ]);
         });
         // 添加合计
-        const personnelTotal = personnelRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
-        personnelData.push([]);
-        personnelData.push(['合计', '', '', '', '', personnelTotal, '', '']);
+        const total = categoryRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
+        data.push([]);
+        data.push(['合计', '', '', '', '', total, '', '']);
 
-        const personnelSheet = XLSX.utils.aoa_to_sheet(personnelData);
-        personnelSheet['!cols'] = [
+        const sheet = XLSX.utils.aoa_to_sheet(data);
+        sheet['!cols'] = [
           { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
           { wch: 15 }, { wch: 12 }, { wch: 30 }, { wch: 20 }
         ];
-        XLSX.utils.book_append_sheet(workbook, personnelSheet, '人员支出');
+        XLSX.utils.book_append_sheet(workbook, sheet, CATEGORY_NAMES[filterCategory]);
+      } else {
+        // 未筛选类别，按类别分组生成工作表
+        const dailyRecords = exportRecords.filter((r: ExpenseRecord) => r.category === EXPENSE_CATEGORIES.DAILY);
+        const personnelRecords = exportRecords.filter((r: ExpenseRecord) => r.category === EXPENSE_CATEGORIES.PERSONNEL);
+
+        // 日常公用支出工作表
+        if (dailyRecords.length > 0) {
+          const dailyData: (string | number)[][] = [headers];
+          dailyRecords.forEach((r: ExpenseRecord) => {
+            dailyData.push([
+              CATEGORY_NAMES[r.category],
+              r.item,
+              r.report_date,
+              r.occur_date,
+              r.invoice_no || '',
+              r.amount,
+              r.summary || '',
+              r.remark || ''
+            ]);
+          });
+          // 添加合计
+          const dailyTotal = dailyRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
+          dailyData.push([]);
+          dailyData.push(['合计', '', '', '', '', dailyTotal, '', '']);
+
+          const dailySheet = XLSX.utils.aoa_to_sheet(dailyData);
+          dailySheet['!cols'] = [
+            { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+            { wch: 15 }, { wch: 12 }, { wch: 30 }, { wch: 20 }
+          ];
+          XLSX.utils.book_append_sheet(workbook, dailySheet, '日常公用支出');
+        }
+
+        // 人员支出工作表
+        if (personnelRecords.length > 0) {
+          const personnelData: (string | number)[][] = [headers];
+          personnelRecords.forEach((r: ExpenseRecord) => {
+            personnelData.push([
+              CATEGORY_NAMES[r.category],
+              r.item,
+              r.report_date,
+              r.occur_date,
+              r.invoice_no || '',
+              r.amount,
+              r.summary || '',
+              r.remark || ''
+            ]);
+          });
+          // 添加合计
+          const personnelTotal = personnelRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
+          personnelData.push([]);
+          personnelData.push(['合计', '', '', '', '', personnelTotal, '', '']);
+
+          const personnelSheet = XLSX.utils.aoa_to_sheet(personnelData);
+          personnelSheet['!cols'] = [
+            { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+            { wch: 15 }, { wch: 12 }, { wch: 30 }, { wch: 20 }
+          ];
+          XLSX.utils.book_append_sheet(workbook, personnelSheet, '人员支出');
+        }
       }
 
       // 汇总工作表
-      const summaryData = [
+      const dailyRecords = exportRecords.filter((r: ExpenseRecord) => r.category === EXPENSE_CATEGORIES.DAILY);
+      const personnelRecords = exportRecords.filter((r: ExpenseRecord) => r.category === EXPENSE_CATEGORIES.PERSONNEL);
+      const dailyTotal = dailyRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
+      const personnelTotal = personnelRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
+
+      const summaryData: (string | number)[][] = [
         ['支出汇总'],
+        [],
+        ['筛选条件:'],
+        ['类别', filterCategory ? CATEGORY_NAMES[filterCategory] : '全部'],
+        ['子项目', filterItem || '全部'],
+        ['年月', filterYearMonth || '全部'],
         [],
         ['类别', '记录数', '金额合计']
       ];
-      const dailyTotal = dailyRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
-      const personnelTotal = personnelRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
-      summaryData.push(['日常公用支出', dailyRecords.length, dailyTotal]);
-      summaryData.push(['人员支出', personnelRecords.length, personnelTotal]);
+      if (dailyRecords.length > 0) {
+        summaryData.push(['日常公用支出', dailyRecords.length, dailyTotal]);
+      }
+      if (personnelRecords.length > 0) {
+        summaryData.push(['人员支出', personnelRecords.length, personnelTotal]);
+      }
       summaryData.push([]);
-      summaryData.push(['总计', allRecords.length, dailyTotal + personnelTotal]);
+      summaryData.push(['总计', exportRecords.length, dailyTotal + personnelTotal]);
 
       const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-      summarySheet['!cols'] = [{ wch: 15 }, { wch: 10 }, { wch: 15 }];
+      summarySheet['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 15 }];
       XLSX.utils.book_append_sheet(workbook, summarySheet, '汇总', true);
 
       // 导出
-      const fileName = `支出明细_${new Date().toISOString().split('T')[0]}.xlsx`;
+      const fileName = `支出明细${fileNameSuffix}_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(workbook, fileName);
     } catch (error) {
       console.error('Export failed:', error);

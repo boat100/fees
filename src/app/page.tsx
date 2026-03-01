@@ -108,22 +108,22 @@ export default function Home() {
       title: '收费管理',
       href: '/fees',
       icon: DollarSign,
-      activeColor: 'text-green-600',
-      bgColor: 'bg-green-50',
+      activeColor: 'text-white',
+      bgColor: 'bg-green-600 hover:bg-green-700',
     },
     {
       title: '支出管理',
       href: '/expenses',
       icon: TrendingDown,
-      activeColor: 'text-red-600',
-      bgColor: 'bg-red-50',
+      activeColor: 'text-white',
+      bgColor: 'bg-red-600 hover:bg-red-700',
     },
     {
       title: '后台管理',
       href: '/admin',
       icon: Settings,
-      activeColor: 'text-purple-600',
-      bgColor: 'bg-purple-50',
+      activeColor: 'text-white',
+      bgColor: 'bg-purple-600 hover:bg-purple-700',
     },
   ];
 
@@ -143,16 +143,14 @@ export default function Home() {
               </div>
               
               {/* 导航菜单 */}
-              <nav className="hidden md:flex items-center gap-1">
+              <nav className="hidden md:flex items-center gap-2">
                 {navItems.map((item) => {
                   const Icon = item.icon;
-                  const isActive = pathname === item.href;
                   return (
                     <Button
                       key={item.href}
-                      variant="ghost"
                       onClick={() => router.push(item.href)}
-                      className={`gap-2 ${isActive ? item.activeColor + ' ' + item.bgColor : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}
+                      className={`gap-2 ${item.bgColor} ${item.activeColor}`}
                     >
                       <Icon className="h-4 w-4" />
                       {item.title}
@@ -178,17 +176,15 @@ export default function Home() {
 
       {/* 移动端导航菜单 */}
       <div className="md:hidden bg-white border-b border-gray-100 px-4 py-2">
-        <nav className="flex items-center gap-1 overflow-x-auto">
+        <nav className="flex items-center gap-2 overflow-x-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href;
             return (
               <Button
                 key={item.href}
-                variant="ghost"
                 size="sm"
                 onClick={() => router.push(item.href)}
-                className={`gap-1.5 shrink-0 ${isActive ? item.activeColor + ' ' + item.bgColor : 'text-gray-600'}`}
+                className={`gap-1.5 shrink-0 ${item.bgColor} ${item.activeColor}`}
               >
                 <Icon className="h-4 w-4" />
                 {item.title}

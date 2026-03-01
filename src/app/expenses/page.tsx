@@ -47,7 +47,8 @@ import {
   Trash2, 
   TrendingDown,
   LogOut,
-  Download
+  Download,
+  Upload
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -116,6 +117,27 @@ export default function ExpensesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<ExpenseRecord | null>(null);
+  
+  // 导入对话框状态
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importData, setImportData] = useState<Array<{
+    category: string;
+    item: string;
+    reportDate: string;
+    occurDate: string;
+    invoiceNo: string;
+    amount: number;
+    summary: string;
+    remark: string;
+  }>>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    success: boolean;
+    message: string;
+    importedCount: number;
+    errorCount: number;
+    errors?: Array<{ row: number; error: string }>;
+  } | null>(null);
   
   // 表单状态
   const [formData, setFormData] = useState<{
@@ -457,6 +479,133 @@ export default function ExpensesPage() {
     }
   };
 
+  // 解析导入文件
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      
+      // 获取第一个工作表
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      
+      // 转换为JSON
+      const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as (string | number)[][];
+      
+      // 跳过表头，处理数据
+      const parsedData: typeof importData = [];
+      
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (!row || row.length < 6) continue; // 跳过空行或数据不完整的行
+        
+        // 支持两种格式：
+        // 格式1: 类别, 子项目, 报账时间, 发生时间, 发票号, 金额, 摘要, 备注
+        // 格式2: 子项目, 报账时间, 发生时间, 发票号, 金额, 摘要, 备注 (需要用户选择类别)
+        
+        let category = '';
+        let item = '';
+        let reportDate = '';
+        let occurDate = '';
+        let invoiceNo = '';
+        let amount = 0;
+        let summary = '';
+        let remark = '';
+        
+        // 判断第一列是否是类别
+        const firstCol = String(row[0] || '').trim();
+        if (firstCol === '日常公用支出' || firstCol === '人员支出' || 
+            firstCol === '日常公用' || firstCol === '人员') {
+          // 格式1: 包含类别
+          category = firstCol;
+          item = String(row[1] || '').trim();
+          reportDate = String(row[2] || '').trim();
+          occurDate = String(row[3] || '').trim();
+          invoiceNo = String(row[4] || '').trim();
+          amount = Number(row[5]) || 0;
+          summary = String(row[6] || '').trim();
+          remark = String(row[7] || '').trim();
+        } else {
+          // 格式2: 不包含类别，默认使用日常公用支出
+          category = '日常公用支出';
+          item = String(row[0] || '').trim();
+          reportDate = String(row[1] || '').trim();
+          occurDate = String(row[2] || '').trim();
+          invoiceNo = String(row[3] || '').trim();
+          amount = Number(row[4]) || 0;
+          summary = String(row[5] || '').trim();
+          remark = String(row[6] || '').trim();
+        }
+        
+        // 跳过金额为0或无效的行
+        if (amount <= 0 || !item) continue;
+        
+        parsedData.push({
+          category,
+          item,
+          reportDate,
+          occurDate,
+          invoiceNo,
+          amount,
+          summary,
+          remark
+        });
+      }
+      
+      setImportData(parsedData);
+      setImportResult(null);
+      
+      if (parsedData.length === 0) {
+        alert('未解析到有效数据，请检查文件格式');
+      }
+    } catch (error) {
+      console.error('Failed to parse file:', error);
+      alert('文件解析失败，请检查文件格式');
+    }
+    
+    // 清空文件选择
+    e.target.value = '';
+  };
+
+  // 执行导入
+  const handleImport = async () => {
+    if (importData.length === 0) {
+      alert('没有可导入的数据');
+      return;
+    }
+
+    setImportLoading(true);
+    try {
+      const response = await authFetch('/api/expenses/batch-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records: importData })
+      });
+      
+      const result = await response.json();
+      setImportResult(result);
+      
+      if (result.success) {
+        fetchRecords();
+      }
+    } catch (error) {
+      console.error('Failed to import:', error);
+      alert('导入失败');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // 打开导入对话框
+  const openImportDialog = () => {
+    setImportData([]);
+    setImportResult(null);
+    setImportDialogOpen(true);
+  };
+
   // 退出登录
   const handleLogout = async () => {
     try {
@@ -502,6 +651,10 @@ export default function ExpensesPage() {
             </div>
             
             <div className="flex items-center gap-2">
+              <Button onClick={openImportDialog} variant="outline" size="sm">
+                <Upload className="h-4 w-4 mr-1" />
+                导入
+              </Button>
               <Button onClick={handleExport} variant="outline" size="sm">
                 <Download className="h-4 w-4 mr-1" />
                 导出
@@ -806,6 +959,137 @@ export default function ExpensesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 导入对话框 */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              批量导入支出记录
+            </DialogTitle>
+            <DialogDescription>
+              上传Excel文件批量导入支出记录。支持格式：
+              <br />
+              格式1：类别、子项目、报账时间、发生时间、发票号、金额、摘要、备注
+              <br />
+              格式2：子项目、报账时间、发生时间、发票号、金额、摘要、备注（默认为日常公用支出）
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* 文件选择 */}
+            <div className="flex items-center gap-4">
+              <Label htmlFor="import-file" className="cursor-pointer">
+                <div className="flex items-center gap-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg hover:bg-gray-50">
+                  <Upload className="h-4 w-4" />
+                  选择Excel文件
+                </div>
+                <Input
+                  id="import-file"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+              </Label>
+              {importData.length > 0 && (
+                <span className="text-sm text-gray-600">
+                  已解析 {importData.length} 条记录
+                </span>
+              )}
+            </div>
+
+            {/* 数据预览 */}
+            {importData.length > 0 && (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold">类别</TableHead>
+                      <TableHead className="font-semibold">子项目</TableHead>
+                      <TableHead className="font-semibold">报账时间</TableHead>
+                      <TableHead className="font-semibold">发生时间</TableHead>
+                      <TableHead className="font-semibold">发票号</TableHead>
+                      <TableHead className="text-right font-semibold">金额</TableHead>
+                      <TableHead className="font-semibold">摘要</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importData.slice(0, 10).map((record, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{record.category}</TableCell>
+                        <TableCell>{record.item}</TableCell>
+                        <TableCell>{record.reportDate}</TableCell>
+                        <TableCell>{record.occurDate}</TableCell>
+                        <TableCell>{record.invoiceNo || '-'}</TableCell>
+                        <TableCell className="text-right">{record.amount.toFixed(2)}</TableCell>
+                        <TableCell>{record.summary || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                    {importData.length > 10 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-gray-500">
+                          ... 还有 {importData.length - 10} 条记录
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* 导入结果 */}
+            {importResult && (
+              <div className={`p-4 rounded-lg ${importResult.success ? 'bg-green-50' : 'bg-red-50'}`}>
+                <div className={`font-medium ${importResult.success ? 'text-green-700' : 'text-red-700'}`}>
+                  {importResult.message}
+                </div>
+                <div className="text-sm text-gray-600 mt-1">
+                  成功导入: {importResult.importedCount} 条
+                  {importResult.errorCount > 0 && `，失败: ${importResult.errorCount} 条`}
+                </div>
+                {importResult.errors && importResult.errors.length > 0 && (
+                  <div className="mt-2 text-sm text-red-600 max-h-32 overflow-y-auto">
+                    {importResult.errors.slice(0, 5).map((err, i) => (
+                      <div key={i}>第{err.row}行: {err.error}</div>
+                    ))}
+                    {importResult.errors.length > 5 && (
+                      <div>... 还有 {importResult.errors.length - 5} 条错误</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 导入说明 */}
+            <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+              <div className="font-medium mb-1">导入说明：</div>
+              <ul className="list-disc list-inside space-y-1">
+                <li>类别可选值：日常公用支出、人员支出</li>
+                <li>子项目必须与系统预设的项目名称一致</li>
+                <li>日期格式：YYYY-MM-DD（如 2024-01-15）</li>
+                <li>金额必须为大于0的数字</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
+              {importResult?.success ? '关闭' : '取消'}
+            </Button>
+            {!importResult?.success && (
+              <Button
+                onClick={handleImport}
+                disabled={importLoading || importData.length === 0}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {importLoading ? '导入中...' : `导入 ${importData.length} 条记录`}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

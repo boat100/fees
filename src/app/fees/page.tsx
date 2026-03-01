@@ -314,6 +314,11 @@ function FeesContent() {
   const handleSubmit = async () => {
     setSubmitting(true);
     
+    // 新增时，agencyPaid 默认等于 agencyFee；修改时保持原值
+    const agencyPaidValue = selectedStudent 
+      ? (formData.agencyPaid ?? formData.agencyFee ?? 0)
+      : (formData.agencyFee || 0);
+    
     // 准备学生数据
     const studentData = {
       class_name: formData.className,
@@ -326,7 +331,7 @@ function FeesContent() {
       after_school_fee: Number(formData.afterSchoolFee),
       club_fee: Number(formData.clubFee),
       agency_fee: Number(formData.agencyFee) || 0,
-      agency_paid: Number(formData.agencyPaid) ?? (Number(formData.agencyFee) || 0),
+      agency_paid: agencyPaidValue,
       tuition_paid: 0,
       lunch_paid: 0,
       nap_paid: 0,
@@ -377,7 +382,7 @@ function FeesContent() {
           afterSchoolFee: Number(formData.afterSchoolFee),
           clubFee: Number(formData.clubFee),
           agencyFee: Number(formData.agencyFee),
-          agencyPaid: Number(formData.agencyPaid),
+          agencyPaid: agencyPaidValue,
           remark: formData.remark || null,
         }),
       });
@@ -978,38 +983,18 @@ function FeesContent() {
             </div>
             
             {/* 代办费 */}
-            <div className="grid grid-cols-4 items-center gap-4 border-t pt-4">
+            <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right font-semibold text-purple-600">代办费</Label>
-              <div className="col-span-3 grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs text-gray-500">应交</Label>
-                  <Input
-                    type="number"
-                    value={formData.agencyFee}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      agencyFee: Number(e.target.value),
-                      // 如果已交大于应交，自动调整已交
-                      agencyPaid: Math.min(Number(formData.agencyPaid), Number(e.target.value))
-                    })}
-                    placeholder="应交代办费"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">已交</Label>
-                  <Input
-                    type="number"
-                    value={formData.agencyPaid}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      agencyPaid: Math.min(Number(e.target.value), formData.agencyFee)
-                    })}
-                    placeholder="已交代办费"
-                  />
-                </div>
+              <div className="col-span-3">
+                <Input
+                  type="number"
+                  value={formData.agencyFee || ''}
+                  onChange={(e) => setFormData({ ...formData, agencyFee: Number(e.target.value) })}
+                  placeholder="默认600元，可修改为0"
+                />
+                <p className="text-xs text-gray-500 mt-1">代办费默认一次性收齐，扣除项目在学生详情页管理</p>
               </div>
             </div>
-            <p className="text-xs text-gray-500 col-span-4 text-center">代办费：应交/已交/剩余（剩余=已交-已扣除），支持应交设为0</p>
             
             {/* 备注 */}
             <div className="grid grid-cols-4 items-center gap-4 border-t pt-4">

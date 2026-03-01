@@ -552,6 +552,45 @@ export default function ExpensesPage() {
     }
   };
 
+  // 将 Excel 日期序列号转换为日期字符串
+  const excelDateToString = (value: unknown): string => {
+    if (value === null || value === undefined || value === '') {
+      return '';
+    }
+    
+    // 如果已经是有效的日期字符串格式
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value;
+    }
+    
+    // 如果是数字（Excel 日期序列号）
+    if (typeof value === 'number') {
+      // Excel 日期序列号：自 1899 年 12 月 30 日以来的天数
+      // 需要减去 1，因为 Excel 错误地将 1900 年视为闰年
+      const excelEpoch = new Date(1899, 11, 30);
+      const date = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000);
+      
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      
+      return `${year}-${month}-${day}`;
+    }
+    
+    // 尝试解析字符串日期
+    if (typeof value === 'string') {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+    }
+    
+    return String(value);
+  };
+
   // 解析导入文件
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -595,8 +634,8 @@ export default function ExpensesPage() {
           // 格式1: 包含类别
           category = firstCol;
           item = String(row[1] || '').trim();
-          reportDate = String(row[2] || '').trim();
-          occurDate = String(row[3] || '').trim();
+          reportDate = excelDateToString(row[2]);
+          occurDate = excelDateToString(row[3]);
           invoiceNo = String(row[4] || '').trim();
           amount = Number(row[5]) || 0;
           summary = String(row[6] || '').trim();
@@ -605,8 +644,8 @@ export default function ExpensesPage() {
           // 格式2: 不包含类别，默认使用日常公用支出
           category = '日常公用支出';
           item = String(row[0] || '').trim();
-          reportDate = String(row[1] || '').trim();
-          occurDate = String(row[2] || '').trim();
+          reportDate = excelDateToString(row[1]);
+          occurDate = excelDateToString(row[2]);
           invoiceNo = String(row[3] || '').trim();
           amount = Number(row[4]) || 0;
           summary = String(row[5] || '').trim();

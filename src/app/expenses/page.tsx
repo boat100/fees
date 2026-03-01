@@ -322,15 +322,16 @@ export default function ExpensesPage() {
       const result = await response.json();
 
       if (response.ok) {
+        toast.success('删除成功');
         setDeleteDialogOpen(false);
         setSelectedRecord(null);
         fetchRecords();
       } else {
-        alert(result.error || '删除失败');
+        toast.error(result.error || '删除失败');
       }
     } catch (error) {
       console.error('Failed to delete expense:', error);
-      alert('删除失败');
+      toast.error('删除失败');
     } finally {
       setSubmitting(false);
     }
@@ -369,7 +370,7 @@ export default function ExpensesPage() {
   // 批量删除
   const handleBatchDelete = async () => {
     if (selectedIds.size === 0) {
-      alert('请先选择要删除的记录');
+      toast.error('请先选择要删除的记录');
       return;
     }
 
@@ -383,15 +384,16 @@ export default function ExpensesPage() {
       const result = await response.json();
 
       if (response.ok) {
+        toast.success(`成功删除 ${selectedIds.size} 条记录`);
         setBatchDeleteDialogOpen(false);
         setSelectedIds(new Set());
         fetchRecords();
       } else {
-        alert(result.error || '删除失败');
+        toast.error(result.error || '删除失败');
       }
     } catch (error) {
       console.error('Failed to batch delete expenses:', error);
-      alert('删除失败');
+      toast.error('删除失败');
     } finally {
       setSubmitting(false);
     }
@@ -404,7 +406,7 @@ export default function ExpensesPage() {
       const exportRecords = records;
 
       if (exportRecords.length === 0) {
-        alert('没有数据可导出');
+        toast.error('没有数据可导出');
         return;
       }
 
@@ -552,7 +554,7 @@ export default function ExpensesPage() {
       XLSX.writeFile(workbook, fileName);
     } catch (error) {
       console.error('Export failed:', error);
-      alert('导出失败');
+      toast.error('导出失败');
     }
   };
 
@@ -715,11 +717,11 @@ export default function ExpensesPage() {
       setImportResult(null);
       
       if (parsedData.length === 0) {
-        alert('未解析到有效数据，请检查文件格式');
+        toast.error('未解析到有效数据，请检查文件格式');
       }
     } catch (error) {
       console.error('Failed to parse file:', error);
-      alert('文件解析失败，请检查文件格式');
+      toast.error('文件解析失败，请检查文件格式');
     }
     
     // 清空文件选择
@@ -729,7 +731,7 @@ export default function ExpensesPage() {
   // 执行导入
   const handleImport = async () => {
     if (importData.length === 0) {
-      alert('没有可导入的数据');
+      toast.error('没有可导入的数据');
       return;
     }
 
@@ -745,11 +747,12 @@ export default function ExpensesPage() {
       setImportResult(result);
       
       if (result.success) {
+        toast.success(result.message || '导入成功');
         fetchRecords();
       }
     } catch (error) {
       console.error('Failed to import:', error);
-      alert('导入失败');
+      toast.error('导入失败');
     } finally {
       setImportLoading(false);
     }

@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   UserPlus, 
   Edit, 
@@ -1313,11 +1314,24 @@ function FeesContent() {
                               {totalFee.toFixed(0)}/{totalPaid.toFixed(0)}
                             </div>
                           </TableCell>
-                          <TableCell 
-                            className="max-w-[100px] truncate"
-                            title={student.remark || undefined}
-                          >
-                            {student.remark || '-'}
+                          <TableCell className="max-w-[100px]">
+                            {student.remark ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="block truncate cursor-default">
+                                    {student.remark}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent 
+                                  side="top" 
+                                  className="max-w-[300px] whitespace-pre-wrap break-words text-left"
+                                >
+                                  {student.remark}
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-center">
                             <Button

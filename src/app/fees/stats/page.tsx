@@ -99,7 +99,7 @@ function StatsContent() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [statsData, setStatsData] = useState<StatsData | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
   // 检查登录状态
   useEffect(() => {
@@ -399,6 +399,7 @@ function StatsContent() {
                         <SelectValue placeholder="选择月份" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="all">全部月份</SelectItem>
                         {statsData.monthlyStats.availableMonths.map((month) => (
                           <SelectItem key={month} value={month}>
                             {month}
@@ -413,15 +414,13 @@ function StatsContent() {
                       disabled={Object.keys(statsData.monthlyStats.classStats).length === 0}
                     >
                       <Download className="h-4 w-4 mr-1" />
-                      导出
+                      导出{selectedMonth === 'all' ? '全部' : selectedMonth || ''}
                     </Button>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {!selectedMonth ? (
-                  <div className="text-center py-8 text-gray-500">请选择月份查看统计数据</div>
-                ) : selectedMonth === 'all' ? (
+                {selectedMonth === 'all' ? (
                   // 显示全部月份汇总
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
@@ -439,31 +438,90 @@ function StatsContent() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {statsData.monthlyStats.availableMonths.map((month) => {
-                          const monthData = statsData.monthlyStats.classStats[month] || {};
-                          const classes = Object.keys(monthData).sort();
-                          return classes.map((className, idx) => {
-                            const classData = monthData[className];
-                            return (
-                              <TableRow key={`${month}-${className}`}>
-                                <TableCell className="font-medium">{idx === 0 ? month : ''}</TableCell>
-                                <TableCell>{className}</TableCell>
-                                <TableCell className="text-right">{classData.payments['tuition']?.amount.toFixed(0) || '-'}</TableCell>
-                                <TableCell className="text-right">{classData.payments['lunch']?.amount.toFixed(0) || '-'}</TableCell>
-                                <TableCell className="text-right">{classData.payments['nap']?.amount.toFixed(0) || '-'}</TableCell>
-                                <TableCell className="text-right">{classData.payments['after_school']?.amount.toFixed(0) || '-'}</TableCell>
-                                <TableCell className="text-right">{classData.payments['club']?.amount.toFixed(0) || '-'}</TableCell>
-                                <TableCell className="text-right">{classData.payments['agency']?.amount.toFixed(0) || '-'}</TableCell>
-                                <TableCell className="text-right font-semibold text-green-600">¥{classData.total.toFixed(0)}</TableCell>
+                        {(() => {
+                          const feeTypes = ['tuition', 'lunch', 'nap', 'after_school', 'club', 'agency'] as const;
+                          const rows: React.ReactNode[] = [];
+                          let grandTotal = 0;
+                          const grandTotals: Record<string, number> = {};
+                          feeTypes.forEach(type => grandTotals[type] = 0);
+                          
+                          statsData.monthlyStats.availableMonths.forEach((month) => {
+                            const monthData = statsData.monthlyStats.classStats[month] || {};
+                            const classes = Object.keys(monthData).sort();
+                            
+                            if (classes.length === 0) return;
+                            
+                            // 计算月度合计
+                            const monthTotals: Record<string, number> = {};
+                            feeTypes.forEach(type => monthTotals[type] = 0);
+                            let monthTotal = 0;
+                            
+                            // 班级行
+                            classes.forEach((className, idx) => {
+                              const classData = monthData[className];
+                              monthTotal += classData.total;
+                              feeTypes.forEach(type => {
+                                monthTotals[type] += classData.payments[type]?.amount || 0;
+                              });
+                              
+                              rows.push(
+                                <TableRow key={`${month}-${className}`}>
+                                  <TableCell className="font-medium">{idx === 0 ? month : ''}</TableCell>
+                                  <TableCell>{className}</TableCell>
+                                  <TableCell className="text-right">{classData.payments['tuition']?.amount.toFixed(0) || '-'}</TableCell>
+                                  <TableCell className="text-right">{classData.payments['lunch']?.amount.toFixed(0) || '-'}</TableCell>
+                                  <TableCell className="text-right">{classData.payments['nap']?.amount.toFixed(0) || '-'}</TableCell>
+                                  <TableCell className="text-right">{classData.payments['after_school']?.amount.toFixed(0) || '-'}</TableCell>
+                                  <TableCell className="text-right">{classData.payments['club']?.amount.toFixed(0) || '-'}</TableCell>
+                                  <TableCell className="text-right">{classData.payments['agency']?.amount.toFixed(0) || '-'}</TableCell>
+                                  <TableCell className="text-right font-semibold text-green-600">¥{classData.total.toFixed(0)}</TableCell>
+                                </TableRow>
+                              );
+                            });
+                            
+                            // 累计到总计
+                            grandTotal += monthTotal;
+                            feeTypes.forEach(type => {
+                              grandTotals[type] += monthTotals[type];
+                            });
+                            
+                            // 月度合计行
+                            rows.push(
+                              <TableRow key={`${month}-total`} className="bg-gray-50">
+                                <TableCell colSpan={2} className="font-semibold text-gray-600">{month} 合计</TableCell>
+                                <TableCell className="text-right font-semibold">¥{monthTotals['tuition'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-semibold">¥{monthTotals['lunch'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-semibold">¥{monthTotals['nap'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-semibold">¥{monthTotals['after_school'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-semibold">¥{monthTotals['club'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-semibold">¥{monthTotals['agency'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-semibold text-blue-600">¥{monthTotal.toFixed(0)}</TableCell>
                               </TableRow>
                             );
                           });
-                        })}
-                        {statsData.monthlyStats.availableMonths.length === 0 && (
-                          <TableRow>
-                            <TableCell colSpan={9} className="text-center text-gray-500">暂无缴费记录</TableCell>
-                          </TableRow>
-                        )}
+                          
+                          // 总计行
+                          if (rows.length > 0) {
+                            rows.push(
+                              <TableRow key="grand-total" className="bg-blue-100">
+                                <TableCell colSpan={2} className="font-bold text-blue-800">总计</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotals['tuition'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotals['lunch'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotals['nap'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotals['after_school'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotals['club'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotals['agency'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotal.toFixed(0)}</TableCell>
+                              </TableRow>
+                            );
+                          }
+                          
+                          return rows.length > 0 ? rows : (
+                            <TableRow>
+                              <TableCell colSpan={9} className="text-center text-gray-500">暂无缴费记录</TableCell>
+                            </TableRow>
+                          );
+                        })()}
                       </TableBody>
                     </Table>
                   </div>
@@ -562,12 +620,15 @@ function StatsContent() {
 
     if (exportAll) {
       // 导出全部月份
+      let hasData = false;
+      
       statsData.monthlyStats.availableMonths.forEach((month) => {
         const monthData = statsData.monthlyStats.classStats[month] || {};
         const classes = Object.keys(monthData).sort();
         
         if (classes.length === 0) return;
 
+        hasData = true;
         const data: (string | number)[][] = [
           ['班级', ...feeTypeNames, '合计']
         ];
@@ -595,6 +656,11 @@ function StatsContent() {
         sheet['!cols'] = [{ wch: 15 }, ...feeTypes.map(() => ({ wch: 12 })), { wch: 12 }];
         XLSX.utils.book_append_sheet(workbook, sheet, month);
       });
+
+      if (!hasData) {
+        toast.error('暂无月度数据可导出');
+        return;
+      }
     } else {
       // 导出选中月份
       const monthData = statsData.monthlyStats.classStats[selectedMonth] || {};

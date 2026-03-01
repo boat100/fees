@@ -107,6 +107,9 @@ export async function GET(request: NextRequest) {
         }
         await exportAgencyFeeDetail(workbook, className);
         break;
+      case 'school_all_classes':
+        await exportSchoolAllClasses(workbook, students, payments);
+        break;
       case 'month':
         await exportByMonth(workbook, students, payments);
         break;
@@ -125,6 +128,7 @@ export async function GET(request: NextRequest) {
       'class_detail': `${className}班级费用明细.xlsx`,
       'class_payment_records': `${className}班级缴费记录.xlsx`,
       'agency_fee_detail': `${className}代办费明细.xlsx`,
+      'school_all_classes': '全校班级费用明细.xlsx',
       'month': '月度费用统计.xlsx',
       'class': '班级费用统计.xlsx'
     };
@@ -770,5 +774,97 @@ async function exportAgencyFeeDetail(workbook: XLSX.WorkBook, className: string)
     // 如果没有扣除记录，添加空表提示
     const emptyWs = XLSX.utils.json_to_sheet([{ 提示: '暂无扣除记录' }]);
     XLSX.utils.book_append_sheet(workbook, emptyWs, '扣除明细记录');
+  }
+}
+
+// 导出全校所有班级数据（每个班级一个工作表）
+async function exportSchoolAllClasses(workbook: XLSX.WorkBook, students: StudentData[], payments: PaymentData[]) {
+  // 获取所有班级
+  const classes = [...new Set(students.map(s => s.class_name))].sort();
+
+  for (const className of classes) {
+    const classStudents = students.filter(s => s.class_name === className);
+    const classPayments = payments.filter(p => p.student_class === className);
+
+    // 学生费用明细
+    const studentDetails = classStudents.map(s => {
+      const studentPayments = classPayments.filter(p => p.student_id === s.id);
+      
+      const paidByType: Record<string, number> = {};
+      ['tuition', 'lunch', 'nap', 'after_school', 'club'].forEach(type => {
+        paidByType[type] = studentPayments
+          .filter(p => p.fee_type === type)
+          .reduce((sum, p) => sum + (p.amount || 0), 0);
+      });
+      
+      const agencyPaid = s.agency_paid ?? s.agency_fee ?? 0;
+
+      const totalFee = (s.tuition_fee || 0) + (s.lunch_fee || 0) + (s.nap_fee || 0) +
+                       (s.after_school_fee || 0) + (s.club_fee || 0) + (s.agency_fee || 0);
+      const totalPaid = Object.values(paidByType).reduce((a, b) => a + b, 0) + agencyPaid;
+
+      return {
+        学生姓名: s.student_name,
+        性别: s.gender || '男',
+        学费应交: s.tuition_fee || 0,
+        学费已交: paidByType['tuition'],
+        午餐费应交: s.lunch_fee || 0,
+        午餐费已交: paidByType['lunch'],
+        午托费应交: s.nap_fee || 0,
+        午托费已交: paidByType['nap'],
+        课后服务应交: s.after_school_fee || 0,
+        课后服务已交: paidByType['after_school'],
+        社团费应交: s.club_fee || 0,
+        社团费已交: paidByType['club'],
+        代办费应交: s.agency_fee || 0,
+        代办费已交: agencyPaid,
+        合计应交: totalFee,
+        合计已交: totalPaid,
+        待收金额: totalFee - totalPaid,
+      };
+    });
+
+    // 添加汇总行
+    const totalRow = {
+      学生姓名: '合计',
+      性别: '',
+      学费应交: classStudents.reduce((sum, s) => sum + (s.tuition_fee || 0), 0),
+      学费已交: studentDetails.reduce((sum, s) => sum + s.学费已交, 0),
+      午餐费应交: classStudents.reduce((sum, s) => sum + (s.lunch_fee || 0), 0),
+      午餐费已交: studentDetails.reduce((sum, s) => sum + s.午餐费已交, 0),
+      午托费应交: classStudents.reduce((sum, s) => sum + (s.nap_fee || 0), 0),
+      午托费已交: studentDetails.reduce((sum, s) => sum + s.午托费已交, 0),
+      课后服务应交: classStudents.reduce((sum, s) => sum + (s.after_school_fee || 0), 0),
+      课后服务已交: studentDetails.reduce((sum, s) => sum + s.课后服务已交, 0),
+      社团费应交: classStudents.reduce((sum, s) => sum + (s.club_fee || 0), 0),
+      社团费已交: studentDetails.reduce((sum, s) => sum + s.社团费已交, 0),
+      代办费应交: classStudents.reduce((sum, s) => sum + (s.agency_fee || 0), 0),
+      代办费已交: studentDetails.reduce((sum, s) => sum + s.代办费已交, 0),
+      合计应交: studentDetails.reduce((sum, s) => sum + s.合计应交, 0),
+      合计已交: studentDetails.reduce((sum, s) => sum + s.合计已交, 0),
+      待收金额: studentDetails.reduce((sum, s) => sum + s.待收金额, 0),
+    };
+
+    const sheetData = [...studentDetails, totalRow];
+
+    // 工作表名称最长31个字符（Excel限制）
+    let sheetName = className;
+    if (sheetName.length > 31) {
+      sheetName = sheetName.substring(0, 31);
+    }
+
+    const ws = XLSX.utils.json_to_sheet(sheetData);
+    ws['!cols'] = [
+      { wch: 12 }, // 学生姓名
+      { wch: 6 },  // 性别
+      { wch: 10 }, { wch: 10 }, // 学费
+      { wch: 10 }, { wch: 10 }, // 午餐费
+      { wch: 10 }, { wch: 10 }, // 午托费
+      { wch: 12 }, { wch: 12 }, // 课后服务
+      { wch: 10 }, { wch: 10 }, // 社团费
+      { wch: 10 }, { wch: 10 }, // 代办费
+      { wch: 10 }, { wch: 10 }, { wch: 10 }, // 合计
+    ];
+    XLSX.utils.book_append_sheet(workbook, ws, sheetName);
   }
 }

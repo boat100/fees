@@ -221,6 +221,7 @@ export async function PUT(request: NextRequest) {
       clubFee?: number;
       clubPaid?: number;
       agencyFee?: number;
+      agencyPaid?: number;
       paymentDate?: string;
       remark?: string;
     }>) => {
@@ -248,7 +249,7 @@ export async function PUT(request: NextRequest) {
             student.afterSchoolFee || 0,
             student.clubFee || 0,
             student.agencyFee || 600,
-            (student as { agencyPaid?: number }).agencyPaid ?? (student.agencyFee || 600),
+            student.agencyPaid ?? (student.agencyFee || 600),
             student.remark || null,
             student.className,
             student.studentName
@@ -268,7 +269,7 @@ export async function PUT(request: NextRequest) {
             student.afterSchoolFee || 0,
             student.clubFee || 0,
             student.agencyFee || 600,
-            (student as { agencyPaid?: number }).agencyPaid ?? (student.agencyFee || 600),
+            student.agencyPaid ?? (student.agencyFee || 600),
             student.remark || null
           );
           studentId = result.lastInsertRowid as number;

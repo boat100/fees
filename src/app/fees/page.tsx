@@ -167,6 +167,7 @@ function FeesContent() {
     clubFee: number;
     clubPaid: number;
     agencyFee: number;
+    agencyPaid: number;
     paymentDate: string;
     remark: string;
   }>>([]);
@@ -721,6 +722,7 @@ function FeesContent() {
         clubFee: Number(row['社团费应交'] || row['社团费'] || 0),
         clubPaid: Number(row['社团费已交'] || 0),
         agencyFee: Number(row['代办费应交'] || row['代办费'] || 600),
+        agencyPaid: Number(row['代办费已交'] || 0),
         paymentDate: String(row['缴费时间'] || '').trim() || today,
         remark: String(row['备注'] || ''),
       }));
@@ -789,7 +791,7 @@ function FeesContent() {
       '午托费应交', '午托费已交',
       '课后服务费应交', '课后服务费已交',
       '社团费应交', '社团费已交',
-      '代办费应交',
+      '代办费应交', '代办费已交',
       '缴费时间',
       '备注'
     ];
@@ -801,7 +803,7 @@ function FeesContent() {
       '500', '500',
       '300', '300',
       '200', '200',
-      '600',
+      '600', '600',
       '2024-09-01',
       '示例备注'
     ];

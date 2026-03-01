@@ -729,7 +729,6 @@ function FeesContent() {
       
       setImportData(formattedData);
       setImportResult(null);
-      setImportDialogOpen(true);
     } catch (error) {
       console.error('Failed to parse file:', error);
       toast.error('文件解析失败，请检查文件格式');
@@ -819,13 +818,6 @@ function FeesContent() {
     window.URL.revokeObjectURL(url);
   };
 
-  // 打开导入对话框
-  const openImportDialog = () => {
-    setImportData([]);
-    setImportResult(null);
-    document.getElementById('import-file-input')?.click();
-  };
-
   // 退出登录
   const handleLogout = async () => {
     try {
@@ -878,20 +870,17 @@ function FeesContent() {
             {/* 导航按钮 */}
             <nav className="flex items-center gap-2">
               <Button
-                onClick={openImportDialog}
+                onClick={() => {
+                  setImportData([]);
+                  setImportResult(null);
+                  setImportDialogOpen(true);
+                }}
                 variant="outline"
                 className="border-purple-600 text-purple-600 hover:bg-purple-50"
               >
                 <Upload className="h-4 w-4 mr-2" />
                 导入
               </Button>
-              <input
-                id="import-file-input"
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
               
               <Button
                 onClick={handleAddStudent}
@@ -1622,11 +1611,44 @@ function FeesContent() {
               批量导入学生费用
             </DialogTitle>
             <DialogDescription>
-              从CSV文件批量导入学生费用数据。支持格式：班级、姓名、性别、各费用应交/已交、缴费时间、备注
+              从CSV文件批量导入学生费用数据。支持格式：班级、姓名、性别、各费用应交/已交、代办费已交、缴费时间、备注
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
+            {/* 文件选择和模板下载 */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Label htmlFor="import-file" className="cursor-pointer">
+                  <div className="flex items-center gap-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg hover:bg-gray-50">
+                    <Upload className="h-4 w-4" />
+                    选择CSV文件
+                  </div>
+                  <Input
+                    id="import-file"
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </Label>
+                {importData.length > 0 && (
+                  <span className="text-sm text-gray-600">
+                    已解析 {importData.length} 条记录
+                  </span>
+                )}
+              </div>
+              <Button 
+                onClick={downloadImportTemplate} 
+                variant="outline" 
+                size="sm"
+                className="text-blue-600 border-blue-300 hover:bg-blue-50"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                下载导入模板
+              </Button>
+            </div>
+
             {/* 数据预览 */}
             {importData.length > 0 && (
               <div className="border rounded-lg overflow-hidden">
@@ -1656,7 +1678,7 @@ function FeesContent() {
                         <TableCell className="text-right">
                           {record.lunchFee}/{record.lunchPaid}
                         </TableCell>
-                        <TableCell className="text-right">{record.agencyFee}</TableCell>
+                        <TableCell className="text-right">{record.agencyFee}/{record.agencyPaid}</TableCell>
                       </TableRow>
                     ))}
                     {importData.length > 10 && (
@@ -1686,36 +1708,26 @@ function FeesContent() {
               <ul className="list-disc list-inside space-y-1">
                 <li>班级、姓名为必填项</li>
                 <li>性别可选：男、女（默认：男）</li>
-                <li>费用格式：学费应交/学费已交、午餐费应交/午餐费已交等</li>
+                <li>费用格式：学费应交/学费已交、午餐费应交/午餐费已交、代办费应交/代办费已交等</li>
                 <li>缴费时间格式：YYYY-MM-DD（如 2024-09-01）</li>
                 <li>已存在的学生（同班级同名）将更新数据，否则新增</li>
               </ul>
             </div>
           </div>
 
-          <DialogFooter className="flex justify-between">
-            <Button 
-              onClick={downloadImportTemplate} 
-              variant="outline"
-              className="text-blue-600 border-blue-300 hover:bg-blue-50"
-            >
-              <Download className="h-4 w-4 mr-1" />
-              下载导入模板
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
+              {importResult?.success ? '关闭' : '取消'}
             </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
-                {importResult?.success ? '关闭' : '取消'}
+            {!importResult?.success && (
+              <Button
+                onClick={handleImport}
+                disabled={importLoading || importData.length === 0}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                {importLoading ? '导入中...' : `导入 ${importData.length} 条记录`}
               </Button>
-              {!importResult?.success && (
-                <Button
-                  onClick={handleImport}
-                  disabled={importLoading || importData.length === 0}
-                  className="bg-purple-600 hover:bg-purple-700"
-                >
-                  {importLoading ? '导入中...' : `导入 ${importData.length} 条记录`}
-                </Button>
-              )}
-            </div>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

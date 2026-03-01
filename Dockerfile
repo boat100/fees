@@ -72,12 +72,9 @@ ENV COZE_WORKSPACE_PATH=/app
 # 暴露端口
 EXPOSE 5000
 
-# 健康检查（使用 --max-time 和 --silent 参数，增加启动等待时间到120秒）
-# --max-time 5: 最多等待5秒
-# --silent --show-error: 静默模式但显示错误
-# start_period: 容器启动后120秒才开始健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
-    CMD curl --max-time 5 --silent --show-error http://localhost:5000 > /dev/null 2>&1 || exit 1
+# 健康检查（增加启动等待时间，适应群晖等资源受限环境）
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:5000 || exit 1
 
 # 启动命令
 CMD ["node", "server.js"]

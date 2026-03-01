@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
       after_school_fee: number;
       club_fee: number;
       agency_fee: number;
+      agency_paid: number;
       remark: string | null;
       created_at: string;
       updated_at: string | null;
@@ -71,10 +72,13 @@ export async function GET(request: NextRequest) {
         paymentMap[p.fee_type] = p.total_paid;
       });
       
-      // 计算代办费余额
+      // 计算代办费已扣除金额
       const agencyUsed = db.prepare(`
         SELECT COALESCE(SUM(amount), 0) as total FROM agency_fee_items WHERE student_id = ?
       `).get(student.id) as { total: number };
+      
+      // agency_balance = agency_paid - 已扣除
+      const agencyPaid = student.agency_paid ?? student.agency_fee ?? 600;
       
       return {
         ...student,
@@ -83,7 +87,8 @@ export async function GET(request: NextRequest) {
         nap_paid: paymentMap['nap'] || 0,
         after_school_paid: paymentMap['after_school'] || 0,
         club_paid: paymentMap['club'] || 0,
-        agency_balance: (student.agency_fee || 600) - agencyUsed.total,
+        agency_paid: agencyPaid,
+        agency_balance: agencyPaid - agencyUsed.total, // 剩余 = 已交 - 已扣除
       };
     });
     
@@ -125,10 +130,13 @@ export async function POST(request: NextRequest) {
     // 根据午托费自动判断午托状态
     const napStatus = napFee > 0 ? '午托' : '走读';
     
+    // agencyPaid 默认等于 agencyFee（视为一次性收齐）
+    const agencyPaidValue = body.agencyPaid ?? agencyFee;
+    
     const stmt = db.prepare(`
       INSERT INTO student_fees 
-      (class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, agency_fee, remark)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, agency_fee, agency_paid, remark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
@@ -142,6 +150,7 @@ export async function POST(request: NextRequest) {
       afterSchoolFee,
       clubFee,
       agencyFee,
+      agencyPaidValue,
       remark
     );
     
@@ -176,15 +185,15 @@ export async function PUT(request: NextRequest) {
     
     const insertStmt = db.prepare(`
       INSERT INTO student_fees 
-      (class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, agency_fee, remark)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, agency_fee, agency_paid, remark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const updateStmt = db.prepare(`
       UPDATE student_fees 
       SET gender = ?, nap_status = ?, 
           tuition_fee = ?, lunch_fee = ?, nap_fee = ?, 
-          after_school_fee = ?, club_fee = ?, agency_fee = ?, remark = ?, updated_at = CURRENT_TIMESTAMP
+          after_school_fee = ?, club_fee = ?, agency_fee = ?, agency_paid = ?, remark = ?, updated_at = CURRENT_TIMESTAMP
       WHERE class_name = ? AND student_name = ?
     `);
     
@@ -239,6 +248,7 @@ export async function PUT(request: NextRequest) {
             student.afterSchoolFee || 0,
             student.clubFee || 0,
             student.agencyFee || 600,
+            (student as { agencyPaid?: number }).agencyPaid ?? (student.agencyFee || 600),
             student.remark || null,
             student.className,
             student.studentName
@@ -258,6 +268,7 @@ export async function PUT(request: NextRequest) {
             student.afterSchoolFee || 0,
             student.clubFee || 0,
             student.agencyFee || 600,
+            (student as { agencyPaid?: number }).agencyPaid ?? (student.agencyFee || 600),
             student.remark || null
           );
           studentId = result.lastInsertRowid as number;

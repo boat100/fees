@@ -24,6 +24,7 @@ export async function GET(
       after_school_fee: number;
       club_fee: number;
       agency_fee: number;
+      agency_paid: number;
       remark: string | null;
       created_at: string;
       updated_at: string | null;
@@ -76,9 +77,10 @@ export async function GET(
       created_at: string;
     }>;
     
-    // 计算代办费余额
+    // 计算代办费余额（剩余 = 已交 - 已扣除）
     const agencyUsed = agencyFeeItems.reduce((sum, item) => sum + item.amount, 0);
-    const agencyBalance = (student.agency_fee || 600) - agencyUsed;
+    const agencyPaid = student.agency_paid ?? student.agency_fee ?? 600;
+    const agencyBalance = agencyPaid - agencyUsed;
     
     return NextResponse.json({ 
       data: {
@@ -118,6 +120,7 @@ export async function PUT(
       afterSchoolFee,
       clubFee,
       agencyFee,
+      agencyPaid,
       remark,
     } = body;
     
@@ -128,7 +131,7 @@ export async function PUT(
       UPDATE student_fees 
       SET class_name = ?, student_name = ?, gender = ?, nap_status = ?,
           tuition_fee = ?, lunch_fee = ?, nap_fee = ?, 
-          after_school_fee = ?, club_fee = ?, agency_fee = ?,
+          after_school_fee = ?, club_fee = ?, agency_fee = ?, agency_paid = ?,
           remark = ?, updated_at = ?
       WHERE id = ?
     `);
@@ -144,6 +147,7 @@ export async function PUT(
       afterSchoolFee ?? 0,
       clubFee ?? 0,
       agencyFee ?? 600,
+      agencyPaid ?? agencyFee ?? 600,
       remark || null,
       new Date().toISOString(),
       id

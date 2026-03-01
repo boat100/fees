@@ -52,6 +52,7 @@ interface StudentDetail {
   after_school_fee: number;
   club_fee: number;
   agency_fee: number;
+  agency_paid: number;
   remark: string | null;
   created_at: string;
   updated_at: string | null;
@@ -654,55 +655,40 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                       </TableRow>
                     );
                   })}
-                  {/* 代办费行（特殊处理） */}
+                  {/* 代办费行（与其他费用相同的显示格式） */}
                   <TableRow className="bg-purple-50">
                     <TableCell className="font-medium">代办费</TableCell>
-                    <TableCell className="text-right">{(student.agency_fee || 600).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{(student.agency_fee || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-right text-purple-600 font-semibold">
-                      已扣除: {(student.agencyUsed || 0).toFixed(2)}
+                      {(student.agency_paid ?? student.agency_fee ?? 0).toFixed(2)}
                     </TableCell>
-                    <TableCell className="text-right text-purple-600">
-                      余额: {(student.agencyBalance || student.agency_fee || 600).toFixed(2)}
+                    <TableCell className="text-right text-red-600">
+                      {Math.max(0, (student.agency_fee || 0) - (student.agency_paid ?? student.agency_fee ?? 0)).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className="inline-flex items-center gap-1 text-green-600">
-                        <CheckCircle className="h-4 w-4" />
-                        一次性收齐
+                      <span className="inline-flex items-center gap-1 text-purple-600">
+                        剩余: {(student.agencyBalance || 0).toFixed(2)}
                       </span>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-purple-600 text-purple-600 hover:bg-purple-100"
-                        onClick={() => {
-                          setAgencyFeeDate(getTodayString());
-                          setAgencyFeeItemType('');
-                          setAgencyFeeAmount(0);
-                          setAgencyFeeRemark('');
-                          setAgencyFeeDialogOpen(true);
-                        }}
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        添加扣除
-                      </Button>
+                      {/* 扣除按钮移到代办费扣除记录模块 */}
                     </TableCell>
                   </TableRow>
                   {/* 合计行 */}
                   <TableRow className="bg-blue-50 font-semibold">
                     <TableCell>合计</TableCell>
                     <TableCell className="text-right text-blue-700">
-                      {(FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => sum + (student[item.field] as number), 0) + (student.agency_fee || 600)).toFixed(2)}
+                      {(FEE_ITEMS.reduce((sum, item) => sum + (student[item.field] as number), 0)).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right text-green-600">
-                      {FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => sum + (student.paymentsByType[item.key]?.total || 0), 0).toFixed(2)}
+                      {(FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => sum + (student.paymentsByType[item.key]?.total || 0), 0) + (student.agency_paid ?? student.agency_fee ?? 0)).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right text-red-600">
-                      {FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => {
+                      {(FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => {
                         const expected = student[item.field] as number;
                         const paid = student.paymentsByType[item.key]?.total || 0;
                         return sum + Math.max(0, expected - paid);
-                      }, 0).toFixed(2)}
+                      }, 0) + Math.max(0, (student.agency_fee || 0) - (student.agency_paid ?? student.agency_fee ?? 0))).toFixed(2)}
                     </TableCell>
                     <TableCell colSpan={2}></TableCell>
                   </TableRow>
@@ -765,18 +751,37 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
         {/* 代办费扣除记录 */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              代办费扣除记录
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                代办费扣除记录
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-purple-600 text-purple-600 hover:bg-purple-100"
+                onClick={() => {
+                  setAgencyFeeDate(getTodayString());
+                  setAgencyFeeItemType('');
+                  setAgencyFeeAmount(0);
+                  setAgencyFeeRemark('');
+                  setAgencyFeeDialogOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                添加扣除
+              </Button>
             </CardTitle>
             <CardDescription>
-              代办费余额: {(student.agencyBalance || student.agency_fee || 600).toFixed(2)} 元
+              应交: {(student.agency_fee || 0).toFixed(2)} 元 | 
+              已交: {(student.agency_paid ?? student.agency_fee ?? 0).toFixed(2)} 元 | 
+              剩余: {(student.agencyBalance || 0).toFixed(2)} 元
             </CardDescription>
           </CardHeader>
           <CardContent>
             {agencyFeeItems.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                暂无扣除记录
+                暂无扣除记录，点击右上角"添加扣除"按钮添加
               </div>
             ) : (
               <Table>

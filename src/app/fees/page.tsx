@@ -74,6 +74,7 @@ interface StudentFee {
   club_fee: number;
   club_paid: number;
   agency_fee: number;
+  agency_paid: number;
   agency_balance: number;
   remark: string | null;
   created_at: string;
@@ -86,7 +87,7 @@ interface FeeTotals {
   nap_fee: number; nap_paid: number;
   after_school_fee: number; after_school_paid: number;
   club_fee: number; club_paid: number;
-  agency_fee: number; agency_balance: number;
+  agency_fee: number; agency_paid: number; agency_balance: number;
   total_fee: number; total_paid: number;
 }
 
@@ -153,6 +154,7 @@ function FeesContent() {
     afterSchoolFee: 0,
     clubFee: 0,
     agencyFee: 600,
+    agencyPaid: 600,
     remark: '',
   });
   
@@ -221,7 +223,7 @@ function FeesContent() {
       nap_fee: 0, nap_paid: 0,
       after_school_fee: 0, after_school_paid: 0,
       club_fee: 0, club_paid: 0,
-      agency_fee: 0, agency_balance: 0,
+      agency_fee: 0, agency_paid: 0, agency_balance: 0,
       total_fee: 0, total_paid: 0,
     };
     
@@ -237,7 +239,8 @@ function FeesContent() {
       totals.club_fee += student.club_fee || 0;
       totals.club_paid += student.club_paid || 0;
       totals.agency_fee += student.agency_fee || 0;
-      totals.agency_balance += student.agency_balance ?? student.agency_fee ?? 600;
+      totals.agency_paid += student.agency_paid ?? student.agency_fee ?? 0;
+      totals.agency_balance += student.agency_balance ?? 0;
     });
     
     totals.total_fee = 
@@ -245,7 +248,7 @@ function FeesContent() {
       totals.after_school_fee + totals.club_fee + totals.agency_fee;
     totals.total_paid = 
       totals.tuition_paid + totals.lunch_paid + totals.nap_paid + 
-      totals.after_school_paid + totals.club_paid + totals.agency_fee; // 代办费视为已收
+      totals.after_school_paid + totals.club_paid + totals.agency_paid;
     
     return totals;
   };
@@ -257,7 +260,7 @@ function FeesContent() {
       (student.after_school_fee || 0) + (student.club_fee || 0) + (student.agency_fee || 0);
     const totalPaid = 
       (student.tuition_paid || 0) + (student.lunch_paid || 0) + (student.nap_paid || 0) +
-      (student.after_school_paid || 0) + (student.club_paid || 0) + (student.agency_fee || 0); // 代办费视为已收
+      (student.after_school_paid || 0) + (student.club_paid || 0) + (student.agency_paid || 0);
     return { totalFee, totalPaid };
   };
 
@@ -274,6 +277,7 @@ function FeesContent() {
       afterSchoolFee: 0,
       clubFee: 0,
       agencyFee: 600,
+      agencyPaid: 600,
       remark: '',
     });
     setFormWarnings({});
@@ -293,6 +297,7 @@ function FeesContent() {
       afterSchoolFee: student.after_school_fee || 0,
       clubFee: student.club_fee || 0,
       agencyFee: student.agency_fee || 600,
+      agencyPaid: student.agency_paid ?? student.agency_fee ?? 600,
       remark: student.remark || '',
     });
     setFormWarnings({});
@@ -320,8 +325,8 @@ function FeesContent() {
       nap_fee: Number(formData.napFee),
       after_school_fee: Number(formData.afterSchoolFee),
       club_fee: Number(formData.clubFee),
-      agency_fee: Number(formData.agencyFee) || 600,
-      agency_balance: Number(formData.agencyFee) || 600,
+      agency_fee: Number(formData.agencyFee) || 0,
+      agency_paid: Number(formData.agencyPaid) ?? (Number(formData.agencyFee) || 0),
       tuition_paid: 0,
       lunch_paid: 0,
       nap_paid: 0,
@@ -372,6 +377,7 @@ function FeesContent() {
           afterSchoolFee: Number(formData.afterSchoolFee),
           clubFee: Number(formData.clubFee),
           agencyFee: Number(formData.agencyFee),
+          agencyPaid: Number(formData.agencyPaid),
           remark: formData.remark || null,
         }),
       });
@@ -703,7 +709,7 @@ function FeesContent() {
                       <TableHead className="font-semibold text-right">午托费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
                       <TableHead className="font-semibold text-right">课后服务费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
                       <TableHead className="font-semibold text-right">社团费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
-                      <TableHead className="font-semibold text-right">代办费<br/><span className="font-normal text-xs text-gray-400">应交/剩余</span></TableHead>
+                      <TableHead className="font-semibold text-right">代办费<br/><span className="font-normal text-xs text-gray-400">应交/已交/剩余</span></TableHead>
                       <TableHead className="font-semibold text-right">合计<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
                       <TableHead className="font-semibold">备注</TableHead>
                       <TableHead className="font-semibold text-right">操作</TableHead>
@@ -737,7 +743,7 @@ function FeesContent() {
                           <TableCell>{renderFeeCell(student.club_fee, student.club_paid)}</TableCell>
                           <TableCell className="text-right">
                             <span className="text-purple-600 font-medium">
-                              {student.agency_fee || 600}/{student.agency_balance ?? 600}
+                              {student.agency_fee ?? 0}/{student.agency_paid ?? 0}/{student.agency_balance ?? 0}
                             </span>
                           </TableCell>
                           <TableCell className="text-right font-semibold">
@@ -786,7 +792,7 @@ function FeesContent() {
                         <div>{totals.club_fee.toFixed(0)}/{totals.club_paid.toFixed(0)}</div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="text-purple-600">{totals.agency_fee.toFixed(0)}/{totals.agency_balance.toFixed(0)}</div>
+                        <div className="text-purple-600">{totals.agency_fee.toFixed(0)}/{totals.agency_paid.toFixed(0)}/{totals.agency_balance.toFixed(0)}</div>
                       </TableCell>
                       <TableCell className="text-right text-lg text-blue-700">
                         {totals.total_fee.toFixed(0)}/{totals.total_paid.toFixed(0)}
@@ -912,18 +918,38 @@ function FeesContent() {
             </div>
             
             {/* 代办费 */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right font-semibold text-blue-600">代办费</Label>
-              <div className="col-span-3">
-                <Input
-                  type="number"
-                  value={formData.agencyFee || ''}
-                  onChange={(e) => setFormData({ ...formData, agencyFee: Number(e.target.value) })}
-                  placeholder="默认600元，一次性收齐"
-                />
-                <p className="text-xs text-gray-500 mt-1">代办费为一次性收齐，默认600元，扣除项目在学生详情页管理</p>
+            <div className="grid grid-cols-4 items-center gap-4 border-t pt-4">
+              <Label className="text-right font-semibold text-purple-600">代办费</Label>
+              <div className="col-span-3 grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-gray-500">应交</Label>
+                  <Input
+                    type="number"
+                    value={formData.agencyFee}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      agencyFee: Number(e.target.value),
+                      // 如果已交大于应交，自动调整已交
+                      agencyPaid: Math.min(Number(formData.agencyPaid), Number(e.target.value))
+                    })}
+                    placeholder="应交代办费"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">已交</Label>
+                  <Input
+                    type="number"
+                    value={formData.agencyPaid}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      agencyPaid: Math.min(Number(e.target.value), formData.agencyFee)
+                    })}
+                    placeholder="已交代办费"
+                  />
+                </div>
               </div>
             </div>
+            <p className="text-xs text-gray-500 col-span-4 text-center">代办费：应交/已交/剩余（剩余=已交-已扣除），支持应交设为0</p>
             
             {/* 备注 */}
             <div className="grid grid-cols-4 items-center gap-4 border-t pt-4">

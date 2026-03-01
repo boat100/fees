@@ -213,6 +213,14 @@ export function initDatabase() {
     console.log('Added agency_fee column and migrated from other_fee');
   }
 
+  // 添加 agency_paid 字段（已交代办费）
+  if (!existingColumns.includes('agency_paid')) {
+    db.exec('ALTER TABLE student_fees ADD COLUMN agency_paid REAL DEFAULT 0');
+    // 迁移数据：对于已有学生，agency_paid 默认等于 agency_fee（视为已收齐）
+    db.exec('UPDATE student_fees SET agency_paid = agency_fee WHERE agency_paid = 0');
+    console.log('Added agency_paid column');
+  }
+
   // 删除不需要的字段（需要重建表）
   const columnsToRemove = ['enrollment_status', 'other_fee'];
   const needsRebuild = columnsToRemove.some(col => existingColumns.includes(col));

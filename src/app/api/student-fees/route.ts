@@ -460,7 +460,8 @@ export async function PUT(request: NextRequest) {
           student.lunchPaid > 0 ||
           student.napPaid > 0 ||
           student.afterSchoolPaid > 0 ||
-          student.clubPaid > 0;
+          student.clubPaid > 0 ||
+          student.agencyPaid > 0;
         
         if (hasPaidAmounts) {
           // 删除该学生之前的所有交费记录
@@ -488,6 +489,10 @@ export async function PUT(request: NextRequest) {
           }
           if (student.clubPaid > 0) {
             insertPaymentStmt.run(studentId, 'club', student.clubPaid, paymentDate, paymentRemark);
+            paymentCount++;
+          }
+          if (student.agencyPaid > 0) {
+            insertPaymentStmt.run(studentId, 'agency', student.agencyPaid, paymentDate, paymentRemark);
             paymentCount++;
           }
         }

@@ -134,21 +134,6 @@ export default function Home() {
             );
           })}
         </div>
-
-        {/* 快捷入口 */}
-        <div className="mt-16 text-center">
-          <p className="text-gray-500 text-sm mb-4">快捷入口</p>
-          <div className="flex justify-center gap-4">
-            <Button
-              variant="outline"
-              onClick={() => router.push('/stats')}
-              className="gap-2"
-            >
-              <DollarSign className="h-4 w-4" />
-              查看收支统计
-            </Button>
-          </div>
-        </div>
       </main>
 
       {/* 底部信息 */}

@@ -50,7 +50,8 @@ import {
   Download,
   Upload,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  BarChart3
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -810,6 +811,14 @@ export default function ExpensesPage() {
             </div>
             
             <div className="flex items-center gap-2">
+              <Button 
+                onClick={() => router.push('/expenses/stats')} 
+                variant="outline" 
+                size="sm"
+              >
+                <BarChart3 className="h-4 w-4 mr-1" />
+                统计
+              </Button>
               <Button onClick={openImportDialog} variant="outline" size="sm">
                 <Upload className="h-4 w-4 mr-1" />
                 导入

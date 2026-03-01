@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, initDatabase, EXPENSE_CATEGORIES, DAILY_EXPENSE_ITEMS, PERSONNEL_EXPENSE_ITEMS } from '@/lib/database';
+import { db, initDatabase } from '@/lib/database';
 import { isAuthenticated } from '@/lib/auth';
 
 // 初始化数据库
 initDatabase();
 
-// GET - 获取支出统计
+// GET - 获取支出统计数据
 export async function GET(request: NextRequest) {
   if (!(await isAuthenticated())) {
     return NextResponse.json({ error: '未登录' }, { status: 401 });
@@ -13,94 +13,139 @@ export async function GET(request: NextRequest) {
 
   try {
     const searchParams = request.nextUrl.searchParams;
-    const yearMonth = searchParams.get('yearMonth');
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+    const timeType = searchParams.get('timeType') || 'all'; // all, year, month
+    const year = searchParams.get('year');
+    const month = searchParams.get('month');
 
-    // 构建日期过滤条件
-    let dateFilter = '';
+    // 构建时间筛选条件
+    let timeCondition = '';
     const params: (string | number)[] = [];
 
-    if (yearMonth) {
-      dateFilter = ' AND report_date LIKE ?';
-      params.push(`${yearMonth}%`);
-    } else if (startDate && endDate) {
-      dateFilter = ' AND report_date >= ? AND report_date <= ?';
-      params.push(startDate, endDate);
+    if (timeType === 'year' && year) {
+      timeCondition = " AND strftime('%Y', occur_date) = ?";
+      params.push(year);
+    } else if (timeType === 'month' && month) {
+      // month 格式: YYYY-MM
+      const [yearPart, monthPart] = month.split('-');
+      timeCondition = " AND strftime('%Y', occur_date) = ? AND strftime('%m', occur_date) = ?";
+      params.push(yearPart, monthPart);
     }
 
-    // 按类别统计
+    // 1. 按类别统计（日常公用支出 vs 人员支出）
     const categoryStats = db.prepare(`
-      SELECT category, SUM(amount) as total, COUNT(*) as count
+      SELECT 
+        category,
+        SUM(amount) as total_amount,
+        COUNT(*) as record_count
       FROM expense_records
-      WHERE 1=1 ${dateFilter}
+      WHERE 1=1 ${timeCondition}
       GROUP BY category
-    `).all(...params) as Array<{ category: string; total: number; count: number }>;
+      ORDER BY total_amount DESC
+    `).all(...params) as Array<{
+      category: string;
+      total_amount: number;
+      record_count: number;
+    }>;
 
-    // 按子项目统计
-    const itemStats = db.prepare(`
-      SELECT category, item, SUM(amount) as total, COUNT(*) as count
-      FROM expense_records
-      WHERE 1=1 ${dateFilter}
-      GROUP BY category, item
-      ORDER BY category, total DESC
-    `).all(...params) as Array<{ category: string; item: string; total: number; count: number }>;
+    // 类别名称映射
+    const categoryNames: Record<string, string> = {
+      'daily': '日常公用支出',
+      'personnel': '人员支出'
+    };
 
-    // 按月份统计（最近12个月）
-    const monthlyStats = db.prepare(`
-      SELECT strftime("%Y-%m", occur_date) as month, 
-             SUM(amount) as total,
-             COUNT(*) as count
+    const categoryData = categoryStats.map(stat => ({
+      category: categoryNames[stat.category] || stat.category,
+      categoryKey: stat.category,
+      totalAmount: stat.total_amount,
+      recordCount: stat.record_count
+    }));
+
+    // 2. 日常公用支出子项目统计
+    const dailyItemStats = db.prepare(`
+      SELECT 
+        item,
+        SUM(amount) as total_amount,
+        COUNT(*) as record_count
       FROM expense_records
-      WHERE occur_date >= date('now', '-12 months')
-      GROUP BY strftime("%Y-%m", occur_date)
+      WHERE category = 'daily' ${timeCondition}
+      GROUP BY item
+      ORDER BY total_amount DESC
+    `).all(...params) as Array<{
+      item: string;
+      total_amount: number;
+      record_count: number;
+    }>;
+
+    const dailyItemData = dailyItemStats.map(stat => ({
+      item: stat.item,
+      totalAmount: stat.total_amount,
+      recordCount: stat.record_count
+    }));
+
+    // 3. 人员支出子项目统计
+    const personnelItemStats = db.prepare(`
+      SELECT 
+        item,
+        SUM(amount) as total_amount,
+        COUNT(*) as record_count
+      FROM expense_records
+      WHERE category = 'personnel' ${timeCondition}
+      GROUP BY item
+      ORDER BY total_amount DESC
+    `).all(...params) as Array<{
+      item: string;
+      total_amount: number;
+      record_count: number;
+    }>;
+
+    const personnelItemData = personnelItemStats.map(stat => ({
+      item: stat.item,
+      totalAmount: stat.total_amount,
+      recordCount: stat.record_count
+    }));
+
+    // 4. 获取可用的年份列表
+    const yearList = db.prepare(`
+      SELECT DISTINCT strftime('%Y', occur_date) as year
+      FROM expense_records
+      WHERE occur_date IS NOT NULL AND occur_date != ''
+      ORDER BY year DESC
+    `).all() as Array<{ year: string }>;
+
+    // 5. 获取可用的月份列表
+    const monthList = db.prepare(`
+      SELECT DISTINCT strftime('%Y-%m', occur_date) as month
+      FROM expense_records
+      WHERE occur_date IS NOT NULL AND occur_date != ''
       ORDER BY month DESC
-    `).all() as Array<{ month: string; total: number; count: number }>;
+    `).all() as Array<{ month: string }>;
 
-    // 计算总支出
-    const totalResult = db.prepare(`
-      SELECT SUM(amount) as total, COUNT(*) as count
+    // 6. 计算总计
+    const totalStats = db.prepare(`
+      SELECT 
+        SUM(amount) as total_amount,
+        COUNT(*) as record_count
       FROM expense_records
-      WHERE 1=1 ${dateFilter}
-    `).get(...params) as { total: number | null; count: number };
-
-    // 分类汇总
-    const dailyTotal = categoryStats.find(s => s.category === EXPENSE_CATEGORIES.DAILY)?.total || 0;
-    const personnelTotal = categoryStats.find(s => s.category === EXPENSE_CATEGORIES.PERSONNEL)?.total || 0;
-
-    // 构建子项目详情
-    const dailyItems = DAILY_EXPENSE_ITEMS.map(itemName => {
-      const stat = itemStats.find(s => s.category === EXPENSE_CATEGORIES.DAILY && s.item === itemName);
-      return {
-        item: itemName,
-        total: stat?.total || 0,
-        count: stat?.count || 0
-      };
-    }).filter(item => item.total > 0 || item.count > 0);
-
-    const personnelItems = PERSONNEL_EXPENSE_ITEMS.map(itemName => {
-      const stat = itemStats.find(s => s.category === EXPENSE_CATEGORIES.PERSONNEL && s.item === itemName);
-      return {
-        item: itemName,
-        total: stat?.total || 0,
-        count: stat?.count || 0
-      };
-    }).filter(item => item.total > 0 || item.count > 0);
+      WHERE 1=1 ${timeCondition}
+    `).get(...params) as {
+      total_amount: number | null;
+      record_count: number | null;
+    };
 
     return NextResponse.json({
-      total: totalResult.total || 0,
-      count: totalResult.count,
-      categoryStats: {
-        daily: dailyTotal,
-        personnel: personnelTotal
-      },
-      dailyItems,
-      personnelItems,
-      monthlyStats,
-      allItemStats: itemStats
+      success: true,
+      data: {
+        categoryData,
+        dailyItemData,
+        personnelItemData,
+        yearList: yearList.map(y => y.year),
+        monthList: monthList.map(m => m.month),
+        totalAmount: totalStats.total_amount || 0,
+        totalRecords: totalStats.record_count || 0
+      }
     });
   } catch (error) {
-    console.error('Error fetching expense statistics:', error);
-    return NextResponse.json({ error: '获取支出统计失败' }, { status: 500 });
+    console.error('Error fetching expense stats:', error);
+    return NextResponse.json({ error: '获取统计数据失败' }, { status: 500 });
   }
 }

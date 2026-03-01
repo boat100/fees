@@ -10,6 +10,7 @@ interface StudentData {
   id: number;
   class_name: string;
   student_name: string;
+  gender: string;
   tuition_fee: number;
   lunch_fee: number;
   nap_fee: number;
@@ -313,7 +314,9 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
     const totalPaid = Object.values(paidByType).reduce((a, b) => a + b, 0);
 
     return {
+      班级: className,
       学生姓名: s.student_name,
+      性别: s.gender || '未设置',
       学费应交: s.tuition_fee || 0,
       学费已交: paidByType['tuition'],
       午餐费应交: s.lunch_fee || 0,
@@ -335,7 +338,9 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
 
   // 添加汇总行
   const totalRow = {
-    学生姓名: '班级合计',
+    班级: '合计',
+    学生姓名: '',
+    性别: '',
     学费应交: classStudents.reduce((sum, s) => sum + (s.tuition_fee || 0), 0),
     学费已交: studentDetails.reduce((sum, s) => sum + s.学费已交, 0),
     午餐费应交: classStudents.reduce((sum, s) => sum + (s.lunch_fee || 0), 0),
@@ -362,7 +367,9 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
 
   const ws = XLSX.utils.json_to_sheet(sheetData);
   ws['!cols'] = [
+    { wch: 10 }, // 班级
     { wch: 12 }, // 学生姓名
+    { wch: 8 },  // 性别
     { wch: 10 }, { wch: 10 }, // 学费
     { wch: 10 }, { wch: 10 }, // 午餐费
     { wch: 10 }, { wch: 10 }, // 午托费
@@ -376,6 +383,7 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
   // 交费记录
   const paymentRecords = classPayments.map(p => ({
     交费日期: p.payment_date,
+    班级: className,
     学生姓名: p.student_name,
     费用类型: feeTypeMap[p.fee_type] || p.fee_type,
     金额: p.amount,
@@ -386,6 +394,7 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
     const paymentWs = XLSX.utils.json_to_sheet(paymentRecords);
     paymentWs['!cols'] = [
       { wch: 12 }, // 交费日期
+      { wch: 10 }, // 班级
       { wch: 12 }, // 学生姓名
       { wch: 10 }, // 费用类型
       { wch: 10 }, // 金额
@@ -622,13 +631,14 @@ const agencyFeeItemTypeMap: Record<string, string> = {
 async function exportAgencyFeeDetail(workbook: XLSX.WorkBook, className: string) {
   // 获取班级学生列表
   const students = db.prepare(`
-    SELECT id, student_name, agency_fee, agency_paid
+    SELECT id, student_name, gender, agency_fee, agency_paid
     FROM student_fees
     WHERE class_name = ?
     ORDER BY student_name
   `).all(className) as Array<{
     id: number;
     student_name: string;
+    gender: string;
     agency_fee: number;
     agency_paid: number;
   }>;
@@ -657,7 +667,9 @@ async function exportAgencyFeeDetail(workbook: XLSX.WorkBook, className: string)
     const balance = agencyPaid - totalDeducted;
 
     studentDetails.push({
+      班级: className,
       学生姓名: student.student_name,
+      性别: student.gender || '未设置',
       应交代办费: student.agency_fee || 0,
       已交代办费: agencyPaid,
       已扣除金额: totalDeducted,
@@ -667,7 +679,9 @@ async function exportAgencyFeeDetail(workbook: XLSX.WorkBook, className: string)
     // 收集所有扣除记录
     for (const d of deductions) {
       allDeductionRecords.push({
+        班级: className,
         学生姓名: student.student_name,
+        性别: student.gender || '未设置',
         扣除日期: d.item_date,
         扣除项目: agencyFeeItemTypeMap[d.item_type] || d.item_type,
         扣除金额: d.amount,
@@ -678,7 +692,9 @@ async function exportAgencyFeeDetail(workbook: XLSX.WorkBook, className: string)
 
   // 添加汇总行
   const summaryRow = {
-    学生姓名: '合计',
+    班级: '合计',
+    学生姓名: '',
+    性别: '',
     应交代办费: studentDetails.reduce((sum, s) => sum + s.应交代办费, 0),
     已交代办费: studentDetails.reduce((sum, s) => sum + s.已交代办费, 0),
     已扣除金额: studentDetails.reduce((sum, s) => sum + s.已扣除金额, 0),
@@ -689,7 +705,9 @@ async function exportAgencyFeeDetail(workbook: XLSX.WorkBook, className: string)
   const summarySheetData = [...studentDetails, summaryRow];
   const summaryWs = XLSX.utils.json_to_sheet(summarySheetData);
   summaryWs['!cols'] = [
+    { wch: 10 }, // 班级
     { wch: 12 }, // 学生姓名
+    { wch: 8 },  // 性别
     { wch: 12 }, // 应交代办费
     { wch: 12 }, // 已交代办费
     { wch: 12 }, // 已扣除金额
@@ -701,7 +719,9 @@ async function exportAgencyFeeDetail(workbook: XLSX.WorkBook, className: string)
   if (allDeductionRecords.length > 0) {
     const detailWs = XLSX.utils.json_to_sheet(allDeductionRecords);
     detailWs['!cols'] = [
+      { wch: 10 }, // 班级
       { wch: 12 }, // 学生姓名
+      { wch: 8 },  // 性别
       { wch: 12 }, // 扣除日期
       { wch: 12 }, // 扣除项目
       { wch: 12 }, // 扣除金额

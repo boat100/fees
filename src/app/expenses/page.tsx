@@ -1064,11 +1064,21 @@ export default function ExpensesPage() {
                         <TableCell>{record.item}</TableCell>
                         <TableCell>{record.report_date}</TableCell>
                         <TableCell>{record.occur_date?.substring(0, 7)}</TableCell>
-                        <TableCell>{record.invoice_no || '-'}</TableCell>
+                        <TableCell 
+                          className="max-w-[120px] truncate" 
+                          title={record.invoice_no || '-'}
+                        >
+                          {record.invoice_no || '-'}
+                        </TableCell>
                         <TableCell className="text-right font-medium text-red-600">
                           ¥{formatAmount(record.amount)}
                         </TableCell>
-                        <TableCell className="max-w-xs truncate">{record.summary || '-'}</TableCell>
+                        <TableCell 
+                          className="max-w-xs truncate" 
+                          title={record.summary || '-'}
+                        >
+                          {record.summary || '-'}
+                        </TableCell>
                         <TableCell className="text-center">
                           <Button
                             size="sm"
@@ -1374,9 +1384,19 @@ export default function ExpensesPage() {
                         <TableCell>{record.item}</TableCell>
                         <TableCell>{record.reportDate}</TableCell>
                         <TableCell>{record.occurDate}</TableCell>
-                        <TableCell>{record.invoiceNo || '-'}</TableCell>
+                        <TableCell 
+                          className="max-w-[120px] truncate" 
+                          title={record.invoiceNo || '-'}
+                        >
+                          {record.invoiceNo || '-'}
+                        </TableCell>
                         <TableCell className="text-right">{record.amount.toFixed(2)}</TableCell>
-                        <TableCell>{record.summary || '-'}</TableCell>
+                        <TableCell 
+                          className="max-w-xs truncate" 
+                          title={record.summary || '-'}
+                        >
+                          {record.summary || '-'}
+                        </TableCell>
                       </TableRow>
                     ))}
                     {importData.length > 10 && (

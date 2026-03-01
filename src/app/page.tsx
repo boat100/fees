@@ -14,8 +14,7 @@ import {
   Users,
   FileText,
   Wallet,
-  BarChart3,
-  ArrowRight
+  BarChart3
 } from 'lucide-react';
 import {
   BarChart,
@@ -107,36 +106,24 @@ export default function Home() {
   const navItems = [
     {
       title: '收费管理',
-      subtitle: '学生费用',
       href: '/fees',
       icon: DollarSign,
-      gradient: 'from-emerald-500 to-green-600',
-      bgGradient: 'from-emerald-50 to-green-50',
-      hoverShadow: 'hover:shadow-emerald-200',
-      borderColor: 'border-emerald-300',
-      iconBg: 'bg-gradient-to-br from-emerald-400 to-green-500',
+      activeColor: 'text-green-600',
+      bgColor: 'bg-green-50',
     },
     {
       title: '支出管理',
-      subtitle: '财务支出',
       href: '/expenses',
       icon: TrendingDown,
-      gradient: 'from-rose-500 to-red-600',
-      bgGradient: 'from-rose-50 to-red-50',
-      hoverShadow: 'hover:shadow-rose-200',
-      borderColor: 'border-rose-300',
-      iconBg: 'bg-gradient-to-br from-rose-400 to-red-500',
+      activeColor: 'text-red-600',
+      bgColor: 'bg-red-50',
     },
     {
       title: '后台管理',
-      subtitle: '系统设置',
       href: '/admin',
       icon: Settings,
-      gradient: 'from-violet-500 to-purple-600',
-      bgGradient: 'from-violet-50 to-purple-50',
-      hoverShadow: 'hover:shadow-violet-200',
-      borderColor: 'border-violet-300',
-      iconBg: 'bg-gradient-to-br from-violet-400 to-purple-500',
+      activeColor: 'text-purple-600',
+      bgColor: 'bg-purple-50',
     },
   ];
 
@@ -147,11 +134,32 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* 左侧：Logo + 系统名称 */}
-            <div className="flex items-center gap-3">
-              <School className="h-8 w-8 text-blue-600" />
-              <h1 className="text-xl font-bold text-gray-900">
-                学校收支管理系统
-              </h1>
+            <div className="flex items-center gap-8">
+              <div className="flex items-center gap-3">
+                <School className="h-8 w-8 text-blue-600" />
+                <h1 className="text-xl font-bold text-gray-900">
+                  学校收支管理系统
+                </h1>
+              </div>
+              
+              {/* 导航菜单 */}
+              <nav className="hidden md:flex items-center gap-1">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+                  return (
+                    <Button
+                      key={item.href}
+                      variant="ghost"
+                      onClick={() => router.push(item.href)}
+                      className={`gap-2 ${isActive ? item.activeColor + ' ' + item.bgColor : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.title}
+                    </Button>
+                  );
+                })}
+              </nav>
             </div>
             
             {/* 右侧：退出按钮 */}
@@ -168,51 +176,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 醒目的模块导航区域 */}
-      <div className="bg-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <nav className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              return (
-                <button
-                  key={item.href}
-                  onClick={() => router.push(item.href)}
-                  className={`
-                    relative flex items-center gap-4 p-4 rounded-xl border-2 
-                    bg-gradient-to-r ${item.bgGradient} ${item.borderColor} ${item.hoverShadow}
-                    hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5
-                    transition-all duration-200 ease-out
-                    ${isActive ? 'ring-2 ring-offset-2 ring-blue-400' : ''}
-                  `}
-                >
-                  {/* 图标区域 */}
-                  <div className={`
-                    flex-shrink-0 w-14 h-14 rounded-xl ${item.iconBg}
-                    flex items-center justify-center shadow-md
-                  `}>
-                    <Icon className="h-7 w-7 text-white" />
-                  </div>
-                  
-                  {/* 文字区域 */}
-                  <div className="flex-1 text-left">
-                    <h3 className={`text-lg font-bold bg-gradient-to-r ${item.gradient} bg-clip-text text-transparent`}>
-                      {item.title}
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-0.5">{item.subtitle}</p>
-                  </div>
-                  
-                  {/* 箭头图标 */}
-                  <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600" />
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </div>
-
-      {/* 移动端导航菜单 - 简化版 */}
+      {/* 移动端导航菜单 */}
       <div className="md:hidden bg-white border-b border-gray-100 px-4 py-2">
         <nav className="flex items-center gap-1 overflow-x-auto">
           {navItems.map((item) => {
@@ -224,7 +188,7 @@ export default function Home() {
                 variant="ghost"
                 size="sm"
                 onClick={() => router.push(item.href)}
-                className={`gap-1.5 shrink-0 ${isActive ? 'text-blue-600 bg-blue-50' : 'text-gray-600'}`}
+                className={`gap-1.5 shrink-0 ${isActive ? item.activeColor + ' ' + item.bgColor : 'text-gray-600'}`}
               >
                 <Icon className="h-4 w-4" />
                 {item.title}

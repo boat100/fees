@@ -1352,7 +1352,7 @@ function FeesContent() {
                       <TableCell className="text-right">
                         <div className="text-purple-600">{totals.agency_fee.toFixed(0)}/{totals.agency_paid.toFixed(0)}/{totals.agency_balance.toFixed(0)}</div>
                       </TableCell>
-                      <TableCell className="text-right text-lg text-blue-700">
+                      <TableCell className="text-right text-blue-700">
                         {totals.total_fee.toFixed(0)}/{totals.total_paid.toFixed(0)}
                       </TableCell>
                       <TableCell className="text-center">-</TableCell>

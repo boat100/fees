@@ -53,7 +53,8 @@ import {
   LogOut,
   Download,
   ArrowLeft,
-  BarChart3
+  BarChart3,
+  Upload
 } from 'lucide-react';
 import { FEE_ITEMS } from '@/lib/constants';
 
@@ -148,6 +149,35 @@ function FeesContent() {
   // 导出班级数据对话框
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportType, setExportType] = useState<'fee_detail' | 'payment_records'>('fee_detail');
+  
+  // 导入状态
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importData, setImportData] = useState<Array<{
+    className: string;
+    studentName: string;
+    gender: string;
+    tuitionFee: number;
+    tuitionPaid: number;
+    lunchFee: number;
+    lunchPaid: number;
+    napFee: number;
+    napPaid: number;
+    afterSchoolFee: number;
+    afterSchoolPaid: number;
+    clubFee: number;
+    clubPaid: number;
+    agencyFee: number;
+    paymentDate: string;
+    remark: string;
+  }>>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    success: boolean;
+    message: string;
+    insertCount?: number;
+    updateCount?: number;
+    total?: number;
+  } | null>(null);
   
   // 表单数据
   const [formData, setFormData] = useState({
@@ -584,6 +614,216 @@ function FeesContent() {
     }
   };
 
+  // 解析CSV行（处理引号包裹的字段）
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  // 解析CSV文件
+  const parseCSV = (text: string): Array<Record<string, string>> => {
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length < 2) return [];
+    
+    const headers = parseCSVLine(lines[0]);
+    const data: Array<Record<string, string>> = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCSVLine(lines[i]);
+      if (values.length < 2) continue;
+      
+      const row: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        row[header] = values[index]?.trim() || '';
+      });
+      data.push(row);
+    }
+    
+    return data;
+  };
+
+  // 检测是否包含乱码
+  const hasGarbledText = (text: string): boolean => {
+    return text.includes('\uFFFD') || /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(text);
+  };
+
+  // 处理文件选择
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const buffer = await file.arrayBuffer();
+      
+      // 先尝试UTF-8解码
+      const utf8Decoder = new TextDecoder('utf-8');
+      let text = utf8Decoder.decode(buffer);
+      
+      // 如果UTF-8解码出现乱码，尝试GBK解码
+      if (hasGarbledText(text)) {
+        try {
+          const gbkDecoder = new TextDecoder('gbk');
+          text = gbkDecoder.decode(buffer);
+        } catch {
+          console.warn('GBK decode failed, using UTF-8');
+        }
+      }
+      
+      // 移除BOM标记
+      if (text.charCodeAt(0) === 0xFEFF) {
+        text = text.slice(1);
+      }
+      
+      const data = parseCSV(text);
+      
+      if (data.length === 0) {
+        toast.error('未能解析到有效数据，请检查文件格式');
+        return;
+      }
+      
+      // 获取今天日期作为默认缴费时间
+      const today = new Date().toISOString().split('T')[0];
+      
+      // 转换数据格式
+      const formattedData = data.map(row => ({
+        className: String(row['班级'] || ''),
+        studentName: String(row['姓名'] || ''),
+        gender: String(row['性别'] || '男'),
+        tuitionFee: Number(row['学费应交'] || row['学费'] || 0),
+        tuitionPaid: Number(row['学费已交'] || 0),
+        lunchFee: Number(row['午餐费应交'] || row['午餐费'] || 0),
+        lunchPaid: Number(row['午餐费已交'] || 0),
+        napFee: Number(row['午托费应交'] || row['午托费'] || 0),
+        napPaid: Number(row['午托费已交'] || 0),
+        afterSchoolFee: Number(row['课后服务费应交'] || row['课后服务费'] || 0),
+        afterSchoolPaid: Number(row['课后服务费已交'] || 0),
+        clubFee: Number(row['社团费应交'] || row['社团费'] || 0),
+        clubPaid: Number(row['社团费已交'] || 0),
+        agencyFee: Number(row['代办费应交'] || row['代办费'] || 600),
+        paymentDate: String(row['缴费时间'] || '').trim() || today,
+        remark: String(row['备注'] || ''),
+      }));
+      
+      setImportData(formattedData);
+      setImportResult(null);
+      setImportDialogOpen(true);
+    } catch (error) {
+      console.error('Failed to parse file:', error);
+      toast.error('文件解析失败，请检查文件格式');
+    }
+    
+    e.target.value = '';
+  };
+
+  // 执行导入
+  const handleImport = async () => {
+    if (importData.length === 0) {
+      toast.error('没有可导入的数据');
+      return;
+    }
+
+    setImportLoading(true);
+    try {
+      const response = await authFetch('/api/student-fees', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: importData })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        setImportResult({
+          success: true,
+          message: `导入成功！新增 ${result.insertCount || 0} 条，更新 ${result.updateCount || 0} 条`,
+          insertCount: result.insertCount,
+          updateCount: result.updateCount,
+          total: result.total
+        });
+        fetchClasses();
+        fetchStudents();
+      } else {
+        setImportResult({
+          success: false,
+          message: result.error || '导入失败'
+        });
+      }
+    } catch (error) {
+      console.error('Failed to import:', error);
+      setImportResult({
+        success: false,
+        message: '导入失败，请重试'
+      });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // 下载导入模板
+  const downloadImportTemplate = () => {
+    const headers = [
+      '班级', '姓名', '性别',
+      '学费应交', '学费已交',
+      '午餐费应交', '午餐费已交',
+      '午托费应交', '午托费已交',
+      '课后服务费应交', '课后服务费已交',
+      '社团费应交', '社团费已交',
+      '代办费应交',
+      '缴费时间',
+      '备注'
+    ];
+    
+    const exampleData = [
+      '一年级1班', '张三', '男',
+      '5000', '5000',
+      '800', '800',
+      '500', '500',
+      '300', '300',
+      '200', '200',
+      '600',
+      '2024-09-01',
+      '示例备注'
+    ];
+    
+    const csvContent = headers.join(',') + '\n' + exampleData.join(',') + '\n';
+    
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '学生费用导入模板.csv';
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // 打开导入对话框
+  const openImportDialog = () => {
+    setImportData([]);
+    setImportResult(null);
+    document.getElementById('import-file-input')?.click();
+  };
+
   // 退出登录
   const handleLogout = async () => {
     try {
@@ -635,6 +875,22 @@ function FeesContent() {
             
             {/* 导航按钮 */}
             <nav className="flex items-center gap-2">
+              <Button
+                onClick={openImportDialog}
+                variant="outline"
+                className="border-purple-600 text-purple-600 hover:bg-purple-50"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                导入
+              </Button>
+              <input
+                id="import-file-input"
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              
               <Button
                 onClick={handleAddStudent}
                 className="bg-green-600 hover:bg-green-700 text-white"
@@ -1351,6 +1607,113 @@ function FeesContent() {
             >
               确认录入
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 导入对话框 */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              批量导入学生费用
+            </DialogTitle>
+            <DialogDescription>
+              从CSV文件批量导入学生费用数据。支持格式：班级、姓名、性别、各费用应交/已交、缴费时间、备注
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* 数据预览 */}
+            {importData.length > 0 && (
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 font-medium">
+                  预览数据（共 {importData.length} 条）
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold">班级</TableHead>
+                      <TableHead className="font-semibold">姓名</TableHead>
+                      <TableHead className="font-semibold">性别</TableHead>
+                      <TableHead className="text-right font-semibold">学费</TableHead>
+                      <TableHead className="text-right font-semibold">午餐费</TableHead>
+                      <TableHead className="text-right font-semibold">代办费</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importData.slice(0, 10).map((record, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{record.className}</TableCell>
+                        <TableCell>{record.studentName}</TableCell>
+                        <TableCell>{record.gender}</TableCell>
+                        <TableCell className="text-right">
+                          {record.tuitionFee}/{record.tuitionPaid}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {record.lunchFee}/{record.lunchPaid}
+                        </TableCell>
+                        <TableCell className="text-right">{record.agencyFee}</TableCell>
+                      </TableRow>
+                    ))}
+                    {importData.length > 10 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-gray-500">
+                          ... 还有 {importData.length - 10} 条记录
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* 导入结果 */}
+            {importResult && (
+              <div className={`p-4 rounded-lg ${importResult.success ? 'bg-green-50' : 'bg-red-50'}`}>
+                <div className={`font-medium ${importResult.success ? 'text-green-700' : 'text-red-700'}`}>
+                  {importResult.message}
+                </div>
+              </div>
+            )}
+
+            {/* 导入说明 */}
+            <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+              <div className="font-medium mb-1">导入说明：</div>
+              <ul className="list-disc list-inside space-y-1">
+                <li>班级、姓名为必填项</li>
+                <li>性别可选：男、女（默认：男）</li>
+                <li>费用格式：学费应交/学费已交、午餐费应交/午餐费已交等</li>
+                <li>缴费时间格式：YYYY-MM-DD（如 2024-09-01）</li>
+                <li>已存在的学生（同班级同名）将更新数据，否则新增</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter className="flex justify-between">
+            <Button 
+              onClick={downloadImportTemplate} 
+              variant="outline"
+              className="text-blue-600 border-blue-300 hover:bg-blue-50"
+            >
+              <Download className="h-4 w-4 mr-1" />
+              下载导入模板
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
+                {importResult?.success ? '关闭' : '取消'}
+              </Button>
+              {!importResult?.success && (
+                <Button
+                  onClick={handleImport}
+                  disabled={importLoading || importData.length === 0}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  {importLoading ? '导入中...' : `导入 ${importData.length} 条记录`}
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

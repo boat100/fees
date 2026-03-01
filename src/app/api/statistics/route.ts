@@ -144,6 +144,42 @@ export async function GET() {
       };
     });
 
+    // 按年级从低到高排序（一年 -> 二年 -> 三年...，班级号升序）
+    const gradeOrder: Record<string, number> = {
+      '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6,
+      '七': 7, '八': 8, '九': 9, '十': 10,
+      '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6,
+      '7': 7, '8': 8, '9': 9, '10': 10
+    };
+
+    // 解析班级名称，提取年级和班级号
+    const parseClassName = (className: string) => {
+      // 匹配格式如: "一年1班"、"二年2班"、"三年1班" 等
+      const match = className.match(/^(.+?)(\d+)班$/);
+      if (match) {
+        const gradePart = match[1]; // "一年"、"二年" 等
+        const classNum = parseInt(match[2], 10); // 班级号
+        
+        // 从年级部分提取年级数字（取最后一个字符）
+        const gradeChar = gradePart.slice(-1); // "年"前面的字符
+        const gradeNum = gradeOrder[gradeChar] || 99;
+        
+        return { gradeNum, classNum };
+      }
+      return { gradeNum: 99, classNum: 99 }; // 无法解析的放最后
+    };
+
+    // 排序班级统计
+    classStatsWithTotals.sort((a, b) => {
+      const parsedA = parseClassName(a.class_name);
+      const parsedB = parseClassName(b.class_name);
+      
+      if (parsedA.gradeNum !== parsedB.gradeNum) {
+        return parsedA.gradeNum - parsedB.gradeNum; // 年级升序
+      }
+      return parsedA.classNum - parsedB.classNum; // 班级号升序
+    });
+
     // 3. 各项目参与人数（全校）
     const projectStats = db.prepare(`
       SELECT 

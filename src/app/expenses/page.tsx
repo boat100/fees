@@ -33,6 +33,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -1064,20 +1069,46 @@ export default function ExpensesPage() {
                         <TableCell>{record.item}</TableCell>
                         <TableCell>{record.report_date}</TableCell>
                         <TableCell>{record.occur_date?.substring(0, 7)}</TableCell>
-                        <TableCell 
-                          className="max-w-[120px] truncate" 
-                          title={record.invoice_no || '-'}
-                        >
-                          {record.invoice_no || '-'}
+                        <TableCell className="max-w-[120px]">
+                          {record.invoice_no ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block truncate cursor-default">
+                                  {record.invoice_no}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent 
+                                side="top" 
+                                className="max-w-[300px] whitespace-pre-wrap break-words text-left"
+                              >
+                                {record.invoice_no}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right font-medium text-red-600">
                           ¥{formatAmount(record.amount)}
                         </TableCell>
-                        <TableCell 
-                          className="max-w-xs truncate" 
-                          title={record.summary || '-'}
-                        >
-                          {record.summary || '-'}
+                        <TableCell className="max-w-[150px]">
+                          {record.summary ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block truncate cursor-default">
+                                  {record.summary}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent 
+                                side="top" 
+                                className="max-w-[300px] whitespace-pre-wrap break-words text-left"
+                              >
+                                {record.summary}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-center">
                           <Button
@@ -1384,18 +1415,44 @@ export default function ExpensesPage() {
                         <TableCell>{record.item}</TableCell>
                         <TableCell>{record.reportDate}</TableCell>
                         <TableCell>{record.occurDate}</TableCell>
-                        <TableCell 
-                          className="max-w-[120px] truncate" 
-                          title={record.invoiceNo || '-'}
-                        >
-                          {record.invoiceNo || '-'}
+                        <TableCell className="max-w-[120px]">
+                          {record.invoiceNo ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block truncate cursor-default">
+                                  {record.invoiceNo}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent 
+                                side="top" 
+                                className="max-w-[300px] whitespace-pre-wrap break-words text-left"
+                              >
+                                {record.invoiceNo}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">{record.amount.toFixed(2)}</TableCell>
-                        <TableCell 
-                          className="max-w-xs truncate" 
-                          title={record.summary || '-'}
-                        >
-                          {record.summary || '-'}
+                        <TableCell className="max-w-[150px]">
+                          {record.summary ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block truncate cursor-default">
+                                  {record.summary}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent 
+                                side="top" 
+                                className="max-w-[300px] whitespace-pre-wrap break-words text-left"
+                              >
+                                {record.summary}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

@@ -1333,7 +1333,7 @@ function FeesContent() {
                     })}
                     {/* 合计行 */}
                     <TableRow className="bg-blue-50 font-semibold">
-                      <TableCell colSpan={selectMode ? 6 : 5} className="text-center">合计</TableCell>
+                      <TableCell colSpan={selectMode ? 5 : 4} className="text-center">合计</TableCell>
                       <TableCell className="text-right">
                         <div>{totals.tuition_fee.toFixed(0)}/{totals.tuition_paid.toFixed(0)}</div>
                       </TableCell>
@@ -1355,7 +1355,8 @@ function FeesContent() {
                       <TableCell className="text-right text-lg text-blue-700">
                         {totals.total_fee.toFixed(0)}/{totals.total_paid.toFixed(0)}
                       </TableCell>
-                      <TableCell colSpan={2}></TableCell>
+                      <TableCell className="text-center">-</TableCell>
+                      <TableCell className="text-center">-</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>

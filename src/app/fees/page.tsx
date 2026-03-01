@@ -990,33 +990,46 @@ function FeesContent() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="class-select" className="whitespace-nowrap">选择班级：</Label>
-                <Select value={selectedClass} onValueChange={setSelectedClass}>
-                  <SelectTrigger id="class-select" className="w-[200px]">
-                    <SelectValue placeholder="请选择班级" />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="max-h-[300px]">
-                    {classes.map((className) => (
-                      <SelectItem key={className} value={className}>
-                        {className}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="flex flex-col gap-4">
+              {/* 第一行：班级选择和学生数量 */}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="class-select" className="whitespace-nowrap">选择班级：</Label>
+                  <Select value={selectedClass} onValueChange={setSelectedClass}>
+                    <SelectTrigger id="class-select" className="w-[200px]">
+                      <SelectValue placeholder="请选择班级" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="max-h-[300px]">
+                      {classes.map((className) => (
+                        <SelectItem key={className} value={className}>
+                          {className}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <Button
+                  onClick={() => { fetchClasses(); fetchStudents(); }}
+                  variant="outline"
+                  size="icon"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                </Button>
+                
+                {selectedClass && (
+                  <div className="text-sm text-gray-500">
+                    共 <span className="font-semibold text-gray-900">{students.length}</span> 名学生
+                    {selectMode && selectedIds.size > 0 && (
+                      <span className="ml-2 text-blue-600">已选 {selectedIds.size} 人</span>
+                    )}
+                  </div>
+                )}
               </div>
               
-              <Button
-                onClick={() => { fetchClasses(); fetchStudents(); }}
-                variant="outline"
-                size="icon"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              </Button>
-              
+              {/* 第二行：操作按钮 */}
               {selectedClass && students.length > 0 && (
-                <>
+                <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     onClick={openExportDialog}
                     variant="outline"
@@ -1056,50 +1069,40 @@ function FeesContent() {
                     <CheckSquare className="h-4 w-4 mr-2" />
                     {selectMode ? '取消多选' : '多选'}
                   </Button>
-                </>
-              )}
-              
-              {/* 多选模式下的批量操作按钮 */}
-              {selectMode && selectedIds.size > 0 && (
-                <>
-                  <Button
-                    onClick={() => {
-                      const selectedStudents = students.filter(s => selectedIds.has(s.id));
-                      setBatchPaymentData({
-                        selectedStudents: Array.from(selectedIds),
-                        payments: [
-                          { feeType: 'tuition', amount: 0 },
-                          { feeType: 'lunch', amount: 0 },
-                          { feeType: 'nap', amount: 0 },
-                          { feeType: 'after_school', amount: 0 },
-                          { feeType: 'club', amount: 0 },
-                        ],
-                        paymentDate: getTodayString(),
-                        remark: '',
-                      });
-                      setBatchPaymentDialogOpen(true);
-                    }}
-                    variant="outline"
-                    className="border-orange-600 text-orange-600 hover:bg-orange-50"
-                  >
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    批量录入 ({selectedIds.size})
-                  </Button>
-                  <Button
-                    onClick={() => setBatchDeleteDialogOpen(true)}
-                    variant="destructive"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    批量删除 ({selectedIds.size})
-                  </Button>
-                </>
-              )}
-              
-              {selectedClass && (
-                <div className="text-sm text-gray-500">
-                  共 <span className="font-semibold text-gray-900">{students.length}</span> 名学生
+                  
+                  {/* 多选模式下的批量操作按钮 */}
                   {selectMode && selectedIds.size > 0 && (
-                    <span className="ml-2 text-blue-600">已选 {selectedIds.size} 人</span>
+                    <>
+                      <Button
+                        onClick={() => {
+                          setBatchPaymentData({
+                            selectedStudents: Array.from(selectedIds),
+                            payments: [
+                              { feeType: 'tuition', amount: 0 },
+                              { feeType: 'lunch', amount: 0 },
+                              { feeType: 'nap', amount: 0 },
+                              { feeType: 'after_school', amount: 0 },
+                              { feeType: 'club', amount: 0 },
+                            ],
+                            paymentDate: getTodayString(),
+                            remark: '',
+                          });
+                          setBatchPaymentDialogOpen(true);
+                        }}
+                        variant="outline"
+                        className="border-orange-600 text-orange-600 hover:bg-orange-50"
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        批量录入 ({selectedIds.size})
+                      </Button>
+                      <Button
+                        onClick={() => setBatchDeleteDialogOpen(true)}
+                        variant="destructive"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        批量删除 ({selectedIds.size})
+                      </Button>
+                    </>
                   )}
                 </div>
               )}

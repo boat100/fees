@@ -139,31 +139,11 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* 左侧：Logo + 系统名称 */}
-            <div className="flex items-center gap-8">
-              <div className="flex items-center gap-3">
-                <School className="h-8 w-8 text-blue-600" />
-                <h1 className="text-xl font-bold text-gray-900">
-                  学校收支管理系统
-                </h1>
-              </div>
-              
-              {/* 导航菜单 - 紧凑样式 */}
-              <nav className="hidden md:flex items-center gap-2">
-                {navItems.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Button
-                      key={item.href}
-                      variant="ghost"
-                      onClick={() => router.push(item.href)}
-                      className={`gap-2 ${item.iconColor} ${item.lightBg} hover:opacity-80`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.title}
-                    </Button>
-                  );
-                })}
-              </nav>
+            <div className="flex items-center gap-3">
+              <School className="h-8 w-8 text-blue-600" />
+              <h1 className="text-xl font-bold text-gray-900">
+                学校收支管理系统
+              </h1>
             </div>
             
             {/* 右侧：退出按钮 */}
@@ -179,27 +159,6 @@ export default function Home() {
           </div>
         </div>
       </header>
-
-      {/* 移动端导航菜单 */}
-      <div className="md:hidden bg-white border-b border-gray-100 px-4 py-2">
-        <nav className="flex items-center gap-2 overflow-x-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Button
-                key={item.href}
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push(item.href)}
-                className={`gap-1.5 shrink-0 ${item.iconColor} ${item.lightBg}`}
-              >
-                <Icon className="h-4 w-4" />
-                {item.title}
-              </Button>
-            );
-          })}
-        </nav>
-      </div>
 
       {/* 主内容区域 */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

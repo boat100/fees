@@ -321,7 +321,6 @@ export default function ExpensesPage() {
       const result = await response.json();
 
       if (response.ok) {
-        alert('删除成功');
         setDeleteDialogOpen(false);
         setSelectedRecord(null);
         fetchRecords();
@@ -383,7 +382,6 @@ export default function ExpensesPage() {
       const result = await response.json();
 
       if (response.ok) {
-        alert(result.message || '删除成功');
         setBatchDeleteDialogOpen(false);
         setSelectedIds(new Set());
         fetchRecords();

@@ -96,12 +96,14 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // 验证发生日期
+      // 验证发生日期（支持 YYYY-MM 或 YYYY-MM-DD 格式）
       const occurDate = record.occurDate || record.occur_date;
-      if (!occurDate || !/^\d{4}-\d{2}-\d{2}$/.test(occurDate)) {
-        errors.push({ row: rowNum, error: `发生日期"${occurDate}"格式无效，应为YYYY-MM-DD格式` });
+      if (!occurDate || !/^\d{4}-\d{2}(-\d{2})?$/.test(occurDate)) {
+        errors.push({ row: rowNum, error: `发生日期"${occurDate}"格式无效，应为YYYY-MM或YYYY-MM-DD格式` });
         continue;
       }
+      // 如果是 YYYY-MM 格式，补充为 YYYY-MM-01
+      const occurDateNormalized = occurDate.length === 7 ? `${occurDate}-01` : occurDate;
 
       // 验证金额
       const amount = Number(record.amount);
@@ -115,7 +117,7 @@ export async function POST(request: NextRequest) {
         category,
         item,
         reportDate,
-        occurDate,
+        occurDate: occurDateNormalized,
         invoiceNo: record.invoiceNo || record.invoice_no || null,
         amount,
         summary: record.summary || null,

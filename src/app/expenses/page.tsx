@@ -591,6 +591,46 @@ export default function ExpensesPage() {
     return String(value);
   };
 
+  // 将 Excel 日期序列号转换为年月字符串（用于发生日期）
+  const excelDateToYearMonth = (value: unknown): string => {
+    if (value === null || value === undefined || value === '') {
+      return '';
+    }
+    
+    // 如果已经是有效的年月格式 yyyy-mm
+    if (typeof value === 'string' && /^\d{4}-\d{2}$/.test(value)) {
+      return value;
+    }
+    
+    // 如果是完整的日期格式 yyyy-mm-dd，截取年月
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value.substring(0, 7);
+    }
+    
+    // 如果是数字（Excel 日期序列号）
+    if (typeof value === 'number') {
+      const excelEpoch = new Date(1899, 11, 30);
+      const date = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000);
+      
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      
+      return `${year}-${month}`;
+    }
+    
+    // 尝试解析字符串日期
+    if (typeof value === 'string') {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        return `${year}-${month}`;
+      }
+    }
+    
+    return String(value);
+  };
+
   // 解析导入文件
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -635,7 +675,7 @@ export default function ExpensesPage() {
           category = firstCol;
           item = String(row[1] || '').trim();
           reportDate = excelDateToString(row[2]);
-          occurDate = excelDateToString(row[3]);
+          occurDate = excelDateToYearMonth(row[3]);
           invoiceNo = String(row[4] || '').trim();
           amount = Number(row[5]) || 0;
           summary = String(row[6] || '').trim();
@@ -645,7 +685,7 @@ export default function ExpensesPage() {
           category = '日常公用支出';
           item = String(row[0] || '').trim();
           reportDate = excelDateToString(row[1]);
-          occurDate = excelDateToString(row[2]);
+          occurDate = excelDateToYearMonth(row[2]);
           invoiceNo = String(row[3] || '').trim();
           amount = Number(row[4]) || 0;
           summary = String(row[5] || '').trim();
@@ -726,13 +766,13 @@ export default function ExpensesPage() {
     // 日常公用支出模板
     const dailyTemplate = [
       ['类别', '子项目', '报账时间', '发生时间', '发票号', '金额', '摘要', '备注'],
-      ['日常公用支出', '办公费用', '2024-01-15', '2024-01-15', 'INV001', 100.00, '购买办公用品示例', '示例备注'],
-      ['日常公用支出', '水电费', '2024-01-16', '2024-01-16', 'INV002', 500.00, '本月水电费', ''],
+      ['日常公用支出', '办公费用', '2024-01-15', '2024-01', 'INV001', 100.00, '购买办公用品示例', '示例备注'],
+      ['日常公用支出', '水电费', '2024-01-16', '2024-01', 'INV002', 500.00, '本月水电费', ''],
       ['', '', '', '', '', '', '', ''],
       ['说明：'],
       ['1. 类别填写"日常公用支出"或"人员支出"'],
       ['2. 子项目必须与系统预设一致（详见"子项目参考"工作表）'],
-      ['3. 日期格式：YYYY-MM-DD'],
+      ['3. 报账时间格式：YYYY-MM-DD；发生时间格式：YYYY-MM 或 YYYY-MM-DD'],
       ['4. 金额必须为大于0的数字'],
       ['5. 发票号、摘要、备注为选填项'],
     ];
@@ -746,13 +786,13 @@ export default function ExpensesPage() {
     // 人员支出模板
     const personnelTemplate = [
       ['类别', '子项目', '报账时间', '发生时间', '发票号', '金额', '摘要', '备注'],
-      ['人员支出', '教职工工资', '2024-01-20', '2024-01-20', '', 10000.00, '1月份工资', ''],
-      ['人员支出', '外聘老师工资', '2024-01-20', '2024-01-20', '', 5000.00, '外聘教师工资', ''],
+      ['人员支出', '教职工工资', '2024-01-20', '2024-01', '', 10000.00, '1月份工资', ''],
+      ['人员支出', '外聘老师工资', '2024-01-20', '2024-01', '', 5000.00, '外聘教师工资', ''],
       ['', '', '', '', '', '', '', ''],
       ['说明：'],
       ['1. 类别填写"日常公用支出"或"人员支出"'],
       ['2. 子项目必须与系统预设一致（详见"子项目参考"工作表）'],
-      ['3. 日期格式：YYYY-MM-DD'],
+      ['3. 报账时间格式：YYYY-MM-DD；发生时间格式：YYYY-MM 或 YYYY-MM-DD'],
       ['4. 金额必须为大于0的数字'],
       ['5. 发票号、摘要、备注为选填项'],
     ];
@@ -1023,7 +1063,7 @@ export default function ExpensesPage() {
                         <TableCell>{CATEGORY_NAMES[record.category]}</TableCell>
                         <TableCell>{record.item}</TableCell>
                         <TableCell>{record.report_date}</TableCell>
-                        <TableCell>{record.occur_date}</TableCell>
+                        <TableCell>{record.occur_date?.substring(0, 7)}</TableCell>
                         <TableCell>{record.invoice_no || '-'}</TableCell>
                         <TableCell className="text-right font-medium text-red-600">
                           ¥{formatAmount(record.amount)}

@@ -1313,7 +1313,12 @@ function FeesContent() {
                               {totalFee.toFixed(0)}/{totalPaid.toFixed(0)}
                             </div>
                           </TableCell>
-                          <TableCell className="max-w-[100px] truncate">{student.remark || '-'}</TableCell>
+                          <TableCell 
+                            className="max-w-[100px] truncate"
+                            title={student.remark || undefined}
+                          >
+                            {student.remark || '-'}
+                          </TableCell>
                           <TableCell className="text-center">
                             <Button
                               variant="ghost"

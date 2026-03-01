@@ -293,30 +293,55 @@ export default function AdminPage() {
             <CardTitle>使用说明</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-600">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-600">
               <div>
-                <h4 className="font-semibold text-gray-900 mb-2">📥 数据导入流程</h4>
-                <ol className="list-decimal list-inside space-y-1">
-                  <li>点击&ldquo;下载导入模板&rdquo;获取CSV模板</li>
-                  <li>用Excel或WPS打开模板填写数据</li>
-                  <li>保存为CSV格式（UTF-8编码）</li>
-                  <li>点击&ldquo;选择文件批量导入&rdquo;上传</li>
-                  <li>预览数据无误后确认导入</li>
-                </ol>
+                <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                  <HardDriveDownload className="h-4 w-4 text-blue-600" />
+                  数据库备份
+                </h4>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>备份包含完整数据库</li>
+                  <li>收费数据：学生、交费记录、代办费</li>
+                  <li>支出数据：日常公用、人员支出</li>
+                  <li>可用于跨环境数据迁移</li>
+                </ul>
                 <div className="mt-3 p-2 bg-blue-50 rounded text-xs text-blue-700">
-                  <strong>提示：</strong>模板包含&ldquo;应交&rdquo;和&ldquo;已交&rdquo;两列，可同时导入应交费用和已交费用；&ldquo;缴费时间&rdquo;可指定已交费用的日期，留空则使用导入当天日期
+                  <strong>建议：</strong>定期备份数据，操作重要功能前先备份
                 </div>
               </div>
               <div>
-                <h4 className="font-semibold text-gray-900 mb-2">💾 数据库备份恢复</h4>
+                <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                  <HardDriveUpload className="h-4 w-4 text-orange-600" />
+                  数据库恢复
+                </h4>
                 <ul className="list-disc list-inside space-y-1">
-                  <li>备份文件包含完整数据库</li>
-                  <li>可用于跨环境迁移数据</li>
-                  <li>恢复会完全覆盖当前数据</li>
+                  <li>仅支持 .db 格式备份文件</li>
+                  <li>恢复将完全覆盖当前数据</li>
                   <li>恢复前务必先备份当前数据</li>
                   <li>恢复后需刷新页面</li>
                 </ul>
+                <div className="mt-3 p-2 bg-orange-50 rounded text-xs text-orange-700">
+                  <strong>警告：</strong>恢复操作不可逆，请谨慎操作
+                </div>
               </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                  <Trash2 className="h-4 w-4 text-red-600" />
+                  清空数据
+                </h4>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>删除所有收费相关数据</li>
+                  <li>删除所有支出相关数据</li>
+                  <li>自动回收磁盘空间</li>
+                  <li>需要二次确认才能执行</li>
+                </ul>
+                <div className="mt-3 p-2 bg-red-50 rounded text-xs text-red-700">
+                  <strong>危险：</strong>此操作不可恢复，操作前务必备份
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 pt-4 border-t text-sm text-gray-500">
+              <p>💡 <strong>数据导入功能</strong>位于「收费管理」页面，支持从CSV文件批量导入学生费用数据</p>
             </div>
           </CardContent>
         </Card>

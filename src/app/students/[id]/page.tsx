@@ -128,6 +128,11 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [agencyFeeDate, setAgencyFeeDate] = useState<string>('');
   const [agencyFeeRemark, setAgencyFeeRemark] = useState<string>('');
   
+  // 代办费交费对话框状态
+  const [agencyPaymentDialogOpen, setAgencyPaymentDialogOpen] = useState(false);
+  const [agencyPaymentAmount, setAgencyPaymentAmount] = useState<number>(0);
+  const [agencyPaymentWarning, setAgencyPaymentWarning] = useState<string>('');
+  
   // 获取学生详情
   const fetchStudent = async () => {
     setLoading(true);
@@ -186,6 +191,76 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
     setPaymentRemark('');
     setPaymentWarning('');
     setPaymentDialogOpen(true);
+  };
+
+  // 打开代办费交费对话框
+  const openAgencyPaymentDialog = () => {
+    setAgencyPaymentAmount(0);
+    setAgencyPaymentWarning('');
+    setAgencyPaymentDialogOpen(true);
+  };
+
+  // 检查代办费交费金额
+  const checkAgencyPaymentAmount = (amount: number) => {
+    if (!student) return;
+    
+    const expectedFee = student.agency_fee || 0;
+    const currentPaid = student.agency_paid ?? 0;
+    const newTotal = currentPaid + amount;
+    
+    if (amount > 0 && newTotal > expectedFee) {
+      setAgencyPaymentWarning(`⚠️ 缴费金额超出应交金额！应交 ${expectedFee}，已交 ${currentPaid}，本次 ${amount}，合计 ${newTotal}`);
+    } else {
+      setAgencyPaymentWarning('');
+    }
+  };
+
+  // 提交代办费交费（乐观更新）
+  const submitAgencyPayment = async () => {
+    if (agencyPaymentAmount <= 0) {
+      toast.error('请输入交费金额');
+      return;
+    }
+    
+    const newAgencyPaid = (student?.agency_paid ?? 0) + agencyPaymentAmount;
+    
+    // 乐观更新
+    const previousStudent = student;
+    setStudent(prev => prev ? { ...prev, agency_paid: newAgencyPaid } : null);
+    
+    setAgencyPaymentDialogOpen(false);
+    toast.loading('正在提交...', { id: 'agency-payment' });
+    
+    try {
+      const response = await authFetch(`/api/student-fees/${resolvedParams.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          className: student?.class_name,
+          studentName: student?.student_name,
+          gender: student?.gender,
+          tuitionFee: student?.tuition_fee,
+          lunchFee: student?.lunch_fee,
+          napFee: student?.nap_fee,
+          afterSchoolFee: student?.after_school_fee,
+          clubFee: student?.club_fee,
+          agencyFee: student?.agency_fee,
+          agencyPaid: newAgencyPaid,
+        }),
+      });
+      
+      if (response.ok) {
+        toast.success('交费成功', { id: 'agency-payment' });
+        fetchStudent();
+      } else {
+        setStudent(previousStudent);
+        toast.error('交费失败', { id: 'agency-payment' });
+      }
+    } catch (error) {
+      console.error('Failed to submit agency payment:', error);
+      setStudent(previousStudent);
+      toast.error('交费失败，请重试', { id: 'agency-payment' });
+    }
   };
 
   // 计算已交金额和检查是否超额
@@ -659,19 +734,37 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   <TableRow className="bg-purple-50">
                     <TableCell className="font-medium">代办费</TableCell>
                     <TableCell className="text-right">{(student.agency_fee || 0).toFixed(2)}</TableCell>
-                    <TableCell className="text-right text-purple-600 font-semibold">
-                      {(student.agency_paid ?? student.agency_fee ?? 0).toFixed(2)}
+                    <TableCell className={`text-right ${((student.agency_fee || 0) > 0 && (student.agency_paid ?? 0) >= (student.agency_fee || 0)) ? 'text-green-600 font-semibold' : ''}`}>
+                      {(student.agency_paid ?? 0).toFixed(2)}
                     </TableCell>
-                    <TableCell className="text-right text-red-600">
-                      {Math.max(0, (student.agency_fee || 0) - (student.agency_paid ?? student.agency_fee ?? 0)).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="inline-flex items-center gap-1 text-purple-600">
-                        剩余: {(student.agencyBalance || 0).toFixed(2)}
-                      </span>
+                    <TableCell className={`text-right ${((student.agency_fee || 0) - (student.agency_paid ?? 0)) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {Math.max(0, (student.agency_fee || 0) - (student.agency_paid ?? 0)).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-center">
-                      {/* 扣除按钮移到代办费扣除记录模块 */}
+                      {(student.agency_fee || 0) === 0 ? (
+                        <span className="text-gray-400">-</span>
+                      ) : (student.agency_paid ?? 0) >= (student.agency_fee || 0) ? (
+                        <span className="inline-flex items-center gap-1 text-green-600">
+                          <CheckCircle className="h-4 w-4" />
+                          已缴清
+                        </span>
+                      ) : (student.agency_paid ?? 0) > 0 ? (
+                        <span className="text-orange-600">部分缴费</span>
+                      ) : (
+                        <span className="text-red-600">未缴费</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {(student.agency_fee || 0) > 0 && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={openAgencyPaymentDialog}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          添加交费
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                   {/* 合计行 */}
@@ -681,14 +774,14 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                       {(FEE_ITEMS.reduce((sum, item) => sum + (student[item.field] as number), 0)).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right text-green-600">
-                      {(FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => sum + (student.paymentsByType[item.key]?.total || 0), 0) + (student.agency_paid ?? student.agency_fee ?? 0)).toFixed(2)}
+                      {(FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => sum + (student.paymentsByType[item.key]?.total || 0), 0) + (student.agency_paid ?? 0)).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right text-red-600">
                       {(FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => {
                         const expected = student[item.field] as number;
                         const paid = student.paymentsByType[item.key]?.total || 0;
                         return sum + Math.max(0, expected - paid);
-                      }, 0) + Math.max(0, (student.agency_fee || 0) - (student.agency_paid ?? student.agency_fee ?? 0))).toFixed(2)}
+                      }, 0) + Math.max(0, (student.agency_fee || 0) - (student.agency_paid ?? 0))).toFixed(2)}
                     </TableCell>
                     <TableCell colSpan={2}></TableCell>
                   </TableRow>
@@ -1039,6 +1132,64 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
               disabled={batchPayments.filter(p => p.amount > 0).length === 0 || !batchPaymentDate}
             >
               确认录入
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 代办费交费对话框 */}
+      <Dialog open={agencyPaymentDialogOpen} onOpenChange={setAgencyPaymentDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>代办费交费</DialogTitle>
+            <DialogDescription>
+              为代办费添加交费记录
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">费用类型</Label>
+              <div className="col-span-3 font-semibold">代办费</div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">应交金额</Label>
+              <div className="col-span-3">{(student?.agency_fee || 0).toFixed(2)} 元</div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">已交金额</Label>
+              <div className="col-span-3">{(student?.agency_paid ?? 0).toFixed(2)} 元</div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">本次交费 *</Label>
+              <Input
+                type="number"
+                value={agencyPaymentAmount || ''}
+                onChange={(e) => {
+                  const amount = Number(e.target.value);
+                  setAgencyPaymentAmount(amount);
+                  checkAgencyPaymentAmount(amount);
+                }}
+                className="col-span-3"
+                placeholder="请输入交费金额"
+              />
+            </div>
+            {agencyPaymentWarning && (
+              <div className="col-span-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <span className="text-yellow-800 text-sm">{agencyPaymentWarning}</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAgencyPaymentDialogOpen(false)}>
+              取消
+            </Button>
+            <Button 
+              onClick={submitAgencyPayment}
+              disabled={agencyPaymentAmount <= 0}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              确认交费
             </Button>
           </DialogFooter>
         </DialogContent>

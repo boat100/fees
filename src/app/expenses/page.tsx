@@ -48,7 +48,9 @@ import {
   TrendingDown,
   LogOut,
   Download,
-  Upload
+  Upload,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -121,6 +123,10 @@ export default function ExpensesPage() {
   // 多选状态
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false);
+  
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 50;
   
   // 导入对话框状态
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -335,14 +341,22 @@ export default function ExpensesPage() {
     setSelectedIds(newSelectedIds);
   };
 
-  // 全选/取消全选
+  // 全选/取消全选（仅当前页）
   const toggleSelectAll = () => {
-    if (selectedIds.size === records.length) {
-      // 取消全选
-      setSelectedIds(new Set());
+    const currentPageIds = new Set(currentRecords.map(r => r.id));
+    const allCurrentSelected = currentPageIds.size > 0 && 
+      Array.from(currentPageIds).every(id => selectedIds.has(id));
+    
+    if (allCurrentSelected) {
+      // 取消当前页选择
+      const newSelectedIds = new Set(selectedIds);
+      currentRecords.forEach(r => newSelectedIds.delete(r.id));
+      setSelectedIds(newSelectedIds);
     } else {
-      // 全选
-      setSelectedIds(new Set(records.map(r => r.id)));
+      // 选中当前页
+      const newSelectedIds = new Set(selectedIds);
+      currentRecords.forEach(r => newSelectedIds.add(r.id));
+      setSelectedIds(newSelectedIds);
     }
   };
 
@@ -750,6 +764,25 @@ export default function ExpensesPage() {
 
   // 计算合计
   const totalAmount = records.reduce((sum, r) => sum + r.amount, 0);
+  
+  // 分页计算
+  const totalPages = Math.ceil(records.length / PAGE_SIZE);
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const endIndex = Math.min(startIndex + PAGE_SIZE, records.length);
+  const currentRecords = records.slice(startIndex, endIndex);
+  
+  // 重置页码（当筛选条件变化时）
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+  }, [filterCategory, filterItem, filterYearMonth]);
+  
+  // 翻页处理
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    // 切换页面时清空选择
+    setSelectedIds(new Set());
+  };
 
   // 获取当前类别的子项目列表
   const currentItems = formData.category === EXPENSE_CATEGORIES.DAILY ? DAILY_ITEMS : PERSONNEL_ITEMS;
@@ -913,7 +946,7 @@ export default function ExpensesPage() {
                       <TableHead className="w-12">
                         <input
                           type="checkbox"
-                          checked={records.length > 0 && selectedIds.size === records.length}
+                          checked={currentRecords.length > 0 && currentRecords.every(r => selectedIds.has(r.id))}
                           onChange={toggleSelectAll}
                           className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
                         />
@@ -929,7 +962,7 @@ export default function ExpensesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {records.map((record) => (
+                    {currentRecords.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell>
                           <input
@@ -961,6 +994,64 @@ export default function ExpensesPage() {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+            )}
+            
+            {/* 分页控制 */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="text-sm text-gray-600">
+                  显示第 {startIndex + 1} - {endIndex} 条，共 {records.length} 条记录
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    上一页
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {/* 页码显示逻辑：显示当前页前后各2页 */}
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(page => {
+                        if (totalPages <= 7) return true;
+                        if (page === 1 || page === totalPages) return true;
+                        if (Math.abs(page - currentPage) <= 2) return true;
+                        return false;
+                      })
+                      .map((page, index, arr) => {
+                        // 添加省略号
+                        const showEllipsisBefore = index > 0 && page - arr[index - 1] > 1;
+                        return (
+                          <span key={page}>
+                            {showEllipsisBefore && (
+                              <span className="px-2 text-gray-400">...</span>
+                            )}
+                            <Button
+                              variant={page === currentPage ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => goToPage(page)}
+                              className={page === currentPage ? 'bg-red-600 hover:bg-red-700' : ''}
+                            >
+                              {page}
+                            </Button>
+                          </span>
+                        );
+                      })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    下一页
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

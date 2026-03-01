@@ -606,6 +606,74 @@ export default function ExpensesPage() {
     setImportDialogOpen(true);
   };
 
+  // 下载导入模板
+  const downloadImportTemplate = () => {
+    // 创建工作簿
+    const workbook = XLSX.utils.book_new();
+
+    // 日常公用支出模板
+    const dailyTemplate = [
+      ['类别', '子项目', '报账时间', '发生时间', '发票号', '金额', '摘要', '备注'],
+      ['日常公用支出', '办公费用', '2024-01-15', '2024-01-15', 'INV001', 100.00, '购买办公用品示例', '示例备注'],
+      ['日常公用支出', '水电费', '2024-01-16', '2024-01-16', 'INV002', 500.00, '本月水电费', ''],
+      ['', '', '', '', '', '', '', ''],
+      ['说明：'],
+      ['1. 类别填写"日常公用支出"或"人员支出"'],
+      ['2. 子项目必须与系统预设一致（详见"子项目参考"工作表）'],
+      ['3. 日期格式：YYYY-MM-DD'],
+      ['4. 金额必须为大于0的数字'],
+      ['5. 发票号、摘要、备注为选填项'],
+    ];
+    const dailySheet = XLSX.utils.aoa_to_sheet(dailyTemplate);
+    dailySheet['!cols'] = [
+      { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+      { wch: 15 }, { wch: 12 }, { wch: 25 }, { wch: 15 }
+    ];
+    XLSX.utils.book_append_sheet(workbook, dailySheet, '日常公用支出模板');
+
+    // 人员支出模板
+    const personnelTemplate = [
+      ['类别', '子项目', '报账时间', '发生时间', '发票号', '金额', '摘要', '备注'],
+      ['人员支出', '教职工工资', '2024-01-20', '2024-01-20', '', 10000.00, '1月份工资', ''],
+      ['人员支出', '外聘老师工资', '2024-01-20', '2024-01-20', '', 5000.00, '外聘教师工资', ''],
+      ['', '', '', '', '', '', '', ''],
+      ['说明：'],
+      ['1. 类别填写"日常公用支出"或"人员支出"'],
+      ['2. 子项目必须与系统预设一致（详见"子项目参考"工作表）'],
+      ['3. 日期格式：YYYY-MM-DD'],
+      ['4. 金额必须为大于0的数字'],
+      ['5. 发票号、摘要、备注为选填项'],
+    ];
+    const personnelSheet = XLSX.utils.aoa_to_sheet(personnelTemplate);
+    personnelSheet['!cols'] = [
+      { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+      { wch: 15 }, { wch: 12 }, { wch: 25 }, { wch: 15 }
+    ];
+    XLSX.utils.book_append_sheet(workbook, personnelSheet, '人员支出模板');
+
+    // 子项目参考
+    const maxRows = Math.max(DAILY_ITEMS.length, PERSONNEL_ITEMS.length);
+    const referenceData: (string | number)[][] = [
+      ['日常公用支出子项目', '人员支出子项目'],
+    ];
+    for (let i = 0; i < maxRows; i++) {
+      referenceData.push([
+        DAILY_ITEMS[i] || '',
+        PERSONNEL_ITEMS[i] || ''
+      ]);
+    }
+    referenceData.push([]);
+    referenceData.push(['提示：复制子项目名称到对应模板中使用']);
+    
+    const referenceSheet = XLSX.utils.aoa_to_sheet(referenceData);
+    referenceSheet['!cols'] = [{ wch: 25 }, { wch: 25 }];
+    XLSX.utils.book_append_sheet(workbook, referenceSheet, '子项目参考');
+
+    // 下载模板
+    const fileName = `支出导入模板_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  };
+
   // 退出登录
   const handleLogout = async () => {
     try {
@@ -978,26 +1046,37 @@ export default function ExpensesPage() {
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            {/* 文件选择 */}
-            <div className="flex items-center gap-4">
-              <Label htmlFor="import-file" className="cursor-pointer">
-                <div className="flex items-center gap-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg hover:bg-gray-50">
-                  <Upload className="h-4 w-4" />
-                  选择Excel文件
-                </div>
-                <Input
-                  id="import-file"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-              </Label>
-              {importData.length > 0 && (
-                <span className="text-sm text-gray-600">
-                  已解析 {importData.length} 条记录
-                </span>
-              )}
+            {/* 文件选择和模板下载 */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Label htmlFor="import-file" className="cursor-pointer">
+                  <div className="flex items-center gap-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg hover:bg-gray-50">
+                    <Upload className="h-4 w-4" />
+                    选择Excel文件
+                  </div>
+                  <Input
+                    id="import-file"
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </Label>
+                {importData.length > 0 && (
+                  <span className="text-sm text-gray-600">
+                    已解析 {importData.length} 条记录
+                  </span>
+                )}
+              </div>
+              <Button 
+                onClick={downloadImportTemplate} 
+                variant="outline" 
+                size="sm"
+                className="text-blue-600 border-blue-300 hover:bg-blue-50"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                下载导入模板
+              </Button>
             </div>
 
             {/* 数据预览 */}

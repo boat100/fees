@@ -1,31 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { isAuthenticated, clearAuthToken, authFetch } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { 
   DollarSign, 
   TrendingDown, 
   Settings, 
   LogOut,
-  School,
-  Users,
-  FileText,
-  Wallet,
-  BarChart3
+  School
 } from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from 'recharts';
 
 // 统计数据类型
 interface DashboardStats {
@@ -48,7 +34,6 @@ interface DashboardStats {
 
 export default function Home() {
   const router = useRouter();
-  const pathname = usePathname();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -95,35 +80,55 @@ export default function Home() {
     return amount.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
 
-  // 准备图表数据
-  const chartData = stats ? [
-    { name: '应交收费', value: stats.totalFee },
-    { name: '已交收费', value: stats.totalPaid },
-    { name: '总支出', value: stats.totalExpense },
-  ] : [];
-
   // 导航菜单配置
   const navItems = [
     {
       title: '收费管理',
       href: '/fees',
       icon: DollarSign,
-      activeColor: 'text-white',
-      bgColor: 'bg-green-600 hover:bg-green-700',
+      description: '学生费用收取与管理',
+      color: 'green',
+      gradient: 'from-green-500 to-emerald-600',
+      lightBg: 'bg-green-50',
+      iconBg: 'bg-green-100',
+      iconColor: 'text-green-600',
+      stats: stats ? {
+        label: '已收/应收',
+        value: `¥${formatAmount(stats.totalPaid)} / ¥${formatAmount(stats.totalFee)}`,
+        subValue: `${stats.studentCount}名学生`
+      } : null
     },
     {
       title: '支出管理',
       href: '/expenses',
       icon: TrendingDown,
-      activeColor: 'text-white',
-      bgColor: 'bg-red-600 hover:bg-red-700',
+      description: '学校支出记录与统计',
+      color: 'red',
+      gradient: 'from-red-500 to-rose-600',
+      lightBg: 'bg-red-50',
+      iconBg: 'bg-red-100',
+      iconColor: 'text-red-600',
+      stats: stats ? {
+        label: '累计支出',
+        value: `¥${formatAmount(stats.totalExpense)}`,
+        subValue: `${stats.expenseRecordCount}条记录`
+      } : null
     },
     {
       title: '后台管理',
       href: '/admin',
       icon: Settings,
-      activeColor: 'text-white',
-      bgColor: 'bg-purple-600 hover:bg-purple-700',
+      description: '系统设置与数据维护',
+      color: 'purple',
+      gradient: 'from-purple-500 to-violet-600',
+      lightBg: 'bg-purple-50',
+      iconBg: 'bg-purple-100',
+      iconColor: 'text-purple-600',
+      stats: stats ? {
+        label: '班级数量',
+        value: `${stats.classCount}个班级`,
+        subValue: '点击进入管理'
+      } : null
     },
   ];
 
@@ -142,15 +147,16 @@ export default function Home() {
                 </h1>
               </div>
               
-              {/* 导航菜单 */}
+              {/* 导航菜单 - 紧凑样式 */}
               <nav className="hidden md:flex items-center gap-2">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   return (
                     <Button
                       key={item.href}
+                      variant="ghost"
                       onClick={() => router.push(item.href)}
-                      className={`gap-2 ${item.bgColor} ${item.activeColor}`}
+                      className={`gap-2 ${item.iconColor} ${item.lightBg} hover:opacity-80`}
                     >
                       <Icon className="h-4 w-4" />
                       {item.title}
@@ -182,9 +188,10 @@ export default function Home() {
             return (
               <Button
                 key={item.href}
+                variant="ghost"
                 size="sm"
                 onClick={() => router.push(item.href)}
-                className={`gap-1.5 shrink-0 ${item.bgColor} ${item.activeColor}`}
+                className={`gap-1.5 shrink-0 ${item.iconColor} ${item.lightBg}`}
               >
                 <Icon className="h-4 w-4" />
                 {item.title}
@@ -196,149 +203,45 @@ export default function Home() {
 
       {/* 主内容区域 */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 欢迎区域 */}
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            欢迎使用学校收支管理系统
-          </h2>
-          <p className="text-gray-500">
-            通过顶部导航栏进入各功能模块
-          </p>
+        {/* 功能入口卡片 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Card 
+                key={item.href}
+                className="group cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-0 overflow-hidden"
+                onClick={() => router.push(item.href)}
+              >
+                {/* 顶部渐变色条 */}
+                <div className={`h-2 bg-gradient-to-r ${item.gradient}`} />
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`w-14 h-14 rounded-2xl ${item.iconBg} flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                      <Icon className={`h-7 w-7 ${item.iconColor}`} />
+                    </div>
+                    <div className="text-right opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className={`text-sm ${item.iconColor}`}>进入 →</span>
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-1">{item.title}</h3>
+                  <p className="text-gray-500 text-sm mb-4">{item.description}</p>
+                  {loading ? (
+                    <div className="h-12 flex items-center">
+                      <div className="animate-pulse bg-gray-200 h-4 w-24 rounded" />
+                    </div>
+                  ) : item.stats && (
+                    <div className={`mt-auto pt-4 border-t ${item.lightBg} -mx-6 -mb-6 px-6 py-4`}>
+                      <p className="text-xs text-gray-500 mb-1">{item.stats.label}</p>
+                      <p className={`text-lg font-bold ${item.iconColor}`}>{item.stats.value}</p>
+                      <p className="text-xs text-gray-400 mt-1">{item.stats.subValue}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
-
-        {/* 统计概览卡片 */}
-        <Card className="mb-8 shadow-md">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-blue-600" />
-              收支概览
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="h-64 flex items-center justify-center text-gray-400">
-                加载中...
-              </div>
-            ) : stats ? (
-              <>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={chartData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis 
-                        dataKey="name" 
-                        tick={{ fontSize: 13, fill: '#374151' }}
-                      />
-                      <YAxis 
-                        tickFormatter={(value) => formatAmount(value)}
-                        tick={{ fontSize: 12, fill: '#6b7280' }}
-                      />
-                      <Tooltip 
-                        formatter={(value: number) => [`¥${value.toLocaleString('zh-CN')}`, '金额']}
-                        contentStyle={{ borderRadius: '8px' }}
-                      />
-                      <Bar 
-                        dataKey="value" 
-                        name="金额"
-                        radius={[6, 6, 0, 0]}
-                      >
-                        <Cell fill="#3b82f6" />
-                        <Cell fill="#22c55e" />
-                        <Cell fill="#ef4444" />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                
-                {/* 统计数字 */}
-                <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-100">
-                  <div className="text-center">
-                    <p className="text-sm text-gray-500 mb-1">应交收费</p>
-                    <p className="text-2xl font-bold text-blue-600">¥{formatAmount(stats.totalFee)}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm text-gray-500 mb-1">已交收费</p>
-                    <p className="text-2xl font-bold text-green-600">¥{formatAmount(stats.totalPaid)}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm text-gray-500 mb-1">总支出</p>
-                    <p className="text-2xl font-bold text-red-600">¥{formatAmount(stats.totalExpense)}</p>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="h-64 flex flex-col items-center justify-center text-gray-400">
-                <Wallet className="h-12 w-12 mb-3 opacity-50" />
-                <p>暂无收支数据</p>
-                <p className="text-sm mt-1">请先添加学生或支出记录</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* 快捷统计卡片 */}
-        {!loading && stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="shadow-sm">
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                    <Users className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">学生人数</p>
-                    <p className="text-xl font-bold text-gray-900">{stats.studentCount}人</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="shadow-sm">
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                    <School className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">班级数量</p>
-                    <p className="text-xl font-bold text-gray-900">{stats.classCount}个</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="shadow-sm">
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
-                    <Wallet className="h-5 w-5 text-orange-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">欠费金额</p>
-                    <p className="text-xl font-bold text-orange-600">¥{formatAmount(stats.totalUnpaid)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="shadow-sm">
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
-                    <FileText className="h-5 w-5 text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">支出记录</p>
-                    <p className="text-xl font-bold text-gray-900">{stats.expenseRecordCount}条</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </main>
 
       {/* 底部信息 */}

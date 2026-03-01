@@ -1635,81 +1635,139 @@ function FeesContent() {
 
       {/* 修改应交费用对话框 */}
       <Dialog open={editFeeDialogOpen} onOpenChange={setEditFeeDialogOpen}>
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Edit className="h-5 w-5 text-blue-600" />
-              修改应交费用
+              修改学生信息
             </DialogTitle>
             <DialogDescription>
-              修改 <span className="font-semibold text-gray-900">{editFeeStudent?.student_name}</span> 的应交费用金额
+              修改学生的基本信息和应交费用金额
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 py-4">
+            {/* 基本信息 */}
+            <div className="grid grid-cols-4 items-center gap-4 pb-3 border-b">
+              <Label className="text-right">姓名</Label>
+              <Input
+                value={editFeeStudent?.student_name || ''}
+                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, student_name: e.target.value } : null)}
+                className="col-span-3"
+                placeholder="学生姓名"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4 pb-3 border-b">
+              <Label className="text-right">性别</Label>
+              <Select 
+                value={editFeeStudent?.gender || '男'} 
+                onValueChange={(value) => setEditFeeStudent(prev => prev ? { ...prev, gender: value } : null)}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="选择性别" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="男">男</SelectItem>
+                  <SelectItem value="女">女</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* 费用项目 - 显示应交/已交 */}
+            <div className="text-sm font-medium text-gray-500 pt-2">应交费用（不能小于已交金额）</div>
+            
             {/* 学费 */}
             <div className="flex items-center justify-between">
               <Label className="font-medium">学费</Label>
-              <Input
-                type="number"
-                value={editFeeStudent?.tuition_fee || 0}
-                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, tuition_fee: Number(e.target.value) } : null)}
-                className="w-32 text-right"
-                min={0}
-              />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">已交: {editFeeStudent?.tuition_paid || 0}</span>
+                <Input
+                  type="number"
+                  value={editFeeStudent?.tuition_fee || 0}
+                  onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, tuition_fee: Number(e.target.value) } : null)}
+                  className="w-24 text-right"
+                  min={0}
+                />
+              </div>
             </div>
             {/* 午餐费 */}
             <div className="flex items-center justify-between">
               <Label className="font-medium">午餐费</Label>
-              <Input
-                type="number"
-                value={editFeeStudent?.lunch_fee || 0}
-                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, lunch_fee: Number(e.target.value) } : null)}
-                className="w-32 text-right"
-                min={0}
-              />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">已交: {editFeeStudent?.lunch_paid || 0}</span>
+                <Input
+                  type="number"
+                  value={editFeeStudent?.lunch_fee || 0}
+                  onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, lunch_fee: Number(e.target.value) } : null)}
+                  className="w-24 text-right"
+                  min={0}
+                />
+              </div>
             </div>
             {/* 午托费 */}
             <div className="flex items-center justify-between">
               <Label className="font-medium">午托费</Label>
-              <Input
-                type="number"
-                value={editFeeStudent?.nap_fee || 0}
-                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, nap_fee: Number(e.target.value) } : null)}
-                className="w-32 text-right"
-                min={0}
-              />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">已交: {editFeeStudent?.nap_paid || 0}</span>
+                <Input
+                  type="number"
+                  value={editFeeStudent?.nap_fee || 0}
+                  onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, nap_fee: Number(e.target.value) } : null)}
+                  className="w-24 text-right"
+                  min={0}
+                />
+              </div>
             </div>
             {/* 课后服务费 */}
             <div className="flex items-center justify-between">
               <Label className="font-medium">课后服务费</Label>
-              <Input
-                type="number"
-                value={editFeeStudent?.after_school_fee || 0}
-                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, after_school_fee: Number(e.target.value) } : null)}
-                className="w-32 text-right"
-                min={0}
-              />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">已交: {editFeeStudent?.after_school_paid || 0}</span>
+                <Input
+                  type="number"
+                  value={editFeeStudent?.after_school_fee || 0}
+                  onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, after_school_fee: Number(e.target.value) } : null)}
+                  className="w-24 text-right"
+                  min={0}
+                />
+              </div>
             </div>
             {/* 社团费 */}
             <div className="flex items-center justify-between">
               <Label className="font-medium">社团费</Label>
-              <Input
-                type="number"
-                value={editFeeStudent?.club_fee || 0}
-                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, club_fee: Number(e.target.value) } : null)}
-                className="w-32 text-right"
-                min={0}
-              />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">已交: {editFeeStudent?.club_paid || 0}</span>
+                <Input
+                  type="number"
+                  value={editFeeStudent?.club_fee || 0}
+                  onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, club_fee: Number(e.target.value) } : null)}
+                  className="w-24 text-right"
+                  min={0}
+                />
+              </div>
             </div>
             {/* 代办费 */}
             <div className="flex items-center justify-between border-t pt-3">
               <Label className="font-medium text-purple-600">代办费</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">已交: {editFeeStudent?.agency_paid || 0}</span>
+                <Input
+                  type="number"
+                  value={editFeeStudent?.agency_fee || 0}
+                  onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, agency_fee: Number(e.target.value) } : null)}
+                  className="w-24 text-right"
+                  min={0}
+                />
+              </div>
+            </div>
+            
+            {/* 备注 */}
+            <div className="grid grid-cols-4 items-center gap-4 border-t pt-3">
+              <Label className="text-right">备注</Label>
               <Input
-                type="number"
-                value={editFeeStudent?.agency_fee || 0}
-                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, agency_fee: Number(e.target.value) } : null)}
-                className="w-32 text-right"
-                min={0}
+                value={editFeeStudent?.remark || ''}
+                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, remark: e.target.value } : null)}
+                className="col-span-3"
+                placeholder="备注信息（选填）"
               />
             </div>
           </div>
@@ -1720,6 +1778,38 @@ function FeesContent() {
             <Button
               onClick={async () => {
                 if (!editFeeStudent) return;
+                
+                // 验证：应交金额不能小于已交金额
+                const errors: string[] = [];
+                if (editFeeStudent.tuition_fee < editFeeStudent.tuition_paid) {
+                  errors.push(`学费应交(${editFeeStudent.tuition_fee})不能小于已交(${editFeeStudent.tuition_paid})`);
+                }
+                if (editFeeStudent.lunch_fee < editFeeStudent.lunch_paid) {
+                  errors.push(`午餐费应交(${editFeeStudent.lunch_fee})不能小于已交(${editFeeStudent.lunch_paid})`);
+                }
+                if (editFeeStudent.nap_fee < editFeeStudent.nap_paid) {
+                  errors.push(`午托费应交(${editFeeStudent.nap_fee})不能小于已交(${editFeeStudent.nap_paid})`);
+                }
+                if (editFeeStudent.after_school_fee < editFeeStudent.after_school_paid) {
+                  errors.push(`课后服务费应交(${editFeeStudent.after_school_fee})不能小于已交(${editFeeStudent.after_school_paid})`);
+                }
+                if (editFeeStudent.club_fee < editFeeStudent.club_paid) {
+                  errors.push(`社团费应交(${editFeeStudent.club_fee})不能小于已交(${editFeeStudent.club_paid})`);
+                }
+                if (editFeeStudent.agency_fee < editFeeStudent.agency_paid) {
+                  errors.push(`代办费应交(${editFeeStudent.agency_fee})不能小于已交(${editFeeStudent.agency_paid})`);
+                }
+                
+                if (errors.length > 0) {
+                  toast.error(errors[0]);
+                  return;
+                }
+                
+                // 验证姓名不能为空
+                if (!editFeeStudent.student_name.trim()) {
+                  toast.error('姓名不能为空');
+                  return;
+                }
                 
                 try {
                   const response = await authFetch(`/api/student-fees/${editFeeStudent.id}`, {

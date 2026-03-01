@@ -93,6 +93,12 @@ export async function GET(request: NextRequest) {
         }
         await exportClassDetail(workbook, students, payments, className);
         break;
+      case 'agency_fee_detail':
+        if (!className) {
+          return NextResponse.json({ error: '缺少班级参数' }, { status: 400 });
+        }
+        await exportAgencyFeeDetail(workbook, className);
+        break;
       case 'month':
         await exportByMonth(workbook, students, payments);
         break;
@@ -109,6 +115,7 @@ export async function GET(request: NextRequest) {
       'project_stats': '全校项目参与人数.xlsx',
       'class_project_stats': '班级项目参与人数.xlsx',
       'class_detail': `${className}班级明细.xlsx`,
+      'agency_fee_detail': `${className}代办费明细.xlsx`,
       'month': '月度费用统计.xlsx',
       'class': '班级费用统计.xlsx'
     };
@@ -599,4 +606,111 @@ async function exportByMonth(workbook: XLSX.WorkBook, students: StudentData[], p
   ];
 
   XLSX.utils.book_append_sheet(workbook, detailWs, '交费明细');
+}
+
+// 代办费扣除项目类型映射
+const agencyFeeItemTypeMap: Record<string, string> = {
+  textbook: '教材教辅',
+  notebook: '簿册费',
+  autumn_trip: '秋游',
+  art_supplies: '美术用品',
+  report_manual: '报告手册',
+  daily_other: '日常其他',
+};
+
+// 导出班级代办费明细
+async function exportAgencyFeeDetail(workbook: XLSX.WorkBook, className: string) {
+  // 获取班级学生列表
+  const students = db.prepare(`
+    SELECT id, student_name, agency_fee, agency_paid
+    FROM student_fees
+    WHERE class_name = ?
+    ORDER BY student_name
+  `).all(className) as Array<{
+    id: number;
+    student_name: string;
+    agency_fee: number;
+    agency_paid: number;
+  }>;
+
+  // 获取每个学生的代办费扣除记录
+  const studentDetails = [];
+  const allDeductionRecords = [];
+
+  for (const student of students) {
+    // 计算已扣除金额
+    const deductions = db.prepare(`
+      SELECT id, item_type, amount, item_date, remark
+      FROM agency_fee_items
+      WHERE student_id = ?
+      ORDER BY item_date DESC
+    `).all(student.id) as Array<{
+      id: number;
+      item_type: string;
+      amount: number;
+      item_date: string;
+      remark: string | null;
+    }>;
+
+    const totalDeducted = deductions.reduce((sum, d) => sum + d.amount, 0);
+    const agencyPaid = student.agency_paid ?? student.agency_fee ?? 0;
+    const balance = agencyPaid - totalDeducted;
+
+    studentDetails.push({
+      学生姓名: student.student_name,
+      应交代办费: student.agency_fee || 0,
+      已交代办费: agencyPaid,
+      已扣除金额: totalDeducted,
+      剩余金额: balance,
+    });
+
+    // 收集所有扣除记录
+    for (const d of deductions) {
+      allDeductionRecords.push({
+        学生姓名: student.student_name,
+        扣除日期: d.item_date,
+        扣除项目: agencyFeeItemTypeMap[d.item_type] || d.item_type,
+        扣除金额: d.amount,
+        备注: d.remark || '',
+      });
+    }
+  }
+
+  // 添加汇总行
+  const summaryRow = {
+    学生姓名: '合计',
+    应交代办费: studentDetails.reduce((sum, s) => sum + s.应交代办费, 0),
+    已交代办费: studentDetails.reduce((sum, s) => sum + s.已交代办费, 0),
+    已扣除金额: studentDetails.reduce((sum, s) => sum + s.已扣除金额, 0),
+    剩余金额: studentDetails.reduce((sum, s) => sum + s.剩余金额, 0),
+  };
+
+  // 创建学生汇总表
+  const summarySheetData = [...studentDetails, summaryRow];
+  const summaryWs = XLSX.utils.json_to_sheet(summarySheetData);
+  summaryWs['!cols'] = [
+    { wch: 12 }, // 学生姓名
+    { wch: 12 }, // 应交代办费
+    { wch: 12 }, // 已交代办费
+    { wch: 12 }, // 已扣除金额
+    { wch: 12 }, // 剩余金额
+  ];
+  XLSX.utils.book_append_sheet(workbook, summaryWs, '学生代办费汇总');
+
+  // 创建扣除明细表
+  if (allDeductionRecords.length > 0) {
+    const detailWs = XLSX.utils.json_to_sheet(allDeductionRecords);
+    detailWs['!cols'] = [
+      { wch: 12 }, // 学生姓名
+      { wch: 12 }, // 扣除日期
+      { wch: 12 }, // 扣除项目
+      { wch: 12 }, // 扣除金额
+      { wch: 20 }, // 备注
+    ];
+    XLSX.utils.book_append_sheet(workbook, detailWs, '扣除明细记录');
+  } else {
+    // 如果没有扣除记录，添加空表提示
+    const emptyWs = XLSX.utils.json_to_sheet([{ 提示: '暂无扣除记录' }]);
+    XLSX.utils.book_append_sheet(workbook, emptyWs, '扣除明细记录');
+  }
 }

@@ -319,10 +319,10 @@ function FeesContent() {
   const handleSubmit = async () => {
     setSubmitting(true);
     
-    // 新增时，agencyPaid 默认等于 agencyFee；修改时保持原值
+    // 新增时，agencyPaid 默认为 0；修改时保持原值
     const agencyPaidValue = selectedStudent 
       ? (formData.agencyPaid ?? formData.agencyFee ?? 0)
-      : (formData.agencyFee || 0);
+      : 0;
     
     // 准备学生数据
     const studentData = {

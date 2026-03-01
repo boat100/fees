@@ -1320,8 +1320,8 @@ function FeesContent() {
                           </TableCell>
                           <TableCell className="text-center">{student.gender || '男'}</TableCell>
                           <TableCell className="text-center">
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${student.nap_fee > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                              {student.nap_fee > 0 ? '午托' : '走读'}
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${(student.lunch_fee > 0 || student.nap_fee > 0) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                              {(student.lunch_fee > 0 || student.nap_fee > 0) ? '午托' : '走读'}
                             </span>
                           </TableCell>
                           <TableCell>{renderFeeCell(student.tuition_fee, student.tuition_paid)}</TableCell>

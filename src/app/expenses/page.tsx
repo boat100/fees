@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -272,7 +273,7 @@ export default function ExpensesPage() {
   // 提交表单
   const handleSubmit = async () => {
     if (!formData.item || !formData.reportDate || !formData.occurDate || formData.amount <= 0) {
-      alert('请填写完整信息，金额必须大于0');
+      toast.error('请填写完整信息，金额必须大于0');
       return;
     }
 
@@ -294,15 +295,15 @@ export default function ExpensesPage() {
       const result = await response.json();
 
       if (response.ok) {
-        alert(selectedRecord ? '更新成功' : '添加成功');
+        toast.success(selectedRecord ? '更新成功' : '添加成功');
         setDialogOpen(false);
         fetchRecords();
       } else {
-        alert(result.error || '操作失败');
+        toast.error(result.error || '操作失败');
       }
     } catch (error) {
       console.error('Failed to save expense:', error);
-      alert('操作失败');
+      toast.error('操作失败');
     } finally {
       setSubmitting(false);
     }

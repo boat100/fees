@@ -50,7 +50,6 @@ import {
   Users,
   DollarSign,
   ExternalLink,
-  CreditCard,
   LogOut,
   Download,
   ArrowLeft,
@@ -59,7 +58,6 @@ import {
   CheckSquare,
   Square
 } from 'lucide-react';
-import { FEE_ITEMS } from '@/lib/constants';
 
 // 类型定义
 interface StudentFee {
@@ -133,22 +131,10 @@ function FeesContent() {
   // 对话框状态
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [batchPaymentDialogOpen, setBatchPaymentDialogOpen] = useState(false);
   const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentFee | null>(null);
-  
-  // 批量录入状态
-  const [batchPaymentData, setBatchPaymentData] = useState<{
-    selectedStudents: number[];
-    payments: Array<{ feeType: string; amount: number }>;
-    paymentDate: string;
-    remark: string;
-  }>({
-    selectedStudents: [],
-    payments: [],
-    paymentDate: '',
-    remark: '',
-  });
+  const [editFeeDialogOpen, setEditFeeDialogOpen] = useState(false);
+  const [editFeeStudent, setEditFeeStudent] = useState<StudentFee | null>(null);
   
   // 导出状态
   const [exportingClass, setExportingClass] = useState(false);
@@ -1199,38 +1185,14 @@ function FeesContent() {
                       
                       {/* 多选模式下的批量操作按钮 */}
                       {selectMode && selectedIds.size > 0 && (
-                        <>
-                          <Button
-                            onClick={() => {
-                              setBatchPaymentData({
-                                selectedStudents: Array.from(selectedIds),
-                                payments: [
-                                  { feeType: 'tuition', amount: 0 },
-                                  { feeType: 'lunch', amount: 0 },
-                                  { feeType: 'nap', amount: 0 },
-                                  { feeType: 'after_school', amount: 0 },
-                                  { feeType: 'club', amount: 0 },
-                                ],
-                                paymentDate: getTodayString(),
-                                remark: '',
-                              });
-                              setBatchPaymentDialogOpen(true);
-                            }}
-                            variant="outline"
-                            size="sm"
-                          >
-                            <CreditCard className="h-4 w-4 mr-1.5" />
-                            批量录入 ({selectedIds.size})
-                          </Button>
-                          <Button
-                            onClick={() => setBatchDeleteDialogOpen(true)}
-                            variant="destructive"
-                            size="sm"
-                          >
-                            <Trash2 className="h-4 w-4 mr-1.5" />
-                            批量删除 ({selectedIds.size})
-                          </Button>
-                        </>
+                        <Button
+                          onClick={() => setBatchDeleteDialogOpen(true)}
+                          variant="destructive"
+                          size="sm"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1.5" />
+                          批量删除 ({selectedIds.size})
+                        </Button>
                       )}
                     </>
                   )}
@@ -1296,6 +1258,7 @@ function FeesContent() {
                       <TableHead className="font-semibold text-right bg-gray-100">代办费<br/><span className="font-normal text-xs text-gray-500">应交/已交/剩余</span></TableHead>
                       <TableHead className="font-semibold text-right bg-gray-100">合计<br/><span className="font-normal text-xs text-gray-500">应交/已交</span></TableHead>
                       <TableHead className="font-semibold bg-gray-100">备注</TableHead>
+                      <TableHead className="font-semibold text-center bg-gray-100 w-16">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1351,12 +1314,26 @@ function FeesContent() {
                             </div>
                           </TableCell>
                           <TableCell className="max-w-[100px] truncate">{student.remark || '-'}</TableCell>
+                          <TableCell className="text-center">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
+                              onClick={() => {
+                                setEditFeeStudent(student);
+                                setEditFeeDialogOpen(true);
+                              }}
+                              title="修改应交费用"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       );
                     })}
                     {/* 合计行 */}
                     <TableRow className="bg-blue-50 font-semibold">
-                      <TableCell colSpan={selectMode ? 5 : 4} className="text-center">合计</TableCell>
+                      <TableCell colSpan={selectMode ? 6 : 5} className="text-center">合计</TableCell>
                       <TableCell className="text-right">
                         <div>{totals.tuition_fee.toFixed(0)}/{totals.tuition_paid.toFixed(0)}</div>
                       </TableCell>
@@ -1378,7 +1355,7 @@ function FeesContent() {
                       <TableCell className="text-right text-lg text-blue-700">
                         {totals.total_fee.toFixed(0)}/{totals.total_paid.toFixed(0)}
                       </TableCell>
-                      <TableCell colSpan={1}></TableCell>
+                      <TableCell colSpan={2}></TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -1656,219 +1633,129 @@ function FeesContent() {
         </DialogContent>
       </Dialog>
 
-      {/* 批量录入交费对话框 */}
-      <Dialog open={batchPaymentDialogOpen} onOpenChange={setBatchPaymentDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+      {/* 修改应交费用对话框 */}
+      <Dialog open={editFeeDialogOpen} onOpenChange={setEditFeeDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              批量录入交费
+              <Edit className="h-5 w-5 text-blue-600" />
+              修改应交费用
             </DialogTitle>
             <DialogDescription>
-              选择学生和费用项目，批量录入交费记录。支持多学生多项目同时录入。
+              修改 <span className="font-semibold text-gray-900">{editFeeStudent?.student_name}</span> 的应交费用金额
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {/* 交费日期 */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">交费日期 *</Label>
+          <div className="grid gap-3 py-4">
+            {/* 学费 */}
+            <div className="flex items-center justify-between">
+              <Label className="font-medium">学费</Label>
               <Input
-                type="date"
-                value={batchPaymentData.paymentDate}
-                onChange={(e) => setBatchPaymentData({ ...batchPaymentData, paymentDate: e.target.value })}
-                className="col-span-3"
+                type="number"
+                value={editFeeStudent?.tuition_fee || 0}
+                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, tuition_fee: Number(e.target.value) } : null)}
+                className="w-32 text-right"
+                min={0}
               />
             </div>
-            
-            {/* 选择学生 */}
-            <div className="border-t pt-4">
-              <Label className="mb-2 block">选择学生（可多选）</Label>
-              <div className="border rounded-lg max-h-[200px] overflow-y-auto">
-                {students.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">暂无学生数据</div>
-                ) : (
-                  <div className="divide-y">
-                    {students.map((student) => {
-                      const isSelected = batchPaymentData.selectedStudents.includes(student.id);
-                      return (
-                        <label
-                          key={student.id}
-                          className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 ${
-                            isSelected ? 'bg-blue-50' : ''
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setBatchPaymentData({
-                                  ...batchPaymentData,
-                                  selectedStudents: [...batchPaymentData.selectedStudents, student.id],
-                                });
-                              } else {
-                                setBatchPaymentData({
-                                  ...batchPaymentData,
-                                  selectedStudents: batchPaymentData.selectedStudents.filter(id => id !== student.id),
-                                });
-                              }
-                            }}
-                            className="h-4 w-4"
-                          />
-                          <span className="font-medium">{student.student_name}</span>
-                          <span className="text-sm text-gray-500">({student.class_name})</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              <div className="mt-2 flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setBatchPaymentData({
-                    ...batchPaymentData,
-                    selectedStudents: students.map(s => s.id),
-                  })}
-                >
-                  全选
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setBatchPaymentData({
-                    ...batchPaymentData,
-                    selectedStudents: [],
-                  })}
-                >
-                  清空
-                </Button>
-              </div>
-            </div>
-            
-            {/* 选择费用项目和金额 */}
-            <div className="border-t pt-4">
-              <Label className="mb-2 block">费用项目和金额</Label>
-              <div className="space-y-3">
-                {FEE_ITEMS.map((item) => {
-                  const existingPayment = batchPaymentData.payments.find(p => p.feeType === item.key);
-                  return (
-                    <div key={item.key} className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={!!existingPayment}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setBatchPaymentData({
-                              ...batchPaymentData,
-                              payments: [...batchPaymentData.payments, { feeType: item.key, amount: 0 }],
-                            });
-                          } else {
-                            setBatchPaymentData({
-                              ...batchPaymentData,
-                              payments: batchPaymentData.payments.filter(p => p.feeType !== item.key),
-                            });
-                          }
-                        }}
-                        className="h-4 w-4"
-                      />
-                      <Label className="w-24">{item.label}</Label>
-                      <Input
-                        type="number"
-                        value={existingPayment?.amount || ''}
-                        onChange={(e) => {
-                          const newPayments = batchPaymentData.payments.map(p =>
-                            p.feeType === item.key ? { ...p, amount: Number(e.target.value) } : p
-                          );
-                          setBatchPaymentData({ ...batchPaymentData, payments: newPayments });
-                        }}
-                        placeholder="金额"
-                        className="w-32"
-                        disabled={!existingPayment}
-                      />
-                      <span className="text-sm text-gray-500">元</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            
-            {/* 备注 */}
-            <div className="grid grid-cols-4 items-center gap-4 border-t pt-4">
-              <Label className="text-right">备注</Label>
+            {/* 午餐费 */}
+            <div className="flex items-center justify-between">
+              <Label className="font-medium">午餐费</Label>
               <Input
-                value={batchPaymentData.remark}
-                onChange={(e) => setBatchPaymentData({ ...batchPaymentData, remark: e.target.value })}
-                className="col-span-3"
-                placeholder="备注信息（选填）"
+                type="number"
+                value={editFeeStudent?.lunch_fee || 0}
+                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, lunch_fee: Number(e.target.value) } : null)}
+                className="w-32 text-right"
+                min={0}
+              />
+            </div>
+            {/* 午托费 */}
+            <div className="flex items-center justify-between">
+              <Label className="font-medium">午托费</Label>
+              <Input
+                type="number"
+                value={editFeeStudent?.nap_fee || 0}
+                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, nap_fee: Number(e.target.value) } : null)}
+                className="w-32 text-right"
+                min={0}
+              />
+            </div>
+            {/* 课后服务费 */}
+            <div className="flex items-center justify-between">
+              <Label className="font-medium">课后服务费</Label>
+              <Input
+                type="number"
+                value={editFeeStudent?.after_school_fee || 0}
+                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, after_school_fee: Number(e.target.value) } : null)}
+                className="w-32 text-right"
+                min={0}
+              />
+            </div>
+            {/* 社团费 */}
+            <div className="flex items-center justify-between">
+              <Label className="font-medium">社团费</Label>
+              <Input
+                type="number"
+                value={editFeeStudent?.club_fee || 0}
+                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, club_fee: Number(e.target.value) } : null)}
+                className="w-32 text-right"
+                min={0}
+              />
+            </div>
+            {/* 代办费 */}
+            <div className="flex items-center justify-between border-t pt-3">
+              <Label className="font-medium text-purple-600">代办费</Label>
+              <Input
+                type="number"
+                value={editFeeStudent?.agency_fee || 0}
+                onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, agency_fee: Number(e.target.value) } : null)}
+                className="w-32 text-right"
+                min={0}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBatchPaymentDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setEditFeeDialogOpen(false)}>
               取消
             </Button>
-            <Button 
+            <Button
               onClick={async () => {
-                if (batchPaymentData.selectedStudents.length === 0) {
-                  alert('请选择至少一个学生');
-                  return;
-                }
-                const validPayments = batchPaymentData.payments.filter(p => p.amount > 0);
-                if (validPayments.length === 0) {
-                  alert('请至少填写一项费用金额');
-                  return;
-                }
-                if (!batchPaymentData.paymentDate) {
-                  alert('请选择交费日期');
-                  return;
-                }
-                
-                // 构建批量录入数据
-                const payments = batchPaymentData.selectedStudents.flatMap(studentId =>
-                  validPayments.map(payment => ({
-                    studentId,
-                    feeType: payment.feeType,
-                    amount: payment.amount,
-                  }))
-                );
+                if (!editFeeStudent) return;
                 
                 try {
-                  const response = await authFetch('/api/payments/batch', {
-                    method: 'POST',
+                  const response = await authFetch(`/api/student-fees/${editFeeStudent.id}`, {
+                    method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      payments,
-                      paymentDate: batchPaymentData.paymentDate,
-                      remark: batchPaymentData.remark || null,
+                      className: editFeeStudent.class_name,
+                      studentName: editFeeStudent.student_name,
+                      gender: editFeeStudent.gender,
+                      tuitionFee: editFeeStudent.tuition_fee,
+                      lunchFee: editFeeStudent.lunch_fee,
+                      napFee: editFeeStudent.nap_fee,
+                      afterSchoolFee: editFeeStudent.after_school_fee,
+                      clubFee: editFeeStudent.club_fee,
+                      agencyFee: editFeeStudent.agency_fee,
+                      remark: editFeeStudent.remark,
                     }),
                   });
                   
                   const result = await response.json();
                   
                   if (response.ok) {
-                    alert(result.message);
-                    setBatchPaymentDialogOpen(false);
-                    setBatchPaymentData({
-                      selectedStudents: [],
-                      payments: [],
-                      paymentDate: '',
-                      remark: '',
-                    });
+                    toast.success('修改成功');
+                    setEditFeeDialogOpen(false);
                     fetchStudents();
                   } else {
-                    alert(result.error || '批量录入失败');
+                    toast.error(result.error || '修改失败');
                   }
                 } catch (error) {
-                  console.error('Failed to batch payment:', error);
-                  alert('批量录入失败');
+                  console.error('Failed to update fee:', error);
+                  toast.error('修改失败，请重试');
                 }
               }}
-              className="bg-orange-600 hover:bg-orange-700"
-              disabled={batchPaymentData.selectedStudents.length === 0 || batchPaymentData.payments.filter(p => p.amount > 0).length === 0}
+              className="bg-blue-600 hover:bg-blue-700"
             >
-              确认录入
+              保存修改
             </Button>
           </DialogFooter>
         </DialogContent>

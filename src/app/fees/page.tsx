@@ -159,6 +159,10 @@ function FeesContent() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportType, setExportType] = useState<'fee_detail' | 'payment_records'>('fee_detail');
   
+  // 添加班级对话框
+  const [addClassDialogOpen, setAddClassDialogOpen] = useState(false);
+  const [newClassName, setNewClassName] = useState('');
+  
   // 导入状态
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importData, setImportData] = useState<Array<{
@@ -312,6 +316,10 @@ function FeesContent() {
 
   // 打开新增对话框
   const handleAddStudent = () => {
+    if (!selectedClass) {
+      toast.error('请先选择班级');
+      return;
+    }
     setSelectedStudent(null);
     setFormData({
       className: selectedClass,
@@ -328,6 +336,30 @@ function FeesContent() {
     });
     setFormWarnings({});
     setStudentDialogOpen(true);
+  };
+
+  const handleAddClass = () => {
+    setNewClassName('');
+    setAddClassDialogOpen(true);
+  };
+
+  const handleSubmitAddClass = async () => {
+    const trimmedName = newClassName.trim();
+    if (!trimmedName) {
+      toast.error('请输入班级名称');
+      return;
+    }
+    
+    if (classes.includes(trimmedName)) {
+      toast.error('该班级已存在');
+      return;
+    }
+
+    // 添加新班级到列表并选中
+    setClasses(prev => [...prev, trimmedName].sort());
+    setSelectedClass(trimmedName);
+    setAddClassDialogOpen(false);
+    toast.success(`班级"${trimmedName}"已添加`);
   };
 
   // 打开修改对话框
@@ -1008,11 +1040,12 @@ function FeesContent() {
               </Button>
               
               <Button
-                onClick={handleAddStudent}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={handleAddClass}
+                variant="outline"
+                className="border-amber-600 text-amber-600 hover:bg-amber-50"
               >
-                <UserPlus className="h-4 w-4 mr-2" />
-                新增学生
+                <Users className="h-4 w-4 mr-2" />
+                添加班级
               </Button>
               
               <Button
@@ -1086,80 +1119,96 @@ function FeesContent() {
               </div>
               
               {/* 第二行：操作按钮 */}
-              {selectedClass && students.length > 0 && (
+              {selectedClass && (
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button
-                    onClick={openExportDialog}
-                    variant="outline"
-                    disabled={exportingClass}
-                    className="border-green-600 text-green-600 hover:bg-green-50"
+                    onClick={handleAddStudent}
+                    className="bg-green-600 hover:bg-green-700 text-white"
                   >
-                    {exportingClass ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4 mr-2" />
-                    )}
-                    导出班级数据
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    新增学生
                   </Button>
-                  <Button
-                    onClick={handleExportAgencyFee}
-                    variant="outline"
-                    disabled={exportingAgency}
-                    className="border-purple-600 text-purple-600 hover:bg-purple-50"
-                  >
-                    {exportingAgency ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4 mr-2" />
-                    )}
-                    导出代办费明细
-                  </Button>
+                  
+                  {students.length > 0 && (
+                    <>
+                      <Button
+                        onClick={openExportDialog}
+                        variant="outline"
+                        disabled={exportingClass}
+                        className="border-green-600 text-green-600 hover:bg-green-50"
+                      >
+                        {exportingClass ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        导出班级数据
+                      </Button>
+                      <Button
+                        onClick={handleExportAgencyFee}
+                        variant="outline"
+                        disabled={exportingAgency}
+                        className="border-purple-600 text-purple-600 hover:bg-purple-50"
+                      >
+                        {exportingAgency ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        导出代办费明细
+                      </Button>
+                    </>
+                  )}
                   
                   {/* 多选模式按钮 */}
-                  <Button
-                    onClick={() => {
-                      setSelectMode(!selectMode);
-                      setSelectedIds(new Set());
-                    }}
-                    variant={selectMode ? "default" : "outline"}
-                    className={selectMode ? "bg-blue-600 hover:bg-blue-700" : "border-blue-600 text-blue-600 hover:bg-blue-50"}
-                  >
-                    <CheckSquare className="h-4 w-4 mr-2" />
-                    {selectMode ? '取消多选' : '多选'}
-                  </Button>
-                  
-                  {/* 多选模式下的批量操作按钮 */}
-                  {selectMode && selectedIds.size > 0 && (
+                  {students.length > 0 && (
                     <>
                       <Button
                         onClick={() => {
-                          setBatchPaymentData({
-                            selectedStudents: Array.from(selectedIds),
-                            payments: [
-                              { feeType: 'tuition', amount: 0 },
-                              { feeType: 'lunch', amount: 0 },
-                              { feeType: 'nap', amount: 0 },
-                              { feeType: 'after_school', amount: 0 },
-                              { feeType: 'club', amount: 0 },
-                            ],
-                            paymentDate: getTodayString(),
-                            remark: '',
-                          });
-                          setBatchPaymentDialogOpen(true);
+                          setSelectMode(!selectMode);
+                          setSelectedIds(new Set());
                         }}
-                        variant="outline"
-                        className="border-orange-600 text-orange-600 hover:bg-orange-50"
+                        variant={selectMode ? "default" : "outline"}
+                        className={selectMode ? "bg-blue-600 hover:bg-blue-700" : "border-blue-600 text-blue-600 hover:bg-blue-50"}
                       >
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        批量录入 ({selectedIds.size})
+                        <CheckSquare className="h-4 w-4 mr-2" />
+                        {selectMode ? '取消多选' : '多选'}
                       </Button>
-                      <Button
-                        onClick={() => setBatchDeleteDialogOpen(true)}
-                        variant="destructive"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        批量删除 ({selectedIds.size})
-                      </Button>
+                      
+                      {/* 多选模式下的批量操作按钮 */}
+                      {selectMode && selectedIds.size > 0 && (
+                        <>
+                          <Button
+                            onClick={() => {
+                              setBatchPaymentData({
+                                selectedStudents: Array.from(selectedIds),
+                                payments: [
+                                  { feeType: 'tuition', amount: 0 },
+                                  { feeType: 'lunch', amount: 0 },
+                                  { feeType: 'nap', amount: 0 },
+                                  { feeType: 'after_school', amount: 0 },
+                                  { feeType: 'club', amount: 0 },
+                                ],
+                                paymentDate: getTodayString(),
+                                remark: '',
+                              });
+                              setBatchPaymentDialogOpen(true);
+                            }}
+                            variant="outline"
+                            className="border-orange-600 text-orange-600 hover:bg-orange-50"
+                          >
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            批量录入 ({selectedIds.size})
+                          </Button>
+                          <Button
+                            onClick={() => setBatchDeleteDialogOpen(true)}
+                            variant="destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            批量删除 ({selectedIds.size})
+                          </Button>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
@@ -1327,12 +1376,19 @@ function FeesContent() {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">班级 *</Label>
-              <Input
-                value={formData.className}
-                onChange={(e) => setFormData({ ...formData, className: e.target.value })}
-                className="col-span-3"
-                placeholder="请输入班级"
-              />
+              {selectedStudent ? (
+                <Input
+                  value={formData.className}
+                  onChange={(e) => setFormData({ ...formData, className: e.target.value })}
+                  className="col-span-3"
+                  placeholder="请输入班级"
+                />
+              ) : (
+                <div className="col-span-3 flex items-center">
+                  <span className="font-medium text-gray-700">{formData.className}</span>
+                  <span className="ml-2 text-xs text-gray-400">（当前班级）</span>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">姓名 *</Label>
@@ -1787,6 +1843,55 @@ function FeesContent() {
               disabled={batchPaymentData.selectedStudents.length === 0 || batchPaymentData.payments.filter(p => p.amount > 0).length === 0}
             >
               确认录入
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 添加班级对话框 */}
+      <Dialog open={addClassDialogOpen} onOpenChange={setAddClassDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              添加班级
+            </DialogTitle>
+            <DialogDescription>
+              输入新班级名称，添加后可在该班级下新增学生
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="class-name">班级名称 *</Label>
+              <Input
+                id="class-name"
+                value={newClassName}
+                onChange={(e) => setNewClassName(e.target.value)}
+                placeholder="例如：一年级1班"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSubmitAddClass();
+                  }
+                }}
+              />
+              {classes.length > 0 && (
+                <div className="text-sm text-gray-500">
+                  现有班级：{classes.slice(0, 5).join('、')}
+                  {classes.length > 5 && ` 等${classes.length}个班级`}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddClassDialogOpen(false)}>
+              取消
+            </Button>
+            <Button 
+              onClick={handleSubmitAddClass}
+              disabled={!newClassName.trim()}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              添加
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -386,29 +386,6 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
     { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, // 合计
   ];
   XLSX.utils.book_append_sheet(workbook, ws, '学生费用明细');
-
-  // 交费记录
-  const paymentRecords = classPayments.map(p => ({
-    交费日期: p.payment_date,
-    班级: className,
-    学生姓名: p.student_name,
-    费用类型: feeTypeMap[p.fee_type] || p.fee_type,
-    金额: p.amount,
-    备注: p.remarks || ''
-  }));
-
-  if (paymentRecords.length > 0) {
-    const paymentWs = XLSX.utils.json_to_sheet(paymentRecords);
-    paymentWs['!cols'] = [
-      { wch: 12 }, // 交费日期
-      { wch: 10 }, // 班级
-      { wch: 12 }, // 学生姓名
-      { wch: 10 }, // 费用类型
-      { wch: 10 }, // 金额
-      { wch: 20 }, // 备注
-    ];
-    XLSX.utils.book_append_sheet(workbook, paymentWs, '交费记录');
-  }
 }
 
 // 导出班级缴费记录

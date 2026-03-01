@@ -994,76 +994,85 @@ function FeesContent() {
       <header className="sticky top-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
+            {/* 左侧：返回按钮 + 标题 */}
+            <div className="flex items-center gap-4">
               <Button
                 onClick={() => router.push('/')}
                 variant="ghost"
                 size="sm"
-                className="gap-1"
+                className="gap-1 text-gray-600 hover:text-gray-900"
               >
                 <ArrowLeft className="h-4 w-4" />
                 返回首页
               </Button>
-              <DollarSign className="h-8 w-8 text-green-600" />
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                学校收费费用管理
-              </h1>
+              <div className="h-6 w-px bg-gray-300" />
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-7 w-7 text-green-600" />
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                  收费管理
+                </h1>
+              </div>
             </div>
             
-            {/* 导航按钮 */}
-            <nav className="flex items-center gap-2">
-              <Button
-                onClick={() => {
-                  setImportData([]);
-                  setImportResult(null);
-                  setImportDialogOpen(true);
-                }}
-                variant="outline"
-                className="border-purple-600 text-purple-600 hover:bg-purple-50"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                导入
-              </Button>
+            {/* 右侧：功能按钮组 */}
+            <nav className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => {
+                    setImportData([]);
+                    setImportResult(null);
+                    setImportDialogOpen(true);
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Upload className="h-4 w-4 mr-1.5" />
+                  导入
+                </Button>
+                
+                <Button
+                  onClick={handleExportSchool}
+                  variant="outline"
+                  size="sm"
+                  disabled={exportingSchool}
+                >
+                  {exportingSchool ? (
+                    <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-1.5" />
+                  )}
+                  导出全校
+                </Button>
+                
+                <Button
+                  onClick={handleAddClass}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Users className="h-4 w-4 mr-1.5" />
+                  添加班级
+                </Button>
+                
+                <Button
+                  onClick={() => router.push('/fees/stats')}
+                  variant="outline"
+                  size="sm"
+                >
+                  <BarChart3 className="h-4 w-4 mr-1.5" />
+                  统计
+                </Button>
+              </div>
               
-              <Button
-                onClick={handleExportSchool}
-                variant="outline"
-                disabled={exportingSchool}
-                className="border-teal-600 text-teal-600 hover:bg-teal-50"
-              >
-                {exportingSchool ? (
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                导出全校
-              </Button>
-              
-              <Button
-                onClick={handleAddClass}
-                variant="outline"
-                className="border-amber-600 text-amber-600 hover:bg-amber-50"
-              >
-                <Users className="h-4 w-4 mr-2" />
-                添加班级
-              </Button>
-              
-              <Button
-                onClick={() => router.push('/fees/stats')}
-                variant="outline"
-                className="border-blue-600 text-blue-600 hover:bg-blue-50"
-              >
-                <BarChart3 className="h-4 w-4 mr-2" />
-                统计
-              </Button>
+              <div className="h-6 w-px bg-gray-300" />
               
               <Button
                 onClick={handleLogout}
-                variant="outline"
-                className="border-gray-400 text-gray-600 hover:bg-gray-100"
+                variant="ghost"
+                size="icon"
+                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                title="退出登录"
               >
-                <LogOut className="h-4 w-4 mr-2" />
-                退出
+                <LogOut className="h-5 w-5" />
               </Button>
             </nav>
           </div>
@@ -1071,16 +1080,16 @@ function FeesContent() {
       </header>
 
       {/* 主内容区域 */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* 班级选择 */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
+        <Card className="mb-6 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Users className="h-5 w-5 text-green-600" />
               班级选择
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="flex flex-col gap-4">
               {/* 第一行：班级选择和学生数量 */}
               <div className="flex items-center gap-4">
@@ -1120,12 +1129,13 @@ function FeesContent() {
               
               {/* 第二行：操作按钮 */}
               {selectedClass && (
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-gray-100">
                   <Button
                     onClick={handleAddStudent}
+                    size="sm"
                     className="bg-green-600 hover:bg-green-700 text-white"
                   >
-                    <UserPlus className="h-4 w-4 mr-2" />
+                    <UserPlus className="h-4 w-4 mr-1.5" />
                     新增学生
                   </Button>
                   
@@ -1134,26 +1144,26 @@ function FeesContent() {
                       <Button
                         onClick={openExportDialog}
                         variant="outline"
+                        size="sm"
                         disabled={exportingClass}
-                        className="border-green-600 text-green-600 hover:bg-green-50"
                       >
                         {exportingClass ? (
-                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" />
                         ) : (
-                          <Download className="h-4 w-4 mr-2" />
+                          <Download className="h-4 w-4 mr-1.5" />
                         )}
                         导出班级数据
                       </Button>
                       <Button
                         onClick={handleExportAgencyFee}
                         variant="outline"
+                        size="sm"
                         disabled={exportingAgency}
-                        className="border-purple-600 text-purple-600 hover:bg-purple-50"
                       >
                         {exportingAgency ? (
-                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" />
                         ) : (
-                          <Download className="h-4 w-4 mr-2" />
+                          <Download className="h-4 w-4 mr-1.5" />
                         )}
                         导出代办费明细
                       </Button>
@@ -1169,9 +1179,10 @@ function FeesContent() {
                           setSelectedIds(new Set());
                         }}
                         variant={selectMode ? "default" : "outline"}
-                        className={selectMode ? "bg-blue-600 hover:bg-blue-700" : "border-blue-600 text-blue-600 hover:bg-blue-50"}
+                        size="sm"
+                        className={selectMode ? "bg-blue-600 hover:bg-blue-700" : ""}
                       >
-                        <CheckSquare className="h-4 w-4 mr-2" />
+                        <CheckSquare className="h-4 w-4 mr-1.5" />
                         {selectMode ? '取消多选' : '多选'}
                       </Button>
                       
@@ -1195,16 +1206,17 @@ function FeesContent() {
                               setBatchPaymentDialogOpen(true);
                             }}
                             variant="outline"
-                            className="border-orange-600 text-orange-600 hover:bg-orange-50"
+                            size="sm"
                           >
-                            <CreditCard className="h-4 w-4 mr-2" />
+                            <CreditCard className="h-4 w-4 mr-1.5" />
                             批量录入 ({selectedIds.size})
                           </Button>
                           <Button
                             onClick={() => setBatchDeleteDialogOpen(true)}
                             variant="destructive"
+                            size="sm"
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
+                            <Trash2 className="h-4 w-4 mr-1.5" />
                             批量删除 ({selectedIds.size})
                           </Button>
                         </>
@@ -1218,34 +1230,37 @@ function FeesContent() {
         </Card>
 
         {/* 费用明细表格 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>费用明细</CardTitle>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">费用明细</CardTitle>
             <CardDescription>
               {selectedClass ? `班级：${selectedClass} | 格式：应交/已交 | 点击姓名查看详情` : '请先选择班级'}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             {!selectedClass ? (
-              <div className="text-center py-8 text-gray-500">
-                请先选择一个班级
+              <div className="text-center py-12 text-gray-400">
+                <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>请先选择一个班级</p>
               </div>
             ) : loading ? (
-              <div className="flex items-center justify-center py-8">
-                <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="h-6 w-6 animate-spin text-green-600" />
                 <span className="ml-2 text-gray-500">加载中...</span>
               </div>
             ) : students.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                暂无数据，点击&ldquo;新增学生&rdquo;添加或&ldquo;批量导入&rdquo;数据
+              <div className="text-center py-12 text-gray-400">
+                <UserPlus className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>暂无数据</p>
+                <p className="text-sm mt-1">点击&ldquo;新增学生&rdquo;添加或&ldquo;导入&rdquo;数据</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-gray-50">
+                    <TableRow className="bg-gray-100 border-b border-gray-200">
                       {selectMode && (
-                        <TableHead className="font-semibold w-12">
+                        <TableHead className="w-12 bg-gray-100">
                           <Checkbox
                             checked={students.length > 0 && selectedIds.size === students.length}
                             onCheckedChange={(checked) => {
@@ -1258,18 +1273,18 @@ function FeesContent() {
                           />
                         </TableHead>
                       )}
-                      <TableHead className="font-semibold">序号</TableHead>
-                      <TableHead className="font-semibold">姓名</TableHead>
-                      <TableHead className="font-semibold text-center">性别</TableHead>
-                      <TableHead className="font-semibold text-center">午托</TableHead>
-                      <TableHead className="font-semibold text-right">学费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
-                      <TableHead className="font-semibold text-right">午餐费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
-                      <TableHead className="font-semibold text-right">午托费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
-                      <TableHead className="font-semibold text-right">课后服务费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
-                      <TableHead className="font-semibold text-right">社团费<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
-                      <TableHead className="font-semibold text-right">代办费<br/><span className="font-normal text-xs text-gray-400">应交/已交/剩余</span></TableHead>
-                      <TableHead className="font-semibold text-right">合计<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
-                      <TableHead className="font-semibold">备注</TableHead>
+                      <TableHead className="font-semibold bg-gray-100">序号</TableHead>
+                      <TableHead className="font-semibold bg-gray-100">姓名</TableHead>
+                      <TableHead className="font-semibold text-center bg-gray-100">性别</TableHead>
+                      <TableHead className="font-semibold text-center bg-gray-100">午托</TableHead>
+                      <TableHead className="font-semibold text-right bg-gray-100">学费<br/><span className="font-normal text-xs text-gray-500">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right bg-gray-100">午餐费<br/><span className="font-normal text-xs text-gray-500">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right bg-gray-100">午托费<br/><span className="font-normal text-xs text-gray-500">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right bg-gray-100">课后服务费<br/><span className="font-normal text-xs text-gray-500">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right bg-gray-100">社团费<br/><span className="font-normal text-xs text-gray-500">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right bg-gray-100">代办费<br/><span className="font-normal text-xs text-gray-500">应交/已交/剩余</span></TableHead>
+                      <TableHead className="font-semibold text-right bg-gray-100">合计<br/><span className="font-normal text-xs text-gray-500">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold bg-gray-100">备注</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

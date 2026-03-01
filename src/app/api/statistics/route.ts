@@ -91,16 +91,15 @@ export async function GET() {
         SUM(sf.club_fee) as club_fee,
         SUM(sf.agency_fee) as agency_fee,
         SUM(sf.agency_paid) as agency_paid,
-        COALESCE(pm.tuition_paid, 0) as tuition_paid,
-        COALESCE(pm.lunch_paid, 0) as lunch_paid,
-        COALESCE(pm.nap_paid, 0) as nap_paid,
-        COALESCE(pm.after_school_paid, 0) as after_school_paid,
-        COALESCE(pm.club_paid, 0) as club_paid
+        COALESCE(SUM(pm.tuition_paid), 0) as tuition_paid,
+        COALESCE(SUM(pm.lunch_paid), 0) as lunch_paid,
+        COALESCE(SUM(pm.nap_paid), 0) as nap_paid,
+        COALESCE(SUM(pm.after_school_paid), 0) as after_school_paid,
+        COALESCE(SUM(pm.club_paid), 0) as club_paid
       FROM student_fees sf
       LEFT JOIN (
         SELECT 
           s.id as student_id,
-          s.class_name,
           SUM(CASE WHEN p.fee_type = 'tuition' THEN p.amount ELSE 0 END) as tuition_paid,
           SUM(CASE WHEN p.fee_type = 'lunch' THEN p.amount ELSE 0 END) as lunch_paid,
           SUM(CASE WHEN p.fee_type = 'nap' THEN p.amount ELSE 0 END) as nap_paid,
@@ -108,10 +107,9 @@ export async function GET() {
           SUM(CASE WHEN p.fee_type = 'club' THEN p.amount ELSE 0 END) as club_paid
         FROM student_fees s
         LEFT JOIN payment_records p ON s.id = p.student_id
-        GROUP BY s.id, s.class_name
+        GROUP BY s.id
       ) pm ON sf.id = pm.student_id
       GROUP BY sf.class_name
-      ORDER BY sf.class_name
     `).all() as Array<{
       class_name: string;
       student_count: number;

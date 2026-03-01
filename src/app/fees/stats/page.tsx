@@ -487,6 +487,11 @@ function StatsContent() {
                         {(() => {
                           const monthData = statsData.monthlyStats.classStats[selectedMonth] || {};
                           const classes = Object.keys(monthData).sort();
+                          const feeTypes = ['tuition', 'lunch', 'nap', 'after_school', 'club', 'agency'] as const;
+                          
+                          // 计算各费用类型的合计
+                          const totals: Record<string, number> = {};
+                          feeTypes.forEach(type => totals[type] = 0);
                           let monthTotal = 0;
                           
                           if (classes.length === 0) {
@@ -502,6 +507,9 @@ function StatsContent() {
                               {classes.map((className) => {
                                 const classData = monthData[className];
                                 monthTotal += classData.total;
+                                feeTypes.forEach(type => {
+                                  totals[type] += classData.payments[type]?.amount || 0;
+                                });
                                 return (
                                   <TableRow key={className}>
                                     <TableCell className="font-medium">{className}</TableCell>
@@ -517,12 +525,12 @@ function StatsContent() {
                               })}
                               <TableRow className="bg-blue-50 font-semibold">
                                 <TableCell>本月合计</TableCell>
-                                <TableCell className="text-right">-</TableCell>
-                                <TableCell className="text-right">-</TableCell>
-                                <TableCell className="text-right">-</TableCell>
-                                <TableCell className="text-right">-</TableCell>
-                                <TableCell className="text-right">-</TableCell>
-                                <TableCell className="text-right">-</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{totals['tuition'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{totals['lunch'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{totals['nap'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{totals['after_school'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{totals['club'].toFixed(0)}</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{totals['agency'].toFixed(0)}</TableCell>
                                 <TableCell className="text-right text-blue-600">¥{monthTotal.toFixed(0)}</TableCell>
                               </TableRow>
                             </>

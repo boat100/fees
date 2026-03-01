@@ -65,7 +65,7 @@ export default function Home() {
     try {
       const response = await authFetch('/api/dashboard/stats');
       const result = await response.json();
-      if (response.ok) {
+      if (response.ok && result.success) {
         setStats(result.data);
       }
     } catch (error) {
@@ -112,25 +112,6 @@ export default function Home() {
       fill: '#ef4444',
     },
   ] : [];
-
-  // 自定义Tooltip
-  const CustomTooltip = ({ active, payload, label }: {
-    active?: boolean;
-    payload?: Array<{ value: number; payload: { fill: string } }>;
-    label?: string;
-  }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-          <p className="font-semibold text-gray-900">{label}</p>
-          <p style={{ color: payload[0].payload.fill }}>
-            金额: ¥{payload[0].value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
 
   // 导航模块配置
   const modules = [
@@ -217,63 +198,78 @@ export default function Home() {
         </div>
 
         {/* 统计概览卡片 */}
-        {!loading && stats && (
-          <Card className="mb-8 shadow-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-blue-600" />
-                收支概览
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={chartData}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis 
-                      dataKey="name" 
-                      tick={{ fontSize: 14, fill: '#374151' }}
-                      axisLine={{ stroke: '#d1d5db' }}
-                    />
-                    <YAxis 
-                      tickFormatter={(value) => formatAmount(value)}
-                      tick={{ fontSize: 12, fill: '#6b7280' }}
-                      axisLine={{ stroke: '#d1d5db' }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar 
-                      dataKey="value" 
-                      radius={[6, 6, 0, 0]}
+        <Card className="mb-8 shadow-md">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-blue-600" />
+              收支概览
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="h-64 flex items-center justify-center text-gray-400">
+                加载中...
+              </div>
+            ) : stats ? (
+              <>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                     >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 13, fill: '#374151' }}
+                      />
+                      <YAxis 
+                        tickFormatter={(value) => formatAmount(value)}
+                        tick={{ fontSize: 12, fill: '#6b7280' }}
+                      />
+                      <Tooltip 
+                        formatter={(value: number) => [`¥${value.toLocaleString('zh-CN')}`, '金额']}
+                        contentStyle={{ borderRadius: '8px' }}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        name="金额"
+                        radius={[6, 6, 0, 0]}
+                        fill="#3b82f6"
+                      >
+                        <Cell fill="#3b82f6" />
+                        <Cell fill="#22c55e" />
+                        <Cell fill="#ef4444" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                {/* 统计数字 */}
+                <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-100">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-500 mb-1">应交收费</p>
+                    <p className="text-xl font-bold text-blue-600">¥{formatAmount(stats.totalFee)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-500 mb-1">已交收费</p>
+                    <p className="text-xl font-bold text-green-600">¥{formatAmount(stats.totalPaid)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-500 mb-1">总支出</p>
+                    <p className="text-xl font-bold text-red-600">¥{formatAmount(stats.totalExpense)}</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="h-64 flex flex-col items-center justify-center text-gray-400">
+                <Wallet className="h-12 w-12 mb-3 opacity-50" />
+                <p>暂无收支数据</p>
+                <p className="text-sm mt-1">请先添加学生或支出记录</p>
               </div>
-              
-              {/* 统计数字 */}
-              <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-100">
-                <div className="text-center">
-                  <p className="text-sm text-gray-500 mb-1">应交收费</p>
-                  <p className="text-xl font-bold text-blue-600">¥{formatAmount(stats.totalFee)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-gray-500 mb-1">已交收费</p>
-                  <p className="text-xl font-bold text-green-600">¥{formatAmount(stats.totalPaid)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-gray-500 mb-1">总支出</p>
-                  <p className="text-xl font-bold text-red-600">¥{formatAmount(stats.totalExpense)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
 
         {/* 导航卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

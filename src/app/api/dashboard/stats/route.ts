@@ -12,38 +12,49 @@ export async function GET() {
   }
 
   try {
-    // 1. 获取收费统计（应交总收费、已交总收费）
+    // 1. 获取收费统计（应交总收费）
     const feeStats = db.prepare(`
       SELECT 
         COALESCE(SUM(tuition_fee), 0) as tuition_fee,
-        COALESCE(SUM(tuition_paid), 0) as tuition_paid,
         COALESCE(SUM(lunch_fee), 0) as lunch_fee,
-        COALESCE(SUM(lunch_paid), 0) as lunch_paid,
         COALESCE(SUM(nap_fee), 0) as nap_fee,
-        COALESCE(SUM(nap_paid), 0) as nap_paid,
         COALESCE(SUM(after_school_fee), 0) as after_school_fee,
-        COALESCE(SUM(after_school_paid), 0) as after_school_paid,
         COALESCE(SUM(club_fee), 0) as club_fee,
-        COALESCE(SUM(club_paid), 0) as club_paid,
         COALESCE(SUM(agency_fee), 0) as agency_fee,
-        COALESCE(SUM(agency_paid), 0) as agency_paid,
         COUNT(*) as student_count
       FROM student_fees
     `).get() as {
       tuition_fee: number;
-      tuition_paid: number;
       lunch_fee: number;
-      lunch_paid: number;
       nap_fee: number;
-      nap_paid: number;
       after_school_fee: number;
-      after_school_paid: number;
       club_fee: number;
-      club_paid: number;
       agency_fee: number;
-      agency_paid: number;
       student_count: number;
     };
+
+    // 2. 获取已交费用统计（从 payment_records 表）
+    const paidStats = db.prepare(`
+      SELECT 
+        COALESCE(SUM(CASE WHEN fee_type = 'tuition' THEN amount ELSE 0 END), 0) as tuition_paid,
+        COALESCE(SUM(CASE WHEN fee_type = 'lunch' THEN amount ELSE 0 END), 0) as lunch_paid,
+        COALESCE(SUM(CASE WHEN fee_type = 'nap' THEN amount ELSE 0 END), 0) as nap_paid,
+        COALESCE(SUM(CASE WHEN fee_type = 'after_school' THEN amount ELSE 0 END), 0) as after_school_paid,
+        COALESCE(SUM(CASE WHEN fee_type = 'club' THEN amount ELSE 0 END), 0) as club_paid
+      FROM payment_records
+    `).get() as {
+      tuition_paid: number;
+      lunch_paid: number;
+      nap_paid: number;
+      after_school_paid: number;
+      club_paid: number;
+    };
+
+    // 3. 获取代办费已交统计（从 student_fees 表的 agency_paid 字段或默认 agency_fee）
+    const agencyPaidStats = db.prepare(`
+      SELECT COALESCE(SUM(COALESCE(agency_paid, agency_fee, 600)), 0) as agency_paid
+      FROM student_fees
+    `).get() as { agency_paid: number };
 
     // 计算总应交和总已交
     const totalFee = 
@@ -55,14 +66,14 @@ export async function GET() {
       (feeStats.agency_fee || 0);
 
     const totalPaid = 
-      (feeStats.tuition_paid || 0) + 
-      (feeStats.lunch_paid || 0) + 
-      (feeStats.nap_paid || 0) + 
-      (feeStats.after_school_paid || 0) + 
-      (feeStats.club_paid || 0) + 
-      (feeStats.agency_paid || 0);
+      (paidStats.tuition_paid || 0) + 
+      (paidStats.lunch_paid || 0) + 
+      (paidStats.nap_paid || 0) + 
+      (paidStats.after_school_paid || 0) + 
+      (paidStats.club_paid || 0) + 
+      (agencyPaidStats.agency_paid || 0);
 
-    // 2. 获取支出统计
+    // 4. 获取支出统计
     const expenseStats = db.prepare(`
       SELECT 
         COALESCE(SUM(amount), 0) as total_amount,
@@ -73,7 +84,7 @@ export async function GET() {
       record_count: number;
     };
 
-    // 3. 获取班级数量
+    // 5. 获取班级数量
     const classCount = db.prepare(`
       SELECT COUNT(DISTINCT class_name) as count FROM student_fees
     `).get() as { count: number };
@@ -94,12 +105,12 @@ export async function GET() {
         
         // 收费明细（用于图表）
         feeBreakdown: {
-          tuition: { fee: feeStats.tuition_fee || 0, paid: feeStats.tuition_paid || 0 },
-          lunch: { fee: feeStats.lunch_fee || 0, paid: feeStats.lunch_paid || 0 },
-          nap: { fee: feeStats.nap_fee || 0, paid: feeStats.nap_paid || 0 },
-          afterSchool: { fee: feeStats.after_school_fee || 0, paid: feeStats.after_school_paid || 0 },
-          club: { fee: feeStats.club_fee || 0, paid: feeStats.club_paid || 0 },
-          agency: { fee: feeStats.agency_fee || 0, paid: feeStats.agency_paid || 0 },
+          tuition: { fee: feeStats.tuition_fee || 0, paid: paidStats.tuition_paid || 0 },
+          lunch: { fee: feeStats.lunch_fee || 0, paid: paidStats.lunch_paid || 0 },
+          nap: { fee: feeStats.nap_fee || 0, paid: paidStats.nap_paid || 0 },
+          afterSchool: { fee: feeStats.after_school_fee || 0, paid: paidStats.after_school_paid || 0 },
+          club: { fee: feeStats.club_fee || 0, paid: paidStats.club_paid || 0 },
+          agency: { fee: feeStats.agency_fee || 0, paid: agencyPaidStats.agency_paid || 0 },
         }
       }
     });

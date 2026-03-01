@@ -142,6 +142,13 @@ export async function GET(request: NextRequest) {
         monthList: monthList.map(m => m.month),
         totalAmount: totalStats.total_amount || 0,
         totalRecords: totalStats.record_count || 0
+      },
+      // 为保持与 stats 页面的兼容性，同时返回扁平格式
+      total: totalStats.total_amount || 0,
+      count: totalStats.record_count || 0,
+      categoryStats: {
+        daily: categoryStats.find(c => c.category === 'daily')?.total_amount || 0,
+        personnel: categoryStats.find(c => c.category === 'personnel')?.total_amount || 0
       }
     });
   } catch (error) {

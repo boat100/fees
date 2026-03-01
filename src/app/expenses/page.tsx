@@ -1051,6 +1051,7 @@ export default function ExpensesPage() {
                       <TableHead>发票号</TableHead>
                       <TableHead className="text-right">金额</TableHead>
                       <TableHead>摘要</TableHead>
+                      <TableHead>备注</TableHead>
                       <TableHead className="text-center">操作</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1104,6 +1105,25 @@ export default function ExpensesPage() {
                                 className="max-w-[300px] whitespace-pre-wrap break-words text-left"
                               >
                                 {record.summary}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-[150px]">
+                          {record.remark ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block truncate cursor-default">
+                                  {record.remark}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent 
+                                side="top" 
+                                className="max-w-[300px] whitespace-pre-wrap break-words text-left"
+                              >
+                                {record.remark}
                               </TooltipContent>
                             </Tooltip>
                           ) : (
@@ -1406,6 +1426,7 @@ export default function ExpensesPage() {
                       <TableHead className="font-semibold">发票号</TableHead>
                       <TableHead className="text-right font-semibold">金额</TableHead>
                       <TableHead className="font-semibold">摘要</TableHead>
+                      <TableHead className="font-semibold">备注</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1454,11 +1475,30 @@ export default function ExpensesPage() {
                             <span className="text-gray-400">-</span>
                           )}
                         </TableCell>
+                        <TableCell className="max-w-[150px]">
+                          {record.remark ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block truncate cursor-default">
+                                  {record.remark}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent 
+                                side="top" 
+                                className="max-w-[300px] whitespace-pre-wrap break-words text-left"
+                              >
+                                {record.remark}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                     {importData.length > 10 && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-gray-500">
+                        <TableCell colSpan={8} className="text-center text-gray-500">
                           ... 还有 {importData.length - 10} 条记录
                         </TableCell>
                       </TableRow>

@@ -365,10 +365,18 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
     
     // 乐观更新：先从本地移除
     const previousStudent = { ...student };
+    
+    // 如果是代办费，需要同时更新 agency_paid
+    const isAgencyFee = record.fee_type === 'agency';
+    const newAgencyPaid = isAgencyFee 
+      ? Math.max(0, (student.agency_paid ?? 0) - record.amount)
+      : student.agency_paid;
+    
     setStudent(prev => {
       if (!prev) return prev;
       return {
         ...prev,
+        agency_paid: newAgencyPaid,
         paymentRecords: prev.paymentRecords.filter(r => r.id !== recordId),
         paymentsByType: {
           ...prev.paymentsByType,

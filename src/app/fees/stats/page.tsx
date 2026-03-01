@@ -91,7 +91,7 @@ interface StatsData {
   schoolSummary: SchoolSummary;
   classStats: ClassStat[];
   projectStats: ProjectStats;
-  monthlyStats: MonthlyStats;
+  monthlyClassStats: MonthlyStats;
   feeTypeMap: Record<string, string>;
 }
 
@@ -116,8 +116,8 @@ function StatsContent() {
       const result = await response.json();
       setStatsData(result);
       // 默认选择第一个月份，提升响应速度
-      if (result?.monthlyStats?.availableMonths?.length > 0) {
-        setSelectedMonth(result.monthlyStats.availableMonths[0]);
+      if (result?.monthlyClassStats?.availableMonths?.length > 0) {
+        setSelectedMonth(result.monthlyClassStats.availableMonths[0]);
       }
     } catch (error) {
       console.error('Failed to fetch statistics:', error);
@@ -404,7 +404,7 @@ function StatsContent() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">全部月份</SelectItem>
-                        {statsData.monthlyStats.availableMonths.map((month) => (
+                        {statsData.monthlyClassStats.availableMonths.map((month) => (
                           <SelectItem key={month} value={month}>
                             {month}
                           </SelectItem>
@@ -415,7 +415,7 @@ function StatsContent() {
                       onClick={() => handleExportMonthlyStats(selectedMonth === 'all' || selectedMonth === '')}
                       variant="outline"
                       size="sm"
-                      disabled={Object.keys(statsData.monthlyStats.classStats).length === 0}
+                      disabled={Object.keys(statsData.monthlyClassStats.classStats).length === 0}
                     >
                       <Download className="h-4 w-4 mr-1" />
                       导出{selectedMonth === 'all' || selectedMonth === '' ? '全部' : selectedMonth}
@@ -449,8 +449,8 @@ function StatsContent() {
                           const grandTotals: Record<string, number> = {};
                           feeTypes.forEach(type => grandTotals[type] = 0);
                           
-                          statsData.monthlyStats.availableMonths.forEach((month) => {
-                            const monthData = statsData.monthlyStats.classStats[month] || {};
+                          statsData.monthlyClassStats.availableMonths.forEach((month) => {
+                            const monthData = statsData.monthlyClassStats.classStats[month] || {};
                             const classes = Object.keys(monthData).sort();
                             
                             if (classes.length === 0) return;
@@ -547,7 +547,7 @@ function StatsContent() {
                       </TableHeader>
                       <TableBody>
                         {(() => {
-                          const monthData = statsData.monthlyStats.classStats[selectedMonth] || {};
+                          const monthData = statsData.monthlyClassStats.classStats[selectedMonth] || {};
                           const classes = Object.keys(monthData).sort();
                           const feeTypes = ['tuition', 'lunch', 'nap', 'after_school', 'club', 'agency'] as const;
                           
@@ -626,8 +626,8 @@ function StatsContent() {
       // 导出全部月份
       let hasData = false;
       
-      statsData.monthlyStats.availableMonths.forEach((month) => {
-        const monthData = statsData.monthlyStats.classStats[month] || {};
+      statsData.monthlyClassStats.availableMonths.forEach((month) => {
+        const monthData = statsData.monthlyClassStats.classStats[month] || {};
         const classes = Object.keys(monthData).sort();
         
         if (classes.length === 0) return;
@@ -667,7 +667,7 @@ function StatsContent() {
       }
     } else {
       // 导出选中月份
-      const monthData = statsData.monthlyStats.classStats[selectedMonth] || {};
+      const monthData = statsData.monthlyClassStats.classStats[selectedMonth] || {};
       const classes = Object.keys(monthData).sort();
 
       if (classes.length === 0) {

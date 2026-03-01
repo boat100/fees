@@ -1781,13 +1781,14 @@ function FeesContent() {
             </div>
             
             {/* 备注 */}
-            <div className="grid grid-cols-4 items-center gap-4 border-t pt-3">
-              <Label className="text-right">备注</Label>
-              <Input
+            <div className="grid grid-cols-4 gap-4 border-t pt-3">
+              <Label className="text-right mt-2">备注</Label>
+              <textarea
                 value={editFeeStudent?.remark || ''}
                 onChange={(e) => setEditFeeStudent(prev => prev ? { ...prev, remark: e.target.value } : null)}
-                className="col-span-3"
+                className="col-span-3 flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
                 placeholder="备注信息（选填）"
+                rows={3}
               />
             </div>
           </div>

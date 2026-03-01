@@ -77,20 +77,6 @@ export async function GET() {
       total_paid: totalPaid,
       pending_amount: totalFee - totalPaid,
       collection_rate: totalFee > 0 ? ((totalPaid / totalFee) * 100).toFixed(1) + '%' : '0%',
-      // 分项费用应交金额
-      tuition_fee: schoolSummaryData.tuition_fee || 0,
-      lunch_fee: schoolSummaryData.lunch_fee || 0,
-      nap_fee: schoolSummaryData.nap_fee || 0,
-      after_school_fee: schoolSummaryData.after_school_fee || 0,
-      club_fee: schoolSummaryData.club_fee || 0,
-      agency_fee: schoolSummaryData.agency_fee || 0,
-      // 分项费用已交金额
-      tuition_paid: paymentMap['tuition'] || 0,
-      lunch_paid: paymentMap['lunch'] || 0,
-      nap_paid: paymentMap['nap'] || 0,
-      after_school_paid: paymentMap['after_school'] || 0,
-      club_paid: paymentMap['club'] || 0,
-      agency_paid: schoolSummaryData.agency_paid || 0,
     };
 
     // 2. 全校各班级交费情况
@@ -105,15 +91,16 @@ export async function GET() {
         SUM(sf.club_fee) as club_fee,
         SUM(sf.agency_fee) as agency_fee,
         SUM(sf.agency_paid) as agency_paid,
-        COALESCE(SUM(pm.tuition_paid), 0) as tuition_paid,
-        COALESCE(SUM(pm.lunch_paid), 0) as lunch_paid,
-        COALESCE(SUM(pm.nap_paid), 0) as nap_paid,
-        COALESCE(SUM(pm.after_school_paid), 0) as after_school_paid,
-        COALESCE(SUM(pm.club_paid), 0) as club_paid
+        COALESCE(pm.tuition_paid, 0) as tuition_paid,
+        COALESCE(pm.lunch_paid, 0) as lunch_paid,
+        COALESCE(pm.nap_paid, 0) as nap_paid,
+        COALESCE(pm.after_school_paid, 0) as after_school_paid,
+        COALESCE(pm.club_paid, 0) as club_paid
       FROM student_fees sf
       LEFT JOIN (
         SELECT 
           s.id as student_id,
+          s.class_name,
           SUM(CASE WHEN p.fee_type = 'tuition' THEN p.amount ELSE 0 END) as tuition_paid,
           SUM(CASE WHEN p.fee_type = 'lunch' THEN p.amount ELSE 0 END) as lunch_paid,
           SUM(CASE WHEN p.fee_type = 'nap' THEN p.amount ELSE 0 END) as nap_paid,
@@ -121,9 +108,10 @@ export async function GET() {
           SUM(CASE WHEN p.fee_type = 'club' THEN p.amount ELSE 0 END) as club_paid
         FROM student_fees s
         LEFT JOIN payment_records p ON s.id = p.student_id
-        GROUP BY s.id
+        GROUP BY s.id, s.class_name
       ) pm ON sf.id = pm.student_id
       GROUP BY sf.class_name
+      ORDER BY sf.class_name
     `).all() as Array<{
       class_name: string;
       student_count: number;
@@ -156,42 +144,6 @@ export async function GET() {
       };
     });
 
-    // 按年级从低到高排序（一年 -> 二年 -> 三年...，班级号升序）
-    const gradeOrder: Record<string, number> = {
-      '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6,
-      '七': 7, '八': 8, '九': 9, '十': 10,
-      '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6,
-      '7': 7, '8': 8, '9': 9, '10': 10
-    };
-
-    // 解析班级名称，提取年级和班级号
-    const parseClassName = (className: string) => {
-      // 匹配格式如: "一年1班"、"二年2班"、"三年1班" 等
-      const match = className.match(/^(.+?)(\d+)班$/);
-      if (match) {
-        const gradePart = match[1]; // "一年"、"二年" 等
-        const classNum = parseInt(match[2], 10); // 班级号
-        
-        // 从年级部分提取年级数字（取最后一个字符）
-        const gradeChar = gradePart.slice(-1); // "年"前面的字符
-        const gradeNum = gradeOrder[gradeChar] || 99;
-        
-        return { gradeNum, classNum };
-      }
-      return { gradeNum: 99, classNum: 99 }; // 无法解析的放最后
-    };
-
-    // 排序班级统计
-    classStatsWithTotals.sort((a, b) => {
-      const parsedA = parseClassName(a.class_name);
-      const parsedB = parseClassName(b.class_name);
-      
-      if (parsedA.gradeNum !== parsedB.gradeNum) {
-        return parsedA.gradeNum - parsedB.gradeNum; // 年级升序
-      }
-      return parsedA.classNum - parsedB.classNum; // 班级号升序
-    });
-
     // 3. 各项目参与人数（全校）
     const projectStats = db.prepare(`
       SELECT 
@@ -212,82 +164,6 @@ export async function GET() {
       club_count: number;
       agency_count: number;
     };
-
-    // 3.1 各项目完成情况统计（完成人数/应交人数）
-    // 完成人数：已交金额 >= 应交金额的学生数
-    const completionStatsData = db.prepare(`
-      SELECT 
-        SUM(CASE WHEN sf.tuition_fee > 0 AND COALESCE(pm.tuition_paid, 0) >= sf.tuition_fee THEN 1 ELSE 0 END) as tuition_completed,
-        SUM(CASE WHEN sf.lunch_fee > 0 AND COALESCE(pm.lunch_paid, 0) >= sf.lunch_fee THEN 1 ELSE 0 END) as lunch_completed,
-        SUM(CASE WHEN sf.nap_fee > 0 AND COALESCE(pm.nap_paid, 0) >= sf.nap_fee THEN 1 ELSE 0 END) as nap_completed,
-        SUM(CASE WHEN sf.after_school_fee > 0 AND COALESCE(pm.after_school_paid, 0) >= sf.after_school_fee THEN 1 ELSE 0 END) as after_school_completed,
-        SUM(CASE WHEN sf.club_fee > 0 AND COALESCE(pm.club_paid, 0) >= sf.club_fee THEN 1 ELSE 0 END) as club_completed,
-        SUM(CASE WHEN sf.agency_fee > 0 AND sf.agency_paid >= sf.agency_fee THEN 1 ELSE 0 END) as agency_completed
-      FROM student_fees sf
-      LEFT JOIN (
-        SELECT 
-          s.id as student_id,
-          SUM(CASE WHEN p.fee_type = 'tuition' THEN p.amount ELSE 0 END) as tuition_paid,
-          SUM(CASE WHEN p.fee_type = 'lunch' THEN p.amount ELSE 0 END) as lunch_paid,
-          SUM(CASE WHEN p.fee_type = 'nap' THEN p.amount ELSE 0 END) as nap_paid,
-          SUM(CASE WHEN p.fee_type = 'after_school' THEN p.amount ELSE 0 END) as after_school_paid,
-          SUM(CASE WHEN p.fee_type = 'club' THEN p.amount ELSE 0 END) as club_paid
-        FROM student_fees s
-        LEFT JOIN payment_records p ON s.id = p.student_id
-        GROUP BY s.id
-      ) pm ON sf.id = pm.student_id
-    `).get() as {
-      tuition_completed: number;
-      lunch_completed: number;
-      nap_completed: number;
-      after_school_completed: number;
-      club_completed: number;
-      agency_completed: number;
-    };
-
-    const completionStats = {
-      tuition: { total: projectStats.tuition_count || 0, completed: completionStatsData.tuition_completed || 0 },
-      lunch: { total: projectStats.lunch_count || 0, completed: completionStatsData.lunch_completed || 0 },
-      nap: { total: projectStats.nap_count || 0, completed: completionStatsData.nap_completed || 0 },
-      after_school: { total: projectStats.after_school_count || 0, completed: completionStatsData.after_school_completed || 0 },
-      club: { total: projectStats.club_count || 0, completed: completionStatsData.club_completed || 0 },
-      agency: { total: projectStats.agency_count || 0, completed: completionStatsData.agency_completed || 0 },
-    };
-
-    // 3.2 各班级项目参与人数统计
-    const classProjectStats = db.prepare(`
-      SELECT 
-        class_name,
-        COUNT(*) as total_students,
-        SUM(CASE WHEN tuition_fee > 0 THEN 1 ELSE 0 END) as tuition_count,
-        SUM(CASE WHEN lunch_fee > 0 THEN 1 ELSE 0 END) as lunch_count,
-        SUM(CASE WHEN nap_fee > 0 THEN 1 ELSE 0 END) as nap_count,
-        SUM(CASE WHEN after_school_fee > 0 THEN 1 ELSE 0 END) as after_school_count,
-        SUM(CASE WHEN club_fee > 0 THEN 1 ELSE 0 END) as club_count,
-        SUM(CASE WHEN agency_fee > 0 THEN 1 ELSE 0 END) as agency_count
-      FROM student_fees
-      GROUP BY class_name
-    `).all() as Array<{
-      class_name: string;
-      total_students: number;
-      tuition_count: number;
-      lunch_count: number;
-      nap_count: number;
-      after_school_count: number;
-      club_count: number;
-      agency_count: number;
-    }>;
-
-    // 按年级排序班级项目统计
-    classProjectStats.sort((a, b) => {
-      const parsedA = parseClassName(a.class_name);
-      const parsedB = parseClassName(b.class_name);
-      
-      if (parsedA.gradeNum !== parsedB.gradeNum) {
-        return parsedA.gradeNum - parsedB.gradeNum;
-      }
-      return parsedA.classNum - parsedB.classNum;
-    });
 
     // 4. 月度各班级缴费统计
     // 先获取所有可用月份
@@ -338,13 +214,6 @@ export async function GET() {
       total: number;
     }>> = {};
 
-    // 同时生成按月汇总的数组格式（用于 stats 页面）
-    const monthlyTotals: Record<string, {
-      month: string;
-      payments: Record<string, { amount: number; count: number }>;
-      total: number;
-    }> = {};
-
     monthlyClassStats.forEach(stat => {
       if (!monthlyClassData[stat.month]) {
         monthlyClassData[stat.month] = {};
@@ -361,26 +230,7 @@ export async function GET() {
         count: stat.payment_count,
       };
       monthlyClassData[stat.month][stat.class_name].total += stat.total_amount;
-
-      // 同时汇总到月度总计
-      if (!monthlyTotals[stat.month]) {
-        monthlyTotals[stat.month] = {
-          month: stat.month,
-          payments: {},
-          total: 0,
-        };
-      }
-      monthlyTotals[stat.month].payments[stat.fee_type] = {
-        amount: (monthlyTotals[stat.month].payments[stat.fee_type]?.amount || 0) + stat.total_amount,
-        count: (monthlyTotals[stat.month].payments[stat.fee_type]?.count || 0) + stat.payment_count,
-      };
-      monthlyTotals[stat.month].total += stat.total_amount;
     });
-
-    // 转换为数组格式，按月份降序排列
-    const monthlyStatsArray = Object.values(monthlyTotals).sort((a, b) => 
-      b.month.localeCompare(a.month)
-    );
 
     // 费用类型映射
     const feeTypeMap: Record<string, string> = {
@@ -395,18 +245,6 @@ export async function GET() {
     return NextResponse.json({
       schoolSummary,
       classStats: classStatsWithTotals,
-      completionStats,
-      classProjectStats,
-      schoolProjectStats: {
-        total_students: projectStats.total_students || 0,
-        tuition: projectStats.tuition_count || 0,
-        lunch: projectStats.lunch_count || 0,
-        nap: projectStats.nap_count || 0,
-        after_school: projectStats.after_school_count || 0,
-        club: projectStats.club_count || 0,
-        agency: projectStats.agency_count || 0,
-      },
-      // 为保持向后兼容，同时返回 projectStats
       projectStats: {
         total_students: projectStats.total_students || 0,
         tuition: projectStats.tuition_count || 0,
@@ -416,8 +254,7 @@ export async function GET() {
         club: projectStats.club_count || 0,
         agency: projectStats.agency_count || 0,
       },
-      monthlyStats: monthlyStatsArray,
-      monthlyClassStats: {
+      monthlyStats: {
         availableMonths: availableMonths.map(m => m.month),
         classStats: monthlyClassData,
       },

@@ -191,6 +191,7 @@ function FeesContent() {
     insertCount?: number;
     updateCount?: number;
     total?: number;
+    errors?: Array<{ row: number; error: string }>;
   } | null>(null);
   
   // 表单数据
@@ -898,19 +899,29 @@ function FeesContent() {
       const result = await response.json();
       
       if (response.ok) {
+        // 构建成功消息
+        let message = '';
+        if (result.errors && result.errors.length > 0) {
+          message = `成功导入 ${result.importedCount || result.insertCount + result.updateCount} 条，${result.errorCount} 条有错误`;
+        } else {
+          message = `导入成功！新增 ${result.insertCount || 0} 条，更新 ${result.updateCount || 0} 条`;
+        }
+        
         setImportResult({
           success: true,
-          message: `导入成功！新增 ${result.insertCount || 0} 条，更新 ${result.updateCount || 0} 条`,
+          message,
           insertCount: result.insertCount,
           updateCount: result.updateCount,
-          total: result.total
+          total: result.total,
+          errors: result.errors
         });
         fetchClasses();
         fetchStudents();
       } else {
         setImportResult({
           success: false,
-          message: result.error || '导入失败'
+          message: result.error || '导入失败',
+          errors: result.errors
         });
       }
     } catch (error) {
@@ -2009,6 +2020,22 @@ function FeesContent() {
                 <div className={`font-medium ${importResult.success ? 'text-green-700' : 'text-red-700'}`}>
                   {importResult.message}
                 </div>
+                {/* 显示错误详情 */}
+                {importResult.errors && importResult.errors.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-green-200">
+                    <div className="text-sm font-medium text-orange-700 mb-2">
+                      以下记录导入失败（{importResult.errors.length}条）：
+                    </div>
+                    <div className="max-h-32 overflow-y-auto text-sm text-red-600 space-y-1">
+                      {importResult.errors.slice(0, 10).map((err, idx) => (
+                        <div key={idx}>第{err.row}行：{err.error}</div>
+                      ))}
+                      {importResult.errors.length > 10 && (
+                        <div className="text-gray-500">... 还有 {importResult.errors.length - 10} 条错误</div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

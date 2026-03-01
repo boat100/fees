@@ -179,6 +179,145 @@ export async function PUT(request: NextRequest) {
       );
     }
     
+    // 验证并处理每条记录
+    const validRecords: Array<{
+      className: string;
+      studentName: string;
+      gender: string;
+      tuitionFee: number;
+      tuitionPaid: number;
+      lunchFee: number;
+      lunchPaid: number;
+      napFee: number;
+      napPaid: number;
+      afterSchoolFee: number;
+      afterSchoolPaid: number;
+      clubFee: number;
+      clubPaid: number;
+      agencyFee: number;
+      agencyPaid: number;
+      paymentDate: string;
+      remark: string;
+    }> = [];
+    
+    const errors: Array<{ row: number; error: string }> = [];
+    
+    // 日期格式验证正则
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    
+    for (let i = 0; i < data.length; i++) {
+      const student = data[i];
+      const rowNum = i + 2; // Excel/CSV行号从2开始（第1行是表头）
+      
+      // 验证班级
+      const className = String(student.className || '').trim();
+      if (!className) {
+        errors.push({ row: rowNum, error: '班级不能为空' });
+        continue;
+      }
+      
+      // 验证姓名
+      const studentName = String(student.studentName || '').trim();
+      if (!studentName) {
+        errors.push({ row: rowNum, error: '姓名不能为空' });
+        continue;
+      }
+      
+      // 验证性别
+      const gender = String(student.gender || '男').trim();
+      if (gender !== '男' && gender !== '女') {
+        errors.push({ row: rowNum, error: `性别"${gender}"无效，必须为"男"或"女"` });
+        continue;
+      }
+      
+      // 验证各项金额（必须为非负数）
+      const validateAmount = (value: unknown, fieldName: string): number => {
+        const num = Number(value);
+        if (isNaN(num) || num < 0) {
+          return -1; // 标记为无效
+        }
+        return num;
+      };
+      
+      const tuitionFee = validateAmount(student.tuitionFee, '学费应交');
+      const lunchFee = validateAmount(student.lunchFee, '午餐费应交');
+      const napFee = validateAmount(student.napFee, '午托费应交');
+      const afterSchoolFee = validateAmount(student.afterSchoolFee, '课后服务费应交');
+      const clubFee = validateAmount(student.clubFee, '社团费应交');
+      const agencyFee = validateAmount(student.agencyFee, '代办费应交');
+      
+      if (tuitionFee < 0 || lunchFee < 0 || napFee < 0 || afterSchoolFee < 0 || clubFee < 0 || agencyFee < 0) {
+        const invalidFields: string[] = [];
+        if (tuitionFee < 0) invalidFields.push('学费应交');
+        if (lunchFee < 0) invalidFields.push('午餐费应交');
+        if (napFee < 0) invalidFields.push('午托费应交');
+        if (afterSchoolFee < 0) invalidFields.push('课后服务费应交');
+        if (clubFee < 0) invalidFields.push('社团费应交');
+        if (agencyFee < 0) invalidFields.push('代办费应交');
+        errors.push({ row: rowNum, error: `${invalidFields.join('、')}金额无效，必须为非负数` });
+        continue;
+      }
+      
+      // 验证已交金额（必须为非负数）
+      const tuitionPaid = validateAmount(student.tuitionPaid, '学费已交');
+      const lunchPaid = validateAmount(student.lunchPaid, '午餐费已交');
+      const napPaid = validateAmount(student.napPaid, '午托费已交');
+      const afterSchoolPaid = validateAmount(student.afterSchoolPaid, '课后服务费已交');
+      const clubPaid = validateAmount(student.clubPaid, '社团费已交');
+      const agencyPaid = validateAmount(student.agencyPaid, '代办费已交');
+      
+      if (tuitionPaid < 0 || lunchPaid < 0 || napPaid < 0 || afterSchoolPaid < 0 || clubPaid < 0 || agencyPaid < 0) {
+        const invalidFields: string[] = [];
+        if (tuitionPaid < 0) invalidFields.push('学费已交');
+        if (lunchPaid < 0) invalidFields.push('午餐费已交');
+        if (napPaid < 0) invalidFields.push('午托费已交');
+        if (afterSchoolPaid < 0) invalidFields.push('课后服务费已交');
+        if (clubPaid < 0) invalidFields.push('社团费已交');
+        if (agencyPaid < 0) invalidFields.push('代办费已交');
+        errors.push({ row: rowNum, error: `${invalidFields.join('、')}金额无效，必须为非负数` });
+        continue;
+      }
+      
+      // 验证缴费日期格式
+      const paymentDate = String(student.paymentDate || '').trim();
+      if (paymentDate && !dateRegex.test(paymentDate)) {
+        errors.push({ row: rowNum, error: `缴费日期"${paymentDate}"格式无效，应为YYYY-MM-DD格式` });
+        continue;
+      }
+      
+      // 验证通过，添加到有效记录列表
+      validRecords.push({
+        className,
+        studentName,
+        gender,
+        tuitionFee,
+        tuitionPaid,
+        lunchFee,
+        lunchPaid,
+        napFee,
+        napPaid,
+        afterSchoolFee,
+        afterSchoolPaid,
+        clubFee,
+        clubPaid,
+        agencyFee,
+        agencyPaid,
+        paymentDate: paymentDate || new Date().toISOString().split('T')[0],
+        remark: String(student.remark || '').trim(),
+      });
+    }
+    
+    // 如果所有记录都有错误，返回错误信息
+    if (errors.length > 0 && validRecords.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: '所有记录都有错误，请修正后再导入',
+        errors,
+        insertCount: 0,
+        updateCount: 0
+      }, { status: 400 });
+    }
+    
     let insertCount = 0;
     let updateCount = 0;
     let paymentCount = 0;
@@ -206,30 +345,10 @@ export async function PUT(request: NextRequest) {
       DELETE FROM payment_records WHERE student_id = ?
     `);
     
-    const importMany = db.transaction((students: Array<{
-      className: string;
-      studentName: string;
-      gender?: string;
-      tuitionFee?: number;
-      tuitionPaid?: number;
-      lunchFee?: number;
-      lunchPaid?: number;
-      napFee?: number;
-      napPaid?: number;
-      afterSchoolFee?: number;
-      afterSchoolPaid?: number;
-      clubFee?: number;
-      clubPaid?: number;
-      agencyFee?: number;
-      agencyPaid?: number;
-      paymentDate?: string;
-      remark?: string;
-    }>) => {
-      for (const student of students) {
-        if (!student.className || !student.studentName) continue;
-        
-        // 根据午托费自动判断午托状态
-        const napStatus = (student.napFee || 0) > 0 ? '午托' : '走读';
+    const importMany = db.transaction((students: typeof validRecords) => {
+      for (const student of students) {        
+        // 根据午餐费或午托费自动判断午托状态
+        const napStatus = (student.lunchFee > 0 || student.napFee > 0) ? '午托' : '走读';
         
         // 检查学生是否已存在
         const existing = db.prepare(
@@ -241,15 +360,15 @@ export async function PUT(request: NextRequest) {
         if (existing) {
           // 更新已存在学生
           updateStmt.run(
-            student.gender || '男',
+            student.gender,
             napStatus,
-            student.tuitionFee || 0,
-            student.lunchFee || 0,
-            student.napFee || 0,
-            student.afterSchoolFee || 0,
-            student.clubFee || 0,
-            student.agencyFee || 600,
-            student.agencyPaid ?? (student.agencyFee || 600),
+            student.tuitionFee,
+            student.lunchFee,
+            student.napFee,
+            student.afterSchoolFee,
+            student.clubFee,
+            student.agencyFee,
+            student.agencyPaid,
             student.remark || null,
             student.className,
             student.studentName
@@ -261,15 +380,15 @@ export async function PUT(request: NextRequest) {
           const result = insertStmt.run(
             student.className,
             student.studentName,
-            student.gender || '男',
+            student.gender,
             napStatus,
-            student.tuitionFee || 0,
-            student.lunchFee || 0,
-            student.napFee || 0,
-            student.afterSchoolFee || 0,
-            student.clubFee || 0,
-            student.agencyFee || 600,
-            student.agencyPaid ?? (student.agencyFee || 600),
+            student.tuitionFee,
+            student.lunchFee,
+            student.napFee,
+            student.afterSchoolFee,
+            student.clubFee,
+            student.agencyFee,
+            student.agencyPaid,
             student.remark || null
           );
           studentId = result.lastInsertRowid as number;
@@ -278,36 +397,35 @@ export async function PUT(request: NextRequest) {
         
         // 处理已交费用（如果有任何已交金额）
         const hasPaidAmounts = 
-          (student.tuitionPaid || 0) > 0 ||
-          (student.lunchPaid || 0) > 0 ||
-          (student.napPaid || 0) > 0 ||
-          (student.afterSchoolPaid || 0) > 0 ||
-          (student.clubPaid || 0) > 0;
+          student.tuitionPaid > 0 ||
+          student.lunchPaid > 0 ||
+          student.napPaid > 0 ||
+          student.afterSchoolPaid > 0 ||
+          student.clubPaid > 0;
         
         if (hasPaidAmounts) {
           // 删除该学生之前的所有交费记录
           deletePaymentsStmt.run(studentId);
           
-          // 使用传入的缴费时间，如果没有则使用今天日期
-          const paymentDate = student.paymentDate || new Date().toISOString().split('T')[0];
+          const paymentDate = student.paymentDate;
           
-          if ((student.tuitionPaid || 0) > 0) {
+          if (student.tuitionPaid > 0) {
             insertPaymentStmt.run(studentId, 'tuition', student.tuitionPaid, paymentDate, '批量导入');
             paymentCount++;
           }
-          if ((student.lunchPaid || 0) > 0) {
+          if (student.lunchPaid > 0) {
             insertPaymentStmt.run(studentId, 'lunch', student.lunchPaid, paymentDate, '批量导入');
             paymentCount++;
           }
-          if ((student.napPaid || 0) > 0) {
+          if (student.napPaid > 0) {
             insertPaymentStmt.run(studentId, 'nap', student.napPaid, paymentDate, '批量导入');
             paymentCount++;
           }
-          if ((student.afterSchoolPaid || 0) > 0) {
+          if (student.afterSchoolPaid > 0) {
             insertPaymentStmt.run(studentId, 'after_school', student.afterSchoolPaid, paymentDate, '批量导入');
             paymentCount++;
           }
-          if ((student.clubPaid || 0) > 0) {
+          if (student.clubPaid > 0) {
             insertPaymentStmt.run(studentId, 'club', student.clubPaid, paymentDate, '批量导入');
             paymentCount++;
           }
@@ -315,7 +433,22 @@ export async function PUT(request: NextRequest) {
       }
     });
     
-    importMany(data);
+    importMany(validRecords);
+    
+    // 如果有错误记录，返回部分成功信息和错误详情
+    if (errors.length > 0) {
+      return NextResponse.json({ 
+        success: true,
+        message: `成功导入 ${validRecords.length} 条记录，${errors.length} 条记录有错误`,
+        insertCount, 
+        updateCount,
+        paymentCount,
+        total: insertCount + updateCount,
+        importedCount: validRecords.length,
+        errorCount: errors.length,
+        errors
+      });
+    }
     
     return NextResponse.json({ 
       success: true, 

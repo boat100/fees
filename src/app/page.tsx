@@ -133,7 +133,7 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-blue-50">
       {/* 顶部导航栏 */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -161,7 +161,7 @@ export default function Home() {
       </header>
 
       {/* 主内容区域 */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         {/* 功能入口卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {navItems.map((item) => {
@@ -204,7 +204,7 @@ export default function Home() {
       </main>
 
       {/* 底部信息 */}
-      <footer className="mt-8 py-6 border-t border-gray-100 bg-white/50">
+      <footer className="py-4 border-t border-gray-100 bg-white/50">
         <div className="max-w-7xl mx-auto px-4 text-center text-sm text-gray-400">
           学校收支管理系统 · 安全可靠 · 数据本地存储
         </div>

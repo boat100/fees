@@ -27,7 +27,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 60s
 
 # 数据卷定义（可选：使用 Docker Volume 替代本地挂载）
 # volumes:

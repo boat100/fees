@@ -59,7 +59,8 @@ export async function POST(request: NextRequest) {
       nap_fee: number;
       after_school_fee: number;
       club_fee: number;
-      other_fee: number;
+      agency_fee: number;
+      agency_paid: number;
     } | undefined;
     
     if (!student) {
@@ -71,13 +72,19 @@ export async function POST(request: NextRequest) {
     const expectedFee = student[feeField] as number;
     
     // 获取该费用类型已交总额
-    const paidResult = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total_paid 
-      FROM payment_records 
-      WHERE student_id = ? AND fee_type = ?
-    `).get(studentId, feeType) as { total_paid: number };
+    // 对于代办费（agency），使用 student_fees.agency_paid 字段
+    let totalPaid: number;
+    if (feeType === 'agency') {
+      totalPaid = student.agency_paid || 0;
+    } else {
+      const paidResult = db.prepare(`
+        SELECT COALESCE(SUM(amount), 0) as total_paid 
+        FROM payment_records 
+        WHERE student_id = ? AND fee_type = ?
+      `).get(studentId, feeType) as { total_paid: number };
+      totalPaid = paidResult.total_paid;
+    }
     
-    const totalPaid = paidResult.total_paid;
     const newTotal = totalPaid + Number(amount);
     
     // 检查是否超过应交金额
@@ -96,6 +103,11 @@ export async function POST(request: NextRequest) {
     `);
     
     const result = stmt.run(studentId, feeType, amount, paymentDate, remark || null);
+    
+    // 对于代办费，同时更新 student_fees.agency_paid 字段
+    if (feeType === 'agency') {
+      db.prepare('UPDATE student_fees SET agency_paid = ? WHERE id = ?').run(newTotal, studentId);
+    }
     
     const newRecord = db.prepare('SELECT * FROM payment_records WHERE id = ?').get(result.lastInsertRowid);
     

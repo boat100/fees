@@ -232,34 +232,30 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
     toast.loading('正在提交...', { id: 'agency-payment' });
     
     try {
-      const response = await authFetch(`/api/student-fees/${resolvedParams.id}`, {
-        method: 'PUT',
+      // 调用缴费记录 API（会自动创建缴费记录并更新 agency_paid）
+      const paymentResponse = await authFetch('/api/payments', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          className: student?.class_name,
-          studentName: student?.student_name,
-          gender: student?.gender,
-          tuitionFee: student?.tuition_fee,
-          lunchFee: student?.lunch_fee,
-          napFee: student?.nap_fee,
-          afterSchoolFee: student?.after_school_fee,
-          clubFee: student?.club_fee,
-          agencyFee: student?.agency_fee,
-          agencyPaid: newAgencyPaid,
+          studentId: resolvedParams.id,
+          feeType: 'agency',
+          amount: agencyPaymentAmount,
+          paymentDate: new Date().toISOString().split('T')[0],
+          remark: '代办费交费',
         }),
       });
       
-      if (response.ok) {
-        toast.success('交费成功', { id: 'agency-payment' });
-        fetchStudent();
-      } else {
-        setStudent(previousStudent);
-        toast.error('交费失败', { id: 'agency-payment' });
+      if (!paymentResponse.ok) {
+        const errorData = await paymentResponse.json();
+        throw new Error(errorData.error || '创建缴费记录失败');
       }
+      
+      toast.success('交费成功', { id: 'agency-payment' });
+      fetchStudent();
     } catch (error) {
       console.error('Failed to submit agency payment:', error);
       setStudent(previousStudent);
-      toast.error('交费失败，请重试', { id: 'agency-payment' });
+      toast.error(error instanceof Error ? error.message : '交费失败，请重试', { id: 'agency-payment' });
     }
   };
 

@@ -17,6 +17,7 @@ interface StudentData {
   after_school_fee: number;
   club_fee: number;
   agency_fee: number;
+  agency_paid: number;
   total_paid: number;
   [key: string]: number | string;
 }
@@ -310,15 +311,19 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
     const studentPayments = classPayments.filter(p => p.student_id === s.id);
     
     const paidByType: Record<string, number> = {};
-    ['tuition', 'lunch', 'nap', 'after_school', 'club', 'other'].forEach(type => {
+    ['tuition', 'lunch', 'nap', 'after_school', 'club'].forEach(type => {
       paidByType[type] = studentPayments
         .filter(p => p.fee_type === type)
         .reduce((sum, p) => sum + (p.amount || 0), 0);
     });
+    
+    // 代办费已交金额：优先使用 agency_paid 字段（从 student_fees 表获取）
+    // 也可以从 payment_records 计算：paidByType['agency'] = studentPayments.filter(p => p.fee_type === 'agency').reduce(...)
+    const agencyPaid = s.agency_paid ?? s.agency_fee ?? 0;
 
     const totalFee = (s.tuition_fee || 0) + (s.lunch_fee || 0) + (s.nap_fee || 0) +
                      (s.after_school_fee || 0) + (s.club_fee || 0) + (s.agency_fee || 0);
-    const totalPaid = Object.values(paidByType).reduce((a, b) => a + b, 0);
+    const totalPaid = Object.values(paidByType).reduce((a, b) => a + b, 0) + agencyPaid;
 
     return {
       班级: className,
@@ -335,7 +340,7 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
       社团费应交: s.club_fee || 0,
       社团费已交: paidByType['club'],
       代办费应交: s.agency_fee || 0,
-      代办费已交: paidByType['other'],
+      代办费已交: agencyPaid,
       合计应交: totalFee,
       合计已交: totalPaid,
       待收金额: totalFee - totalPaid,

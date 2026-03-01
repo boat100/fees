@@ -149,46 +149,6 @@ function FeesContent() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportType, setExportType] = useState<'fee_detail' | 'payment_records'>('fee_detail');
   
-  // 统计对话框
-  const [statsDialogOpen, setStatsDialogOpen] = useState(false);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [statsData, setStatsData] = useState<{
-    schoolSummary: {
-      student_count: number;
-      male_count: number;
-      female_count: number;
-      nap_count: number;
-      day_student_count: number;
-      total_fee: number;
-      total_paid: number;
-      pending_amount: number;
-      collection_rate: string;
-    };
-    classStats: Array<{
-      class_name: string;
-      student_count: number;
-      total_fee: number;
-      total_paid: number;
-      pending_amount: number;
-      collection_rate: string;
-    }>;
-    projectStats: {
-      total_students: number;
-      tuition: number;
-      lunch: number;
-      nap: number;
-      after_school: number;
-      club: number;
-      agency: number;
-    };
-    monthlyStats: Array<{
-      month: string;
-      payments: Record<string, { amount: number; count: number }>;
-      total: number;
-    }>;
-    feeTypeMap: Record<string, string>;
-  } | null>(null);
-  
   // 表单数据
   const [formData, setFormData] = useState({
     className: '',
@@ -624,22 +584,6 @@ function FeesContent() {
     }
   };
 
-  // 获取统计数据
-  const fetchStats = async () => {
-    setStatsLoading(true);
-    try {
-      const response = await authFetch('/api/statistics');
-      const result = await response.json();
-      setStatsData(result);
-      setStatsDialogOpen(true);
-    } catch (error) {
-      console.error('Failed to fetch statistics:', error);
-      toast.error('获取统计数据失败');
-    } finally {
-      setStatsLoading(false);
-    }
-  };
-
   // 退出登录
   const handleLogout = async () => {
     try {
@@ -723,16 +667,11 @@ function FeesContent() {
               </Button>
               
               <Button
-                onClick={fetchStats}
-                disabled={statsLoading}
+                onClick={() => router.push('/fees/stats')}
                 variant="outline"
                 className="border-blue-600 text-blue-600 hover:bg-blue-50"
               >
-                {statsLoading ? (
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                )}
+                <BarChart3 className="h-4 w-4 mr-2" />
                 统计
               </Button>
               
@@ -1193,212 +1132,6 @@ function FeesContent() {
               className="bg-green-600 hover:bg-green-700"
             >
               {exportingClass ? '导出中...' : '确认导出'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 统计对话框 */}
-      <Dialog open={statsDialogOpen} onOpenChange={setStatsDialogOpen}>
-        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              收费统计
-            </DialogTitle>
-            <DialogDescription>
-              查看全校收费统计数据
-            </DialogDescription>
-          </DialogHeader>
-          
-          {statsData && (
-            <div className="space-y-6 py-4">
-              {/* 全校汇总 */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">全校汇总</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-4 gap-4 mb-4">
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">{statsData.schoolSummary.student_count}</div>
-                      <div className="text-sm text-gray-600">学生总数</div>
-                    </div>
-                    <div className="text-center p-3 bg-pink-50 rounded-lg">
-                      <div className="text-lg font-semibold text-pink-600">男 {statsData.schoolSummary.male_count} / 女 {statsData.schoolSummary.female_count}</div>
-                      <div className="text-sm text-gray-600">男女人数</div>
-                    </div>
-                    <div className="text-center p-3 bg-orange-50 rounded-lg">
-                      <div className="text-lg font-semibold text-orange-600">走读 {statsData.schoolSummary.day_student_count} / 午托 {statsData.schoolSummary.nap_count}</div>
-                      <div className="text-sm text-gray-600">走读/午托</div>
-                    </div>
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <div className="text-xl font-bold text-green-600">{statsData.schoolSummary.collection_rate}</div>
-                      <div className="text-sm text-gray-600">总体收缴率</div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-xl font-bold text-gray-700">¥{statsData.schoolSummary.total_fee.toFixed(0)}</div>
-                      <div className="text-sm text-gray-600">应交总额</div>
-                    </div>
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <div className="text-xl font-bold text-green-600">¥{statsData.schoolSummary.total_paid.toFixed(0)}</div>
-                      <div className="text-sm text-gray-600">已收金额</div>
-                    </div>
-                    <div className="text-center p-3 bg-red-50 rounded-lg">
-                      <div className="text-xl font-bold text-red-600">¥{statsData.schoolSummary.pending_amount.toFixed(0)}</div>
-                      <div className="text-sm text-gray-600">待收金额</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* 班级缴费汇总 */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">班级缴费汇总</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-gray-50">
-                          <TableHead className="font-semibold">班级</TableHead>
-                          <TableHead className="text-center font-semibold">人数</TableHead>
-                          <TableHead className="text-right font-semibold">应交总额</TableHead>
-                          <TableHead className="text-right font-semibold">已收金额</TableHead>
-                          <TableHead className="text-right font-semibold">待收金额</TableHead>
-                          <TableHead className="text-center font-semibold">收缴率</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {statsData.classStats.map((c) => (
-                          <TableRow key={c.class_name}>
-                            <TableCell className="font-medium">{c.class_name}</TableCell>
-                            <TableCell className="text-center">{c.student_count}</TableCell>
-                            <TableCell className="text-right">¥{c.total_fee.toFixed(0)}</TableCell>
-                            <TableCell className="text-right text-green-600">¥{c.total_paid.toFixed(0)}</TableCell>
-                            <TableCell className="text-right text-red-600">¥{c.pending_amount.toFixed(0)}</TableCell>
-                            <TableCell className="text-center">
-                              <span className={`px-2 py-1 rounded text-sm ${
-                                parseFloat(c.collection_rate) >= 90 ? 'bg-green-100 text-green-700' :
-                                parseFloat(c.collection_rate) >= 70 ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-red-100 text-red-700'
-                              }`}>
-                                {c.collection_rate}
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        {/* 合计行 */}
-                        <TableRow className="bg-blue-50 font-semibold">
-                          <TableCell>全校合计</TableCell>
-                          <TableCell className="text-center">{statsData.schoolSummary.student_count}</TableCell>
-                          <TableCell className="text-right">¥{statsData.schoolSummary.total_fee.toFixed(0)}</TableCell>
-                          <TableCell className="text-right text-green-600">¥{statsData.schoolSummary.total_paid.toFixed(0)}</TableCell>
-                          <TableCell className="text-right text-red-600">¥{statsData.schoolSummary.pending_amount.toFixed(0)}</TableCell>
-                          <TableCell className="text-center">
-                            <span className="px-2 py-1 rounded text-sm bg-blue-100 text-blue-700">
-                              {statsData.schoolSummary.collection_rate}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* 各项目参与人数 */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">各项目参与人数</CardTitle>
-                  <CardDescription>应交金额大于0则代表参与该项目</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-xl font-bold text-gray-700">{statsData.projectStats.total_students}</div>
-                      <div className="text-sm text-gray-600">学生总数</div>
-                    </div>
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
-                      <div className="text-xl font-bold text-blue-600">{statsData.projectStats.tuition}</div>
-                      <div className="text-sm text-gray-600">学费</div>
-                    </div>
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <div className="text-xl font-bold text-green-600">{statsData.projectStats.lunch}</div>
-                      <div className="text-sm text-gray-600">午餐费</div>
-                    </div>
-                    <div className="text-center p-3 bg-orange-50 rounded-lg">
-                      <div className="text-xl font-bold text-orange-600">{statsData.projectStats.nap}</div>
-                      <div className="text-sm text-gray-600">午托费</div>
-                    </div>
-                    <div className="text-center p-3 bg-purple-50 rounded-lg">
-                      <div className="text-xl font-bold text-purple-600">{statsData.projectStats.after_school}</div>
-                      <div className="text-sm text-gray-600">课后服务</div>
-                    </div>
-                    <div className="text-center p-3 bg-pink-50 rounded-lg">
-                      <div className="text-xl font-bold text-pink-600">{statsData.projectStats.club}</div>
-                      <div className="text-sm text-gray-600">社团费</div>
-                    </div>
-                    <div className="text-center p-3 bg-indigo-50 rounded-lg">
-                      <div className="text-xl font-bold text-indigo-600">{statsData.projectStats.agency}</div>
-                      <div className="text-sm text-gray-600">代办费</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* 月度缴费统计 */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">月度缴费统计</CardTitle>
-                  <CardDescription>按月份显示缴费金额</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {statsData.monthlyStats.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">暂无缴费记录</div>
-                  ) : (
-                    <div className="border rounded-lg overflow-hidden">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-gray-50">
-                            <TableHead className="font-semibold">月份</TableHead>
-                            <TableHead className="text-right font-semibold">学费</TableHead>
-                            <TableHead className="text-right font-semibold">午餐费</TableHead>
-                            <TableHead className="text-right font-semibold">午托费</TableHead>
-                            <TableHead className="text-right font-semibold">课后服务</TableHead>
-                            <TableHead className="text-right font-semibold">社团费</TableHead>
-                            <TableHead className="text-right font-semibold">代办费</TableHead>
-                            <TableHead className="text-right font-semibold">月度合计</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {statsData.monthlyStats.map((m) => (
-                            <TableRow key={m.month}>
-                              <TableCell className="font-medium">{m.month}</TableCell>
-                              <TableCell className="text-right">{m.payments['tuition']?.amount.toFixed(0) || '-'}</TableCell>
-                              <TableCell className="text-right">{m.payments['lunch']?.amount.toFixed(0) || '-'}</TableCell>
-                              <TableCell className="text-right">{m.payments['nap']?.amount.toFixed(0) || '-'}</TableCell>
-                              <TableCell className="text-right">{m.payments['after_school']?.amount.toFixed(0) || '-'}</TableCell>
-                              <TableCell className="text-right">{m.payments['club']?.amount.toFixed(0) || '-'}</TableCell>
-                              <TableCell className="text-right">{m.payments['agency']?.amount.toFixed(0) || '-'}</TableCell>
-                              <TableCell className="text-right font-semibold text-green-600">¥{m.total.toFixed(0)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button onClick={() => setStatsDialogOpen(false)}>
-              关闭
             </Button>
           </DialogFooter>
         </DialogContent>

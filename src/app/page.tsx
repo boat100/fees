@@ -286,7 +286,7 @@ export default function Home() {
         {/* 快捷统计卡片 */}
         {!loading && stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/fees')}>
+            <Card className="shadow-sm">
               <CardContent className="pt-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -300,7 +300,7 @@ export default function Home() {
               </CardContent>
             </Card>
             
-            <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/fees')}>
+            <Card className="shadow-sm">
               <CardContent className="pt-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
@@ -314,7 +314,7 @@ export default function Home() {
               </CardContent>
             </Card>
             
-            <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/fees')}>
+            <Card className="shadow-sm">
               <CardContent className="pt-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
@@ -328,7 +328,7 @@ export default function Home() {
               </CardContent>
             </Card>
             
-            <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/expenses')}>
+            <Card className="shadow-sm">
               <CardContent className="pt-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">

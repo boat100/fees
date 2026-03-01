@@ -13,11 +13,71 @@ export async function GET(request: NextRequest) {
     // 获取班级列表
     if (action === 'classes') {
       const classes = db.prepare(`
-        SELECT DISTINCT class_name FROM student_fees ORDER BY class_name
+        SELECT DISTINCT class_name FROM student_fees
       `).all() as Array<{ class_name: string }>;
       
+      // 中文数字到阿拉伯数字的映射
+      const chineseToNumber: Record<string, number> = {
+        '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+        '六': 6, '七': 7, '八': 8, '九': 9, '十': 10
+      };
+      
+      // 提取年级数字的函数
+      const extractGradeNumber = (className: string): number => {
+        // 尝试匹配各种年级格式
+        // 1. "X年级" 格式（如 "一年级1班"）
+        const match1 = className.match(/([一二三四五六七八九十])年级/);
+        if (match1) {
+          return chineseToNumber[match1[1]] || 0;
+        }
+        // 2. "X年" 格式（如 "一年1班"）
+        const match2 = className.match(/([一二三四五六七八九十])年/);
+        if (match2) {
+          return chineseToNumber[match2[1]] || 0;
+        }
+        // 3. "数字年级" 格式（如 "1年级1班"）
+        const match3 = className.match(/(\d+)\s*年级/);
+        if (match3) {
+          return parseInt(match3[1], 10);
+        }
+        // 4. "数字年" 格式（如 "1年1班"）
+        const match4 = className.match(/(\d+)\s*年/);
+        if (match4) {
+          return parseInt(match4[1], 10);
+        }
+        // 5. 开头是数字（如 "1班"、"101班"）
+        const match5 = className.match(/^(\d+)/);
+        if (match5) {
+          return parseInt(match5[1], 10);
+        }
+        return 999; // 未知年级排到最后
+      };
+      
+      // 提取班级数字的函数
+      const extractClassNumber = (className: string): number => {
+        // 匹配 "X班" 格式
+        const match = className.match(/(\d+)\s*班/);
+        if (match) {
+          return parseInt(match[1], 10);
+        }
+        return 0;
+      };
+      
+      // 按年级和班级排序
+      const sortedClasses = classes.map(c => c.class_name).sort((a, b) => {
+        const gradeA = extractGradeNumber(a);
+        const gradeB = extractGradeNumber(b);
+        if (gradeA !== gradeB) {
+          return gradeA - gradeB; // 年级从低到高
+        }
+        // 同年级按班级号排序
+        const classA = extractClassNumber(a);
+        const classB = extractClassNumber(b);
+        return classA - classB;
+      });
+      
       return NextResponse.json({ 
-        data: classes.map(c => c.class_name) 
+        data: sortedClasses 
       });
     }
     

@@ -190,7 +190,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - 删除支出记录
+// DELETE - 删除支出记录（支持单个删除和批量删除）
 export async function DELETE(request: NextRequest) {
   if (!(await isAuthenticated())) {
     return NextResponse.json({ error: '未登录' }, { status: 401 });
@@ -199,7 +199,37 @@ export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
+    const ids = searchParams.get('ids');
 
+    // 支持批量删除：通过ids参数传入逗号分隔的ID列表
+    if (ids) {
+      const idList = ids.split(',').map(i => parseInt(i.trim())).filter(i => !isNaN(i));
+      
+      if (idList.length === 0) {
+        return NextResponse.json({ error: '缺少有效的记录ID' }, { status: 400 });
+      }
+
+      // 使用事务批量删除
+      const deleteStmt = db.prepare('DELETE FROM expense_records WHERE id = ?');
+      const deleteMany = db.transaction((ids: number[]) => {
+        let deletedCount = 0;
+        for (const id of ids) {
+          const result = deleteStmt.run(id);
+          if (result.changes > 0) deletedCount++;
+        }
+        return deletedCount;
+      });
+
+      const deletedCount = deleteMany(idList);
+
+      return NextResponse.json({
+        success: true,
+        message: `成功删除 ${deletedCount} 条记录`,
+        deletedCount
+      });
+    }
+
+    // 单个删除
     if (!id) {
       return NextResponse.json({ error: '缺少记录ID' }, { status: 400 });
     }

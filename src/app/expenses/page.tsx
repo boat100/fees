@@ -118,6 +118,10 @@ export default function ExpensesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<ExpenseRecord | null>(null);
   
+  // 多选状态
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false);
+  
   // 导入对话框状态
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importData, setImportData] = useState<Array<{
@@ -314,6 +318,60 @@ export default function ExpensesPage() {
       }
     } catch (error) {
       console.error('Failed to delete expense:', error);
+      alert('删除失败');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 切换单个选中状态
+  const toggleSelect = (id: number) => {
+    const newSelectedIds = new Set(selectedIds);
+    if (newSelectedIds.has(id)) {
+      newSelectedIds.delete(id);
+    } else {
+      newSelectedIds.add(id);
+    }
+    setSelectedIds(newSelectedIds);
+  };
+
+  // 全选/取消全选
+  const toggleSelectAll = () => {
+    if (selectedIds.size === records.length) {
+      // 取消全选
+      setSelectedIds(new Set());
+    } else {
+      // 全选
+      setSelectedIds(new Set(records.map(r => r.id)));
+    }
+  };
+
+  // 批量删除
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) {
+      alert('请先选择要删除的记录');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const ids = Array.from(selectedIds).join(',');
+      const response = await authFetch(`/api/expenses?ids=${ids}`, {
+        method: 'DELETE'
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        alert(result.message || '删除成功');
+        setBatchDeleteDialogOpen(false);
+        setSelectedIds(new Set());
+        fetchRecords();
+      } else {
+        alert(result.error || '删除失败');
+      }
+    } catch (error) {
+      console.error('Failed to batch delete expenses:', error);
       alert('删除失败');
     } finally {
       setSubmitting(false);
@@ -818,10 +876,21 @@ export default function ExpensesPage() {
                 />
               </div>
 
-              <Button onClick={openAddDialog} className="ml-auto bg-red-600 hover:bg-red-700">
+              <Button onClick={openAddDialog} className="bg-red-600 hover:bg-red-700">
                 <Plus className="h-4 w-4 mr-1" />
                 新增支出
               </Button>
+              
+              {selectedIds.size > 0 && (
+                <Button 
+                  variant="destructive" 
+                  onClick={() => setBatchDeleteDialogOpen(true)}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  删除选中 ({selectedIds.size})
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -841,6 +910,14 @@ export default function ExpensesPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">
+                        <input
+                          type="checkbox"
+                          checked={records.length > 0 && selectedIds.size === records.length}
+                          onChange={toggleSelectAll}
+                          className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                        />
+                      </TableHead>
                       <TableHead>类别</TableHead>
                       <TableHead>子项目</TableHead>
                       <TableHead>报账时间</TableHead>
@@ -854,6 +931,14 @@ export default function ExpensesPage() {
                   <TableBody>
                     {records.map((record) => (
                       <TableRow key={record.id}>
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(record.id)}
+                            onChange={() => toggleSelect(record.id)}
+                            className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                          />
+                        </TableCell>
                         <TableCell>{CATEGORY_NAMES[record.category]}</TableCell>
                         <TableCell>{record.item}</TableCell>
                         <TableCell>{record.report_date}</TableCell>
@@ -864,26 +949,13 @@ export default function ExpensesPage() {
                         </TableCell>
                         <TableCell className="max-w-xs truncate">{record.summary || '-'}</TableCell>
                         <TableCell className="text-center">
-                          <div className="flex justify-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openEditDialog(record)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-red-600 hover:text-red-700"
-                              onClick={() => {
-                                setSelectedRecord(record);
-                                setDeleteDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openEditDialog(record)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1023,6 +1095,28 @@ export default function ExpensesPage() {
               className="bg-red-600 hover:bg-red-700"
             >
               {submitting ? '删除中...' : '删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 批量删除确认对话框 */}
+      <AlertDialog open={batchDeleteDialogOpen} onOpenChange={setBatchDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600">确认批量删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除选中的 {selectedIds.size} 条支出记录吗？此操作不可恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBatchDelete}
+              disabled={submitting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {submitting ? '删除中...' : '确认删除'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

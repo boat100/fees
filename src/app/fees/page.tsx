@@ -958,29 +958,6 @@ function FeesContent() {
               </Button>
               
               <Button
-                onClick={() => {
-                  setBatchPaymentData({
-                    selectedStudents: [],
-                    payments: [
-                      { feeType: 'tuition', amount: 0 },
-                      { feeType: 'lunch', amount: 0 },
-                      { feeType: 'nap', amount: 0 },
-                      { feeType: 'after_school', amount: 0 },
-                      { feeType: 'club', amount: 0 },
-                    ],
-                    paymentDate: getTodayString(),
-                    remark: '',
-                  });
-                  setBatchPaymentDialogOpen(true);
-                }}
-                variant="outline"
-                className="border-orange-600 text-orange-600 hover:bg-orange-50"
-              >
-                <CreditCard className="h-4 w-4 mr-2" />
-                批量录入
-              </Button>
-              
-              <Button
                 onClick={() => router.push('/fees/stats')}
                 variant="outline"
                 className="border-blue-600 text-blue-600 hover:bg-blue-50"

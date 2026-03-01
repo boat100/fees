@@ -332,7 +332,7 @@ export async function PUT(request: NextRequest) {
       UPDATE student_fees 
       SET gender = ?, nap_status = ?, 
           tuition_fee = ?, lunch_fee = ?, nap_fee = ?, 
-          after_school_fee = ?, club_fee = ?, agency_fee = ?, agency_paid = ?, remark = ?, updated_at = CURRENT_TIMESTAMP
+          after_school_fee = ?, club_fee = ?, agency_fee = ?, agency_paid = ?, updated_at = CURRENT_TIMESTAMP
       WHERE class_name = ? AND student_name = ?
     `);
     
@@ -369,7 +369,6 @@ export async function PUT(request: NextRequest) {
             student.clubFee,
             student.agencyFee,
             student.agencyPaid,
-            student.remark || null,
             student.className,
             student.studentName
           );
@@ -389,7 +388,7 @@ export async function PUT(request: NextRequest) {
             student.clubFee,
             student.agencyFee,
             student.agencyPaid,
-            student.remark || null
+            null  // 备注不存入费用明细，只用于缴费记录
           );
           studentId = result.lastInsertRowid as number;
           insertCount++;
@@ -408,25 +407,27 @@ export async function PUT(request: NextRequest) {
           deletePaymentsStmt.run(studentId);
           
           const paymentDate = student.paymentDate;
+          // 使用导入的备注，如果没有则为空
+          const paymentRemark = student.remark || null;
           
           if (student.tuitionPaid > 0) {
-            insertPaymentStmt.run(studentId, 'tuition', student.tuitionPaid, paymentDate, '批量导入');
+            insertPaymentStmt.run(studentId, 'tuition', student.tuitionPaid, paymentDate, paymentRemark);
             paymentCount++;
           }
           if (student.lunchPaid > 0) {
-            insertPaymentStmt.run(studentId, 'lunch', student.lunchPaid, paymentDate, '批量导入');
+            insertPaymentStmt.run(studentId, 'lunch', student.lunchPaid, paymentDate, paymentRemark);
             paymentCount++;
           }
           if (student.napPaid > 0) {
-            insertPaymentStmt.run(studentId, 'nap', student.napPaid, paymentDate, '批量导入');
+            insertPaymentStmt.run(studentId, 'nap', student.napPaid, paymentDate, paymentRemark);
             paymentCount++;
           }
           if (student.afterSchoolPaid > 0) {
-            insertPaymentStmt.run(studentId, 'after_school', student.afterSchoolPaid, paymentDate, '批量导入');
+            insertPaymentStmt.run(studentId, 'after_school', student.afterSchoolPaid, paymentDate, paymentRemark);
             paymentCount++;
           }
           if (student.clubPaid > 0) {
-            insertPaymentStmt.run(studentId, 'club', student.clubPaid, paymentDate, '批量导入');
+            insertPaymentStmt.run(studentId, 'club', student.clubPaid, paymentDate, paymentRemark);
             paymentCount++;
           }
         }

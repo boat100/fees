@@ -1930,7 +1930,7 @@ function FeesContent() {
               批量导入学生费用
             </DialogTitle>
             <DialogDescription>
-              从CSV文件批量导入学生费用数据。支持格式：班级、姓名、性别、各费用应交/已交、代办费已交、缴费时间、备注
+              从CSV文件批量导入学生费用数据。支持格式：班级、姓名、性别、各费用应交/已交、代办费已交、缴费时间、备注（备注用于缴费记录）
             </DialogDescription>
           </DialogHeader>
           
@@ -2045,6 +2045,7 @@ function FeesContent() {
                 <li>性别可选：男、女（默认：男）</li>
                 <li>费用格式：学费应交/学费已交、午餐费应交/午餐费已交、代办费应交/代办费已交等</li>
                 <li>缴费时间格式：YYYY-MM-DD（如 2024-09-01）</li>
+                <li><span className="text-orange-600 font-medium">备注将写入缴费记录（如有已交项目时）</span>，不存入费用明细</li>
                 <li>已存在的学生（同班级同名）将更新数据，否则新增</li>
               </ul>
             </div>

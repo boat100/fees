@@ -1,20 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { isAuthenticated, clearAuthToken, authFetch } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   DollarSign, 
   TrendingDown, 
   Settings, 
   LogOut,
   School,
-  ArrowRight,
   Users,
   FileText,
-  Wallet
+  Wallet,
+  BarChart3
 } from 'lucide-react';
 import {
   BarChart,
@@ -48,6 +48,7 @@ interface DashboardStats {
 
 export default function Home() {
   const router = useRouter();
+  const pathname = usePathname();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -96,82 +97,72 @@ export default function Home() {
 
   // 准备图表数据
   const chartData = stats ? [
-    {
-      name: '应交收费',
-      value: stats.totalFee,
-      fill: '#3b82f6',
-    },
-    {
-      name: '已交收费',
-      value: stats.totalPaid,
-      fill: '#22c55e',
-    },
-    {
-      name: '总支出',
-      value: stats.totalExpense,
-      fill: '#ef4444',
-    },
+    { name: '应交收费', value: stats.totalFee },
+    { name: '已交收费', value: stats.totalPaid },
+    { name: '总支出', value: stats.totalExpense },
   ] : [];
 
-  // 导航模块配置
-  const modules = [
+  // 导航菜单配置
+  const navItems = [
     {
       title: '收费管理',
-      description: '学生费用管理、班级费用统计、批量录入交费记录、代办费管理',
-      icon: DollarSign,
-      iconColor: 'text-green-600',
-      iconBg: 'bg-green-100',
-      cardBorder: 'border-green-200 hover:border-green-400',
-      hoverShadow: 'hover:shadow-green-100',
       href: '/fees',
-      stats: stats ? [
-        { label: '应交总额', value: `¥${formatAmount(stats.totalFee)}`, icon: Wallet, color: 'text-blue-600' },
-        { label: '已交总额', value: `¥${formatAmount(stats.totalPaid)}`, icon: DollarSign, color: 'text-green-600' },
-      ] : [],
+      icon: DollarSign,
+      activeColor: 'text-green-600',
+      bgColor: 'bg-green-50',
     },
     {
       title: '支出管理',
-      description: '日常公用支出、人员支出管理、支出记录统计与导出',
-      icon: TrendingDown,
-      iconColor: 'text-red-600',
-      iconBg: 'bg-red-100',
-      cardBorder: 'border-red-200 hover:border-red-400',
-      hoverShadow: 'hover:shadow-red-100',
       href: '/expenses',
-      stats: stats ? [
-        { label: '支出总额', value: `¥${formatAmount(stats.totalExpense)}`, icon: TrendingDown, color: 'text-red-600' },
-        { label: '支出记录', value: `${stats.expenseRecordCount}条`, icon: FileText, color: 'text-orange-600' },
-      ] : [],
+      icon: TrendingDown,
+      activeColor: 'text-red-600',
+      bgColor: 'bg-red-50',
     },
     {
       title: '后台管理',
-      description: '数据统计报表、数据备份恢复、系统设置',
-      icon: Settings,
-      iconColor: 'text-purple-600',
-      iconBg: 'bg-purple-100',
-      cardBorder: 'border-purple-200 hover:border-purple-400',
-      hoverShadow: 'hover:shadow-purple-100',
       href: '/admin',
-      stats: stats ? [
-        { label: '班级数量', value: `${stats.classCount}个`, icon: Users, color: 'text-purple-600' },
-        { label: '学生人数', value: `${stats.studentCount}人`, icon: Users, color: 'text-indigo-600' },
-      ] : [],
+      icon: Settings,
+      activeColor: 'text-purple-600',
+      bgColor: 'bg-purple-50',
     },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       {/* 顶部导航栏 */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-200 shadow-sm">
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <School className="h-8 w-8 text-blue-600" />
-              <h1 className="text-xl font-bold text-gray-900">
-                学校收支管理系统
-              </h1>
+            {/* 左侧：Logo + 系统名称 */}
+            <div className="flex items-center gap-8">
+              <div className="flex items-center gap-3">
+                <School className="h-8 w-8 text-blue-600" />
+                <h1 className="text-xl font-bold text-gray-900">
+                  学校收支管理系统
+                </h1>
+              </div>
+              
+              {/* 导航菜单 */}
+              <nav className="hidden md:flex items-center gap-1">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+                  return (
+                    <Button
+                      key={item.href}
+                      variant="ghost"
+                      onClick={() => router.push(item.href)}
+                      className={`gap-2 ${isActive ? item.activeColor + ' ' + item.bgColor : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.title}
+                    </Button>
+                  );
+                })}
+              </nav>
             </div>
             
+            {/* 右侧：退出按钮 */}
             <Button
               onClick={handleLogout}
               variant="ghost"
@@ -185,15 +176,37 @@ export default function Home() {
         </div>
       </header>
 
+      {/* 移动端导航菜单 */}
+      <div className="md:hidden bg-white border-b border-gray-100 px-4 py-2">
+        <nav className="flex items-center gap-1 overflow-x-auto">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
+              <Button
+                key={item.href}
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push(item.href)}
+                className={`gap-1.5 shrink-0 ${isActive ? item.activeColor + ' ' + item.bgColor : 'text-gray-600'}`}
+              >
+                <Icon className="h-4 w-4" />
+                {item.title}
+              </Button>
+            );
+          })}
+        </nav>
+      </div>
+
       {/* 主内容区域 */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 欢迎区域 */}
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             欢迎使用学校收支管理系统
           </h2>
           <p className="text-gray-500">
-            请选择要进入的功能模块
+            通过顶部导航栏进入各功能模块
           </p>
         </div>
 
@@ -201,7 +214,7 @@ export default function Home() {
         <Card className="mb-8 shadow-md">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-blue-600" />
+              <BarChart3 className="h-5 w-5 text-blue-600" />
               收支概览
             </CardTitle>
           </CardHeader>
@@ -212,7 +225,7 @@ export default function Home() {
               </div>
             ) : stats ? (
               <>
-                <div className="h-64">
+                <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={chartData}
@@ -235,7 +248,6 @@ export default function Home() {
                         dataKey="value" 
                         name="金额"
                         radius={[6, 6, 0, 0]}
-                        fill="#3b82f6"
                       >
                         <Cell fill="#3b82f6" />
                         <Cell fill="#22c55e" />
@@ -249,15 +261,15 @@ export default function Home() {
                 <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-100">
                   <div className="text-center">
                     <p className="text-sm text-gray-500 mb-1">应交收费</p>
-                    <p className="text-xl font-bold text-blue-600">¥{formatAmount(stats.totalFee)}</p>
+                    <p className="text-2xl font-bold text-blue-600">¥{formatAmount(stats.totalFee)}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-sm text-gray-500 mb-1">已交收费</p>
-                    <p className="text-xl font-bold text-green-600">¥{formatAmount(stats.totalPaid)}</p>
+                    <p className="text-2xl font-bold text-green-600">¥{formatAmount(stats.totalPaid)}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-sm text-gray-500 mb-1">总支出</p>
-                    <p className="text-xl font-bold text-red-600">¥{formatAmount(stats.totalExpense)}</p>
+                    <p className="text-2xl font-bold text-red-600">¥{formatAmount(stats.totalExpense)}</p>
                   </div>
                 </div>
               </>
@@ -271,52 +283,66 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        {/* 导航卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {modules.map((module) => {
-            const Icon = module.icon;
-            return (
-              <Card
-                key={module.title}
-                className={`cursor-pointer transition-all duration-300 ${module.cardBorder} ${module.hoverShadow} hover:shadow-lg hover:-translate-y-1`}
-                onClick={() => router.push(module.href)}
-              >
-                <CardHeader className="pb-3">
-                  <div className={`w-14 h-14 rounded-xl ${module.iconBg} flex items-center justify-center mb-3`}>
-                    <Icon className={`h-7 w-7 ${module.iconColor}`} />
+        {/* 快捷统计卡片 */}
+        {!loading && stats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/fees')}>
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-blue-600" />
                   </div>
-                  <CardTitle className="text-lg flex items-center justify-between">
-                    {module.title}
-                    <ArrowRight className="h-4 w-4 text-gray-400" />
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <CardDescription className="text-sm text-gray-500 mb-4">
-                    {module.description}
-                  </CardDescription>
-                  
-                  {/* 模块统计 */}
-                  {module.stats.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
-                      {module.stats.map((stat, idx) => {
-                        const StatIcon = stat.icon;
-                        return (
-                          <div key={idx} className="flex items-center gap-2">
-                            <StatIcon className={`h-4 w-4 ${stat.color}`} />
-                            <div>
-                              <p className="text-xs text-gray-400">{stat.label}</p>
-                              <p className={`text-sm font-semibold ${stat.color}`}>{stat.value}</p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                  <div>
+                    <p className="text-sm text-gray-500">学生人数</p>
+                    <p className="text-xl font-bold text-gray-900">{stats.studentCount}人</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/fees')}>
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                    <School className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">班级数量</p>
+                    <p className="text-xl font-bold text-gray-900">{stats.classCount}个</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/fees')}>
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                    <Wallet className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">欠费金额</p>
+                    <p className="text-xl font-bold text-orange-600">¥{formatAmount(stats.totalUnpaid)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/expenses')}>
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                    <FileText className="h-5 w-5 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">支出记录</p>
+                    <p className="text-xl font-bold text-gray-900">{stats.expenseRecordCount}条</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </main>
 
       {/* 底部信息 */}

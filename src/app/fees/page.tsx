@@ -141,7 +141,12 @@ function FeesContent() {
   });
   
   // 导出状态
-  const [exporting, setExporting] = useState(false);
+  const [exportingClass, setExportingClass] = useState(false);
+  const [exportingAgency, setExportingAgency] = useState(false);
+  
+  // 导出班级数据对话框
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportType, setExportType] = useState<'fee_detail' | 'payment_records'>('fee_detail');
   
   // 表单数据
   const [formData, setFormData] = useState({
@@ -477,13 +482,20 @@ function FeesContent() {
     }
   };
 
+  // 打开导出班级数据对话框
+  const openExportDialog = () => {
+    setExportDialogOpen(true);
+  };
+
   // 导出班级数据
   const handleExportClass = async () => {
     if (!selectedClass) return;
     
-    setExporting(true);
+    setExportingClass(true);
     try {
-      const url = `/api/export/stats?type=class_detail&class_name=${encodeURIComponent(selectedClass)}`;
+      // 根据选择导出不同类型
+      const exportParam = exportType === 'fee_detail' ? 'class_detail' : 'class_payment_records';
+      const url = `/api/export/stats?type=${exportParam}&class_name=${encodeURIComponent(selectedClass)}`;
       const response = await authFetch(url);
       
       if (!response.ok) {
@@ -495,7 +507,9 @@ function FeesContent() {
       
       // 从响应头获取文件名
       const disposition = response.headers.get('Content-Disposition');
-      let filename = `${selectedClass}班级明细.xlsx`;
+      let filename = exportType === 'fee_detail' 
+        ? `${selectedClass}班级费用明细.xlsx`
+        : `${selectedClass}班级缴费记录.xlsx`;
       if (disposition) {
         const filenameMatch = disposition.match(/filename\*?=['"]?(?:UTF-\d['"]*)?([^;\r\n"']*)['"]?;?/i);
         if (filenameMatch && filenameMatch[1]) {
@@ -514,11 +528,13 @@ function FeesContent() {
       // 清理
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
+      
+      setExportDialogOpen(false);
     } catch (error) {
       console.error('Export error:', error);
       alert('导出失败，请重试');
     } finally {
-      setExporting(false);
+      setExportingClass(false);
     }
   };
 
@@ -526,7 +542,7 @@ function FeesContent() {
   const handleExportAgencyFee = async () => {
     if (!selectedClass) return;
     
-    setExporting(true);
+    setExportingAgency(true);
     try {
       const url = `/api/export/stats?type=agency_fee_detail&class_name=${encodeURIComponent(selectedClass)}`;
       const response = await authFetch(url);
@@ -563,7 +579,7 @@ function FeesContent() {
       console.error('Export error:', error);
       alert('导出失败，请重试');
     } finally {
-      setExporting(false);
+      setExportingAgency(false);
     }
   };
 
@@ -701,12 +717,12 @@ function FeesContent() {
               {selectedClass && students.length > 0 && (
                 <>
                   <Button
-                    onClick={handleExportClass}
+                    onClick={openExportDialog}
                     variant="outline"
-                    disabled={exporting}
+                    disabled={exportingClass}
                     className="border-green-600 text-green-600 hover:bg-green-50"
                   >
-                    {exporting ? (
+                    {exportingClass ? (
                       <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
                       <Download className="h-4 w-4 mr-2" />
@@ -716,10 +732,10 @@ function FeesContent() {
                   <Button
                     onClick={handleExportAgencyFee}
                     variant="outline"
-                    disabled={exporting}
+                    disabled={exportingAgency}
                     className="border-purple-600 text-purple-600 hover:bg-purple-50"
                   >
-                    {exporting ? (
+                    {exportingAgency ? (
                       <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
                       <Download className="h-4 w-4 mr-2" />
@@ -1043,6 +1059,73 @@ function FeesContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 导出班级数据对话框 */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Download className="h-5 w-5" />
+              导出班级数据
+            </DialogTitle>
+            <DialogDescription>
+              请选择要导出的数据类型
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col gap-3">
+              <label
+                className={`flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${
+                  exportType === 'fee_detail' ? 'border-green-600 bg-green-50' : 'hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="exportType"
+                  value="fee_detail"
+                  checked={exportType === 'fee_detail'}
+                  onChange={() => setExportType('fee_detail')}
+                  className="h-4 w-4 text-green-600"
+                />
+                <div>
+                  <div className="font-medium">费用明细</div>
+                  <div className="text-sm text-gray-500">导出每位学生的各项费用明细</div>
+                </div>
+              </label>
+              <label
+                className={`flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${
+                  exportType === 'payment_records' ? 'border-green-600 bg-green-50' : 'hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="exportType"
+                  value="payment_records"
+                  checked={exportType === 'payment_records'}
+                  onChange={() => setExportType('payment_records')}
+                  className="h-4 w-4 text-green-600"
+                />
+                <div>
+                  <div className="font-medium">缴费记录</div>
+                  <div className="text-sm text-gray-500">导出该班级所有缴费记录</div>
+                </div>
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)} disabled={exportingClass}>
+              取消
+            </Button>
+            <Button
+              onClick={handleExportClass}
+              disabled={exportingClass}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {exportingClass ? '导出中...' : '确认导出'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 批量录入交费对话框 */}
       <Dialog open={batchPaymentDialogOpen} onOpenChange={setBatchPaymentDialogOpen}>

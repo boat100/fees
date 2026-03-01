@@ -94,6 +94,12 @@ export async function GET(request: NextRequest) {
         }
         await exportClassDetail(workbook, students, payments, className);
         break;
+      case 'class_payment_records':
+        if (!className) {
+          return NextResponse.json({ error: '缺少班级参数' }, { status: 400 });
+        }
+        await exportClassPaymentRecords(workbook, payments, className);
+        break;
       case 'agency_fee_detail':
         if (!className) {
           return NextResponse.json({ error: '缺少班级参数' }, { status: 400 });
@@ -115,7 +121,8 @@ export async function GET(request: NextRequest) {
       'completion_stats': '缴费完成人数统计.xlsx',
       'project_stats': '全校项目参与人数.xlsx',
       'class_project_stats': '班级项目参与人数.xlsx',
-      'class_detail': `${className}班级明细.xlsx`,
+      'class_detail': `${className}班级费用明细.xlsx`,
+      'class_payment_records': `${className}班级缴费记录.xlsx`,
       'agency_fee_detail': `${className}代办费明细.xlsx`,
       'month': '月度费用统计.xlsx',
       'class': '班级费用统计.xlsx'
@@ -401,6 +408,55 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
       { wch: 20 }, // 备注
     ];
     XLSX.utils.book_append_sheet(workbook, paymentWs, '交费记录');
+  }
+}
+
+// 导出班级缴费记录
+async function exportClassPaymentRecords(workbook: XLSX.WorkBook, payments: PaymentData[], className: string) {
+  const classPayments = payments.filter(p => p.student_class === className);
+
+  // 按日期排序
+  const sortedPayments = [...classPayments].sort((a, b) => 
+    (b.payment_date || '').localeCompare(a.payment_date || '')
+  );
+
+  // 缴费记录
+  const paymentRecords = sortedPayments.map(p => ({
+    班级: className,
+    学生姓名: p.student_name,
+    交费日期: p.payment_date,
+    费用类型: feeTypeMap[p.fee_type] || p.fee_type,
+    金额: p.amount,
+    备注: p.remarks || ''
+  }));
+
+  // 添加汇总行
+  const summaryRow = {
+    班级: '合计',
+    学生姓名: '',
+    交费日期: '',
+    费用类型: '',
+    金额: paymentRecords.reduce((sum, p) => sum + p.金额, 0),
+    备注: `共 ${paymentRecords.length} 条记录`
+  };
+
+  const sheetData = [...paymentRecords, summaryRow];
+
+  if (sheetData.length > 1) {
+    const ws = XLSX.utils.json_to_sheet(sheetData);
+    ws['!cols'] = [
+      { wch: 10 }, // 班级
+      { wch: 12 }, // 学生姓名
+      { wch: 12 }, // 交费日期
+      { wch: 10 }, // 费用类型
+      { wch: 10 }, // 金额
+      { wch: 20 }, // 备注
+    ];
+    XLSX.utils.book_append_sheet(workbook, ws, '缴费记录');
+  } else {
+    // 如果没有缴费记录，添加空表提示
+    const emptyWs = XLSX.utils.json_to_sheet([{ 提示: '暂无缴费记录' }]);
+    XLSX.utils.book_append_sheet(workbook, emptyWs, '缴费记录');
   }
 }
 

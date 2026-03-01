@@ -14,13 +14,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   ArrowLeft, 
   LogOut,
   BarChart3,
   Users,
-  RefreshCw
+  RefreshCw,
+  Download
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 // 统计数据类型
 interface SchoolSummary {
@@ -66,17 +75,23 @@ interface ProjectStats {
   agency: number;
 }
 
-interface MonthlyStat {
-  month: string;
+// 月度班级统计类型
+interface MonthlyClassStat {
+  class_name: string;
   payments: Record<string, { amount: number; count: number }>;
   total: number;
+}
+
+interface MonthlyStats {
+  availableMonths: string[];
+  classStats: Record<string, Record<string, MonthlyClassStat>>; // month -> class_name -> stats
 }
 
 interface StatsData {
   schoolSummary: SchoolSummary;
   classStats: ClassStat[];
   projectStats: ProjectStats;
-  monthlyStats: MonthlyStat[];
+  monthlyStats: MonthlyStats;
   feeTypeMap: Record<string, string>;
 }
 
@@ -84,6 +99,7 @@ function StatsContent() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [statsData, setStatsData] = useState<StatsData | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
 
   // 检查登录状态
   useEffect(() => {
@@ -369,43 +385,149 @@ function StatsContent() {
               </CardContent>
             </Card>
 
-            {/* 月度缴费统计 */}
+            {/* 月度各班级缴费统计 */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">月度缴费统计</CardTitle>
-                <CardDescription>按月份显示缴费金额</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">月度各班级缴费统计</CardTitle>
+                    <CardDescription>选择月份查看各班级缴费详情</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="选择月份" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statsData.monthlyStats.availableMonths.map((month) => (
+                          <SelectItem key={month} value={month}>
+                            {month}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      onClick={() => handleExportMonthlyStats(selectedMonth === 'all')}
+                      variant="outline"
+                      size="sm"
+                      disabled={Object.keys(statsData.monthlyStats.classStats).length === 0}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      导出
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                {statsData.monthlyStats.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">暂无缴费记录</div>
-                ) : (
+                {!selectedMonth ? (
+                  <div className="text-center py-8 text-gray-500">请选择月份查看统计数据</div>
+                ) : selectedMonth === 'all' ? (
+                  // 显示全部月份汇总
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-gray-50">
                           <TableHead className="font-semibold">月份</TableHead>
+                          <TableHead className="font-semibold">班级</TableHead>
                           <TableHead className="text-right font-semibold">学费</TableHead>
                           <TableHead className="text-right font-semibold">午餐费</TableHead>
                           <TableHead className="text-right font-semibold">午托费</TableHead>
                           <TableHead className="text-right font-semibold">课后服务</TableHead>
                           <TableHead className="text-right font-semibold">社团费</TableHead>
                           <TableHead className="text-right font-semibold">代办费</TableHead>
-                          <TableHead className="text-right font-semibold">月度合计</TableHead>
+                          <TableHead className="text-right font-semibold">合计</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {statsData.monthlyStats.map((m) => (
-                          <TableRow key={m.month}>
-                            <TableCell className="font-medium">{m.month}</TableCell>
-                            <TableCell className="text-right">{m.payments['tuition']?.amount.toFixed(0) || '-'}</TableCell>
-                            <TableCell className="text-right">{m.payments['lunch']?.amount.toFixed(0) || '-'}</TableCell>
-                            <TableCell className="text-right">{m.payments['nap']?.amount.toFixed(0) || '-'}</TableCell>
-                            <TableCell className="text-right">{m.payments['after_school']?.amount.toFixed(0) || '-'}</TableCell>
-                            <TableCell className="text-right">{m.payments['club']?.amount.toFixed(0) || '-'}</TableCell>
-                            <TableCell className="text-right">{m.payments['agency']?.amount.toFixed(0) || '-'}</TableCell>
-                            <TableCell className="text-right font-semibold text-green-600">¥{m.total.toFixed(0)}</TableCell>
+                        {statsData.monthlyStats.availableMonths.map((month) => {
+                          const monthData = statsData.monthlyStats.classStats[month] || {};
+                          const classes = Object.keys(monthData).sort();
+                          return classes.map((className, idx) => {
+                            const classData = monthData[className];
+                            return (
+                              <TableRow key={`${month}-${className}`}>
+                                <TableCell className="font-medium">{idx === 0 ? month : ''}</TableCell>
+                                <TableCell>{className}</TableCell>
+                                <TableCell className="text-right">{classData.payments['tuition']?.amount.toFixed(0) || '-'}</TableCell>
+                                <TableCell className="text-right">{classData.payments['lunch']?.amount.toFixed(0) || '-'}</TableCell>
+                                <TableCell className="text-right">{classData.payments['nap']?.amount.toFixed(0) || '-'}</TableCell>
+                                <TableCell className="text-right">{classData.payments['after_school']?.amount.toFixed(0) || '-'}</TableCell>
+                                <TableCell className="text-right">{classData.payments['club']?.amount.toFixed(0) || '-'}</TableCell>
+                                <TableCell className="text-right">{classData.payments['agency']?.amount.toFixed(0) || '-'}</TableCell>
+                                <TableCell className="text-right font-semibold text-green-600">¥{classData.total.toFixed(0)}</TableCell>
+                              </TableRow>
+                            );
+                          });
+                        })}
+                        {statsData.monthlyStats.availableMonths.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={9} className="text-center text-gray-500">暂无缴费记录</TableCell>
                           </TableRow>
-                        ))}
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  // 显示选中月份的班级统计
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-gray-50">
+                          <TableHead className="font-semibold">班级</TableHead>
+                          <TableHead className="text-right font-semibold">学费</TableHead>
+                          <TableHead className="text-right font-semibold">午餐费</TableHead>
+                          <TableHead className="text-right font-semibold">午托费</TableHead>
+                          <TableHead className="text-right font-semibold">课后服务</TableHead>
+                          <TableHead className="text-right font-semibold">社团费</TableHead>
+                          <TableHead className="text-right font-semibold">代办费</TableHead>
+                          <TableHead className="text-right font-semibold">合计</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(() => {
+                          const monthData = statsData.monthlyStats.classStats[selectedMonth] || {};
+                          const classes = Object.keys(monthData).sort();
+                          let monthTotal = 0;
+                          
+                          if (classes.length === 0) {
+                            return (
+                              <TableRow>
+                                <TableCell colSpan={8} className="text-center text-gray-500">该月份暂无缴费记录</TableCell>
+                              </TableRow>
+                            );
+                          }
+                          
+                          return (
+                            <>
+                              {classes.map((className) => {
+                                const classData = monthData[className];
+                                monthTotal += classData.total;
+                                return (
+                                  <TableRow key={className}>
+                                    <TableCell className="font-medium">{className}</TableCell>
+                                    <TableCell className="text-right">{classData.payments['tuition']?.amount.toFixed(0) || '-'}</TableCell>
+                                    <TableCell className="text-right">{classData.payments['lunch']?.amount.toFixed(0) || '-'}</TableCell>
+                                    <TableCell className="text-right">{classData.payments['nap']?.amount.toFixed(0) || '-'}</TableCell>
+                                    <TableCell className="text-right">{classData.payments['after_school']?.amount.toFixed(0) || '-'}</TableCell>
+                                    <TableCell className="text-right">{classData.payments['club']?.amount.toFixed(0) || '-'}</TableCell>
+                                    <TableCell className="text-right">{classData.payments['agency']?.amount.toFixed(0) || '-'}</TableCell>
+                                    <TableCell className="text-right font-semibold text-green-600">¥{classData.total.toFixed(0)}</TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                              <TableRow className="bg-blue-50 font-semibold">
+                                <TableCell>本月合计</TableCell>
+                                <TableCell className="text-right">-</TableCell>
+                                <TableCell className="text-right">-</TableCell>
+                                <TableCell className="text-right">-</TableCell>
+                                <TableCell className="text-right">-</TableCell>
+                                <TableCell className="text-right">-</TableCell>
+                                <TableCell className="text-right">-</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{monthTotal.toFixed(0)}</TableCell>
+                              </TableRow>
+                            </>
+                          );
+                        })()}
                       </TableBody>
                     </Table>
                   </div>
@@ -421,6 +543,94 @@ function StatsContent() {
       </main>
     </div>
   );
+
+  // 导出月度统计
+  function handleExportMonthlyStats(exportAll: boolean) {
+    if (!statsData) return;
+
+    const workbook = XLSX.utils.book_new();
+    const feeTypes = ['tuition', 'lunch', 'nap', 'after_school', 'club', 'agency'];
+    const feeTypeNames = ['学费', '午餐费', '午托费', '课后服务', '社团费', '代办费'];
+
+    if (exportAll) {
+      // 导出全部月份
+      statsData.monthlyStats.availableMonths.forEach((month) => {
+        const monthData = statsData.monthlyStats.classStats[month] || {};
+        const classes = Object.keys(monthData).sort();
+        
+        if (classes.length === 0) return;
+
+        const data: (string | number)[][] = [
+          ['班级', ...feeTypeNames, '合计']
+        ];
+
+        classes.forEach((className) => {
+          const classData = monthData[className];
+          const row: (string | number)[] = [className];
+          feeTypes.forEach((type) => {
+            row.push(classData.payments[type]?.amount || 0);
+          });
+          row.push(classData.total);
+          data.push(row);
+        });
+
+        // 添加合计行
+        const totalRow: (string | number)[] = ['合计'];
+        feeTypes.forEach((type) => {
+          const typeTotal = classes.reduce((sum, c) => sum + (monthData[c].payments[type]?.amount || 0), 0);
+          totalRow.push(typeTotal);
+        });
+        totalRow.push(classes.reduce((sum, c) => sum + monthData[c].total, 0));
+        data.push(totalRow);
+
+        const sheet = XLSX.utils.aoa_to_sheet(data);
+        sheet['!cols'] = [{ wch: 15 }, ...feeTypes.map(() => ({ wch: 12 })), { wch: 12 }];
+        XLSX.utils.book_append_sheet(workbook, sheet, month);
+      });
+    } else {
+      // 导出选中月份
+      const monthData = statsData.monthlyStats.classStats[selectedMonth] || {};
+      const classes = Object.keys(monthData).sort();
+
+      if (classes.length === 0) {
+        toast.error('该月份暂无数据可导出');
+        return;
+      }
+
+      const data: (string | number)[][] = [
+        ['班级', ...feeTypeNames, '合计']
+      ];
+
+      classes.forEach((className) => {
+        const classData = monthData[className];
+        const row: (string | number)[] = [className];
+        feeTypes.forEach((type) => {
+          row.push(classData.payments[type]?.amount || 0);
+        });
+        row.push(classData.total);
+        data.push(row);
+      });
+
+      // 添加合计行
+      const totalRow: (string | number)[] = ['合计'];
+      feeTypes.forEach((type) => {
+        const typeTotal = classes.reduce((sum, c) => sum + (monthData[c].payments[type]?.amount || 0), 0);
+        totalRow.push(typeTotal);
+      });
+      totalRow.push(classes.reduce((sum, c) => sum + monthData[c].total, 0));
+      data.push(totalRow);
+
+      const sheet = XLSX.utils.aoa_to_sheet(data);
+      sheet['!cols'] = [{ wch: 15 }, ...feeTypes.map(() => ({ wch: 12 })), { wch: 12 }];
+      XLSX.utils.book_append_sheet(workbook, sheet, selectedMonth);
+    }
+
+    // 下载文件
+    const fileName = exportAll 
+      ? `月度各班级缴费统计_全部_${new Date().toISOString().split('T')[0]}.xlsx`
+      : `月度各班级缴费统计_${selectedMonth}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  }
 }
 
 export default function StatsPage() {

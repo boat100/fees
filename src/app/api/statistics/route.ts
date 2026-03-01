@@ -165,51 +165,71 @@ export async function GET() {
       agency_count: number;
     };
 
-    // 4. 月度缴费统计
-    // 注意：需要处理不同的日期格式（YYYY-MM-DD 和 YYYY/M/D）
-    const monthlyStats = db.prepare(`
-      SELECT 
+    // 4. 月度各班级缴费统计
+    // 先获取所有可用月份
+    const availableMonths = db.prepare(`
+      SELECT DISTINCT 
         CASE 
           WHEN payment_date LIKE '%/%' THEN 
             strftime('%Y-%m', date(payment_date))
           ELSE 
             strftime('%Y-%m', payment_date)
-        END as month,
-        fee_type,
-        SUM(amount) as total_amount,
-        COUNT(*) as payment_count
+        END as month
       FROM payment_records
       WHERE payment_date IS NOT NULL AND payment_date != ''
-      GROUP BY month, fee_type
+      ORDER BY month DESC
+    `).all() as Array<{ month: string }>;
+
+    // 获取月度各班级缴费统计
+    const monthlyClassStats = db.prepare(`
+      SELECT 
+        CASE 
+          WHEN pr.payment_date LIKE '%/%' THEN 
+            strftime('%Y-%m', date(pr.payment_date))
+          ELSE 
+            strftime('%Y-%m', pr.payment_date)
+        END as month,
+        sf.class_name,
+        pr.fee_type,
+        SUM(pr.amount) as total_amount,
+        COUNT(*) as payment_count
+      FROM payment_records pr
+      JOIN student_fees sf ON pr.student_id = sf.id
+      WHERE pr.payment_date IS NOT NULL AND pr.payment_date != ''
+      GROUP BY month, sf.class_name, pr.fee_type
       HAVING month IS NOT NULL
-      ORDER BY month DESC, fee_type
+      ORDER BY month DESC, sf.class_name, pr.fee_type
     `).all() as Array<{
       month: string;
+      class_name: string;
       fee_type: string;
       total_amount: number;
       payment_count: number;
     }>;
 
-    // 转换为按月份分组的格式
-    const monthlyData: Record<string, {
-      month: string;
+    // 转换为按月份->班级分组的格式
+    const monthlyClassData: Record<string, Record<string, {
+      class_name: string;
       payments: Record<string, { amount: number; count: number }>;
       total: number;
-    }> = {};
+    }>> = {};
 
-    monthlyStats.forEach(stat => {
-      if (!monthlyData[stat.month]) {
-        monthlyData[stat.month] = {
-          month: stat.month,
+    monthlyClassStats.forEach(stat => {
+      if (!monthlyClassData[stat.month]) {
+        monthlyClassData[stat.month] = {};
+      }
+      if (!monthlyClassData[stat.month][stat.class_name]) {
+        monthlyClassData[stat.month][stat.class_name] = {
+          class_name: stat.class_name,
           payments: {},
           total: 0,
         };
       }
-      monthlyData[stat.month].payments[stat.fee_type] = {
+      monthlyClassData[stat.month][stat.class_name].payments[stat.fee_type] = {
         amount: stat.total_amount,
         count: stat.payment_count,
       };
-      monthlyData[stat.month].total += stat.total_amount;
+      monthlyClassData[stat.month][stat.class_name].total += stat.total_amount;
     });
 
     // 费用类型映射
@@ -234,7 +254,10 @@ export async function GET() {
         club: projectStats.club_count || 0,
         agency: projectStats.agency_count || 0,
       },
-      monthlyStats: Object.values(monthlyData),
+      monthlyStats: {
+        availableMonths: availableMonths.map(m => m.month),
+        classStats: monthlyClassData,
+      },
       feeTypeMap,
     });
   } catch (error) {

@@ -24,6 +24,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { 
   ArrowLeft, 
   Plus, 
@@ -643,7 +649,25 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
               </div>
               <div>
                 <Label className="text-gray-500">备注</Label>
-                <div className="text-sm truncate">{student.remark || '-'}</div>
+                <div className="text-sm truncate max-w-[100px]">
+                  {student.remark ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-default block truncate">{student.remark}</span>
+                        </TooltipTrigger>
+                        <TooltipContent 
+                          className="max-w-[300px] whitespace-pre-wrap break-words"
+                          side="top"
+                        >
+                          {student.remark}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    <span>-</span>
+                  )}
+                </div>
               </div>
             </div>
           </CardContent>

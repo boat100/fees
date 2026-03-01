@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated, clearAuthToken, authFetch } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   DollarSign, 
   TrendingDown, 
@@ -96,16 +96,15 @@ export default function Home() {
 
   // 准备图表数据
   const chartData = stats ? [
-    { name: '应交收费', value: stats.totalFee },
-    { name: '已交收费', value: stats.totalPaid },
-    { name: '总支出', value: stats.totalExpense },
+    { name: '应交', value: stats.totalFee, fill: '#3b82f6' },
+    { name: '已交', value: stats.totalPaid, fill: '#22c55e' },
+    { name: '支出', value: stats.totalExpense, fill: '#ef4444' },
   ] : [];
 
   // 导航模块配置
   const modules = [
     {
       title: '收费管理',
-      description: '学生费用管理、班级费用统计、批量录入',
       icon: DollarSign,
       iconColor: 'text-green-600',
       iconBg: 'bg-green-100',
@@ -119,7 +118,6 @@ export default function Home() {
     },
     {
       title: '支出管理',
-      description: '日常公用支出、人员支出管理',
       icon: TrendingDown,
       iconColor: 'text-red-600',
       iconBg: 'bg-red-100',
@@ -133,7 +131,6 @@ export default function Home() {
     },
     {
       title: '后台管理',
-      description: '数据备份恢复、系统设置',
       icon: Settings,
       iconColor: 'text-purple-600',
       iconBg: 'bg-purple-100',
@@ -148,161 +145,138 @@ export default function Home() {
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      {/* 顶部导航栏 */}
+    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-blue-50 overflow-hidden">
+      {/* 顶部导航栏 - 固定高度 */}
       <header className="flex-shrink-0 bg-white/90 backdrop-blur-sm border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <School className="h-7 w-7 text-blue-600" />
+        <div className="max-w-7xl mx-auto px-4 lg:px-8 h-14 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <School className="h-6 w-6 text-blue-600" />
             <h1 className="text-lg font-bold text-gray-900">学校收支管理系统</h1>
           </div>
-          
           <Button
             onClick={handleLogout}
             variant="ghost"
             size="icon"
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 h-8 w-8"
             title="退出登录"
           >
-            <LogOut className="h-5 w-5" />
+            <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </header>
 
       {/* 主内容区域 - 自适应填充 */}
-      <main className="flex-1 min-h-0 max-w-7xl mx-auto w-full px-6 py-4 flex flex-col gap-4">
-        {/* 统计概览区域 - 左右布局 */}
-        <div className="flex-shrink-0 flex gap-4 h-48">
-          {/* 左侧：图表 */}
-          <Card className="flex-1 shadow-sm">
+      <main className="flex-1 overflow-auto min-h-0">
+        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 h-full flex flex-col gap-4">
+          
+          {/* 上部：收支概览 */}
+          <Card className="shadow-md flex-shrink-0">
             <CardHeader className="py-3 px-4">
               <CardTitle className="text-base flex items-center gap-2">
                 <Wallet className="h-4 w-4 text-blue-600" />
                 收支概览
               </CardTitle>
             </CardHeader>
-            <CardContent className="py-0 px-4 pb-3">
+            <CardContent className="py-2 px-4">
               {loading ? (
-                <div className="h-28 flex items-center justify-center text-gray-400 text-sm">
+                <div className="h-32 flex items-center justify-center text-gray-400 text-sm">
                   加载中...
                 </div>
               ) : stats ? (
-                <div className="flex h-28">
-                  <div className="flex-1">
+                <div className="flex flex-col lg:flex-row gap-4">
+                  {/* 图表区域 */}
+                  <div className="h-32 lg:h-36 lg:w-1/2 xl:w-3/5">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                      <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} />
+                        <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#374151' }} />
                         <YAxis 
-                          tickFormatter={(v) => formatAmount(v)} 
-                          tick={{ fontSize: 10, fill: '#9ca3af' }}
-                          width={45}
+                          tickFormatter={(value) => formatAmount(value)}
+                          tick={{ fontSize: 11, fill: '#6b7280' }}
+                          width={50}
                         />
                         <Tooltip 
-                          formatter={(v: number) => [`¥${v.toLocaleString()}`, '金额']}
-                          contentStyle={{ fontSize: 12, borderRadius: 6 }}
+                          formatter={(value: number) => [`¥${value.toLocaleString('zh-CN')}`, '金额']}
+                          contentStyle={{ borderRadius: '6px', fontSize: '12px' }}
                         />
                         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                          <Cell fill="#3b82f6" />
-                          <Cell fill="#22c55e" />
-                          <Cell fill="#ef4444" />
+                          {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
+                  
+                  {/* 统计数字 */}
+                  <div className="flex-1 grid grid-cols-3 lg:grid-cols-1 gap-2 lg:gap-3 content-center">
+                    <div className="text-center lg:text-left lg:flex lg:items-center lg:justify-between">
+                      <p className="text-xs text-gray-500">应交收费</p>
+                      <p className="text-sm lg:text-base font-bold text-blue-600">¥{formatAmount(stats.totalFee)}</p>
+                    </div>
+                    <div className="text-center lg:text-left lg:flex lg:items-center lg:justify-between">
+                      <p className="text-xs text-gray-500">已交收费</p>
+                      <p className="text-sm lg:text-base font-bold text-green-600">¥{formatAmount(stats.totalPaid)}</p>
+                    </div>
+                    <div className="text-center lg:text-left lg:flex lg:items-center lg:justify-between">
+                      <p className="text-xs text-gray-500">总支出</p>
+                      <p className="text-sm lg:text-base font-bold text-red-600">¥{formatAmount(stats.totalExpense)}</p>
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <div className="h-28 flex items-center justify-center text-gray-400 text-sm">
-                  暂无数据
+                <div className="h-32 flex flex-col items-center justify-center text-gray-400">
+                  <Wallet className="h-8 w-8 mb-2 opacity-50" />
+                  <p className="text-sm">暂无数据</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* 右侧：数字统计 */}
-          <Card className="w-72 shadow-sm">
-            <CardHeader className="py-3 px-4">
-              <CardTitle className="text-base">数据统计</CardTitle>
-            </CardHeader>
-            <CardContent className="py-0 px-4 pb-3">
-              {stats ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-blue-50 rounded-lg p-2.5 text-center">
-                    <p className="text-xs text-gray-500">应交收费</p>
-                    <p className="text-lg font-bold text-blue-600">¥{formatAmount(stats.totalFee)}</p>
-                  </div>
-                  <div className="bg-green-50 rounded-lg p-2.5 text-center">
-                    <p className="text-xs text-gray-500">已交收费</p>
-                    <p className="text-lg font-bold text-green-600">¥{formatAmount(stats.totalPaid)}</p>
-                  </div>
-                  <div className="bg-red-50 rounded-lg p-2.5 text-center">
-                    <p className="text-xs text-gray-500">总支出</p>
-                    <p className="text-lg font-bold text-red-600">¥{formatAmount(stats.totalExpense)}</p>
-                  </div>
-                  <div className="bg-purple-50 rounded-lg p-2.5 text-center">
-                    <p className="text-xs text-gray-500">欠费金额</p>
-                    <p className="text-lg font-bold text-orange-600">¥{formatAmount(stats.totalUnpaid)}</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="h-24 flex items-center justify-center text-gray-400 text-sm">
-                  加载中...
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* 功能模块卡片 */}
-        <div className="flex-1 grid grid-cols-3 gap-4 min-h-0">
-          {modules.map((module) => {
-            const Icon = module.icon;
-            return (
-              <Card
-                key={module.title}
-                className={`cursor-pointer transition-all duration-300 flex flex-col ${module.cardBorder} ${module.hoverShadow} hover:shadow-lg hover:-translate-y-0.5`}
-                onClick={() => router.push(module.href)}
-              >
-                <CardHeader className="py-4 px-4 flex-shrink-0">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-xl ${module.iconBg} flex items-center justify-center flex-shrink-0`}>
-                      <Icon className={`h-6 w-6 ${module.iconColor}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base flex items-center justify-between">
-                        <span>{module.title}</span>
-                        <ArrowRight className="h-4 w-4 text-gray-400" />
-                      </CardTitle>
-                      <CardDescription className="text-xs text-gray-500 mt-0.5 truncate">
-                        {module.description}
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="py-0 px-4 pb-4 flex-1 flex items-end">
-                  {module.stats.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2 w-full">
-                      {module.stats.map((stat, idx) => (
-                        <div key={idx} className="bg-gray-50 rounded-lg p-2 text-center">
-                          <p className="text-xs text-gray-400">{stat.label}</p>
-                          <p className={`text-sm font-semibold ${stat.color}`}>{stat.value}</p>
+          {/* 下部：功能模块 - 自适应填充 */}
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0">
+            {modules.map((module) => {
+              const Icon = module.icon;
+              return (
+                <Card
+                  key={module.title}
+                  className={`cursor-pointer transition-all duration-300 ${module.cardBorder} ${module.hoverShadow} hover:shadow-lg hover:-translate-y-0.5 flex flex-col`}
+                  onClick={() => router.push(module.href)}
+                >
+                  <CardHeader className="py-3 px-4 flex-shrink-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg ${module.iconBg} flex items-center justify-center`}>
+                          <Icon className={`h-5 w-5 ${module.iconColor}`} />
                         </div>
-                      ))}
+                        <CardTitle className="text-base">{module.title}</CardTitle>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-gray-400" />
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+                  </CardHeader>
+                  <CardContent className="py-2 px-4 flex-1 flex items-end">
+                    {module.stats.length > 0 && (
+                      <div className="grid grid-cols-2 gap-3 w-full">
+                        {module.stats.map((stat, idx) => (
+                          <div key={idx} className="text-center">
+                            <p className="text-xs text-gray-400">{stat.label}</p>
+                            <p className={`text-sm font-semibold ${stat.color}`}>{stat.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* 底部信息 - 固定高度 */}
+          <footer className="flex-shrink-0 text-center text-xs text-gray-400 py-2">
+            学校收支管理系统 · 数据本地存储
+          </footer>
         </div>
       </main>
-
-      {/* 底部信息 */}
-      <footer className="flex-shrink-0 py-2 border-t border-gray-100 bg-white/50">
-        <div className="max-w-7xl mx-auto px-6 text-center text-xs text-gray-400">
-          学校收支管理系统 · 安全可靠 · 数据本地存储
-        </div>
-      </footer>
     </div>
   );
 }

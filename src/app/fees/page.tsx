@@ -7,6 +7,7 @@ import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -54,7 +55,9 @@ import {
   Download,
   ArrowLeft,
   BarChart3,
-  Upload
+  Upload,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { FEE_ITEMS } from '@/lib/constants';
 
@@ -123,10 +126,15 @@ function FeesContent() {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   
+  // 多选模式状态
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  
   // 对话框状态
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [batchPaymentDialogOpen, setBatchPaymentDialogOpen] = useState(false);
+  const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentFee | null>(null);
   
   // 批量录入状态
@@ -509,6 +517,65 @@ function FeesContent() {
       // 回滚
       setStudents(previousStudents);
       toast.error('删除失败，请重试', { id: 'delete-student' });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // 批量删除学生
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return;
+    
+    setDeleting(true);
+    
+    // 乐观更新：先从本地移除
+    const previousStudents = [...students];
+    const idsArray = Array.from(selectedIds);
+    const newStudentsList = students.filter(s => !selectedIds.has(s.id));
+    setStudents(newStudentsList);
+    setBatchDeleteDialogOpen(false);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    
+    toast.loading(`正在删除 ${idsArray.length} 名学生...`, { id: 'batch-delete-student' });
+    
+    try {
+      // 批量调用删除API
+      const deletePromises = idsArray.map(id => 
+        authFetch(`/api/student-fees/${id}`, {
+          method: 'DELETE',
+        })
+      );
+      
+      const responses = await Promise.all(deletePromises);
+      const failedCount = responses.filter(r => !r.ok).length;
+      
+      if (failedCount === 0) {
+        toast.success(`成功删除 ${idsArray.length} 名学生`, { id: 'batch-delete-student' });
+        
+        // 检查当前班级是否还有学生
+        if (newStudentsList.length === 0) {
+          const newClasses = classes.filter(c => c !== selectedClass);
+          setClasses(newClasses);
+          
+          if (newClasses.length > 0) {
+            setSelectedClass(newClasses[0]);
+          } else {
+            setSelectedClass('');
+          }
+          
+          toast.info(`${selectedClass} 班级已无学生，已自动移除`, { duration: 3000 });
+        }
+      } else {
+        // 部分失败，刷新列表
+        toast.error(`删除失败 ${failedCount} 条，请重试`, { id: 'batch-delete-student' });
+        fetchStudents();
+      }
+    } catch (error) {
+      console.error('Failed to batch delete students:', error);
+      // 回滚
+      setStudents(previousStudents);
+      toast.error('批量删除失败，请重试', { id: 'batch-delete-student' });
     } finally {
       setDeleting(false);
     }
@@ -999,12 +1066,64 @@ function FeesContent() {
                     )}
                     导出代办费明细
                   </Button>
+                  
+                  {/* 多选模式按钮 */}
+                  <Button
+                    onClick={() => {
+                      setSelectMode(!selectMode);
+                      setSelectedIds(new Set());
+                    }}
+                    variant={selectMode ? "default" : "outline"}
+                    className={selectMode ? "bg-blue-600 hover:bg-blue-700" : "border-blue-600 text-blue-600 hover:bg-blue-50"}
+                  >
+                    <CheckSquare className="h-4 w-4 mr-2" />
+                    {selectMode ? '取消多选' : '多选'}
+                  </Button>
+                </>
+              )}
+              
+              {/* 多选模式下的批量操作按钮 */}
+              {selectMode && selectedIds.size > 0 && (
+                <>
+                  <Button
+                    onClick={() => {
+                      const selectedStudents = students.filter(s => selectedIds.has(s.id));
+                      setBatchPaymentData({
+                        selectedStudents: Array.from(selectedIds),
+                        payments: [
+                          { feeType: 'tuition', amount: 0 },
+                          { feeType: 'lunch', amount: 0 },
+                          { feeType: 'nap', amount: 0 },
+                          { feeType: 'after_school', amount: 0 },
+                          { feeType: 'club', amount: 0 },
+                        ],
+                        paymentDate: getTodayString(),
+                        remark: '',
+                      });
+                      setBatchPaymentDialogOpen(true);
+                    }}
+                    variant="outline"
+                    className="border-orange-600 text-orange-600 hover:bg-orange-50"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    批量录入 ({selectedIds.size})
+                  </Button>
+                  <Button
+                    onClick={() => setBatchDeleteDialogOpen(true)}
+                    variant="destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    批量删除 ({selectedIds.size})
+                  </Button>
                 </>
               )}
               
               {selectedClass && (
                 <div className="text-sm text-gray-500">
                   共 <span className="font-semibold text-gray-900">{students.length}</span> 名学生
+                  {selectMode && selectedIds.size > 0 && (
+                    <span className="ml-2 text-blue-600">已选 {selectedIds.size} 人</span>
+                  )}
                 </div>
               )}
             </div>
@@ -1038,6 +1157,20 @@ function FeesContent() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50">
+                      {selectMode && (
+                        <TableHead className="font-semibold w-12">
+                          <Checkbox
+                            checked={students.length > 0 && selectedIds.size === students.length}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedIds(new Set(students.map(s => s.id)));
+                              } else {
+                                setSelectedIds(new Set());
+                              }
+                            }}
+                          />
+                        </TableHead>
+                      )}
                       <TableHead className="font-semibold">序号</TableHead>
                       <TableHead className="font-semibold">姓名</TableHead>
                       <TableHead className="font-semibold text-center">性别</TableHead>
@@ -1050,7 +1183,6 @@ function FeesContent() {
                       <TableHead className="font-semibold text-right">代办费<br/><span className="font-normal text-xs text-gray-400">应交/已交/剩余</span></TableHead>
                       <TableHead className="font-semibold text-right">合计<br/><span className="font-normal text-xs text-gray-400">应交/已交</span></TableHead>
                       <TableHead className="font-semibold">备注</TableHead>
-                      <TableHead className="font-semibold text-right">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1058,6 +1190,22 @@ function FeesContent() {
                       const { totalFee, totalPaid } = calculateStudentTotals(student);
                       return (
                         <TableRow key={student.id} className="hover:bg-gray-50">
+                          {selectMode && (
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedIds.has(student.id)}
+                                onCheckedChange={(checked) => {
+                                  const newSet = new Set(selectedIds);
+                                  if (checked) {
+                                    newSet.add(student.id);
+                                  } else {
+                                    newSet.delete(student.id);
+                                  }
+                                  setSelectedIds(newSet);
+                                }}
+                              />
+                            </TableCell>
+                          )}
                           <TableCell>{index + 1}</TableCell>
                           <TableCell>
                             <button
@@ -1090,30 +1238,12 @@ function FeesContent() {
                             </div>
                           </TableCell>
                           <TableCell className="max-w-[100px] truncate">{student.remark || '-'}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                onClick={() => handleEditStudent(student)}
-                                variant="outline"
-                                size="sm"
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                onClick={() => handleDeleteConfirm(student)}
-                                variant="destructive"
-                                size="sm"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
                         </TableRow>
                       );
                     })}
                     {/* 合计行 */}
                     <TableRow className="bg-blue-50 font-semibold">
-                      <TableCell colSpan={4} className="text-center">合计</TableCell>
+                      <TableCell colSpan={selectMode ? 5 : 4} className="text-center">合计</TableCell>
                       <TableCell className="text-right">
                         <div>{totals.tuition_fee.toFixed(0)}/{totals.tuition_paid.toFixed(0)}</div>
                       </TableCell>
@@ -1135,7 +1265,7 @@ function FeesContent() {
                       <TableCell className="text-right text-lg text-blue-700">
                         {totals.total_fee.toFixed(0)}/{totals.total_paid.toFixed(0)}
                       </TableCell>
-                      <TableCell colSpan={2}></TableCell>
+                      <TableCell colSpan={1}></TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -1312,6 +1442,28 @@ function FeesContent() {
               className="bg-red-600 hover:bg-red-700"
             >
               {deleting ? '删除中...' : '删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 批量删除确认对话框 */}
+      <AlertDialog open={batchDeleteDialogOpen} onOpenChange={setBatchDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认批量删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除选中的 <span className="font-bold text-red-600">{selectedIds.size}</span> 名学生的费用记录吗？此操作将同时删除所有相关交费记录，且无法撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBatchDelete}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? '删除中...' : '确认删除'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

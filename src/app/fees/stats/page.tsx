@@ -99,7 +99,7 @@ function StatsContent() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [statsData, setStatsData] = useState<StatsData | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
 
   // 检查登录状态
   useEffect(() => {
@@ -115,6 +115,10 @@ function StatsContent() {
       const response = await authFetch('/api/statistics');
       const result = await response.json();
       setStatsData(result);
+      // 默认选择第一个月份，提升响应速度
+      if (result?.monthlyStats?.availableMonths?.length > 0) {
+        setSelectedMonth(result.monthlyStats.availableMonths[0]);
+      }
     } catch (error) {
       console.error('Failed to fetch statistics:', error);
       toast.error('获取统计数据失败');
@@ -408,19 +412,19 @@ function StatsContent() {
                       </SelectContent>
                     </Select>
                     <Button
-                      onClick={() => handleExportMonthlyStats(selectedMonth === 'all')}
+                      onClick={() => handleExportMonthlyStats(selectedMonth === 'all' || selectedMonth === '')}
                       variant="outline"
                       size="sm"
                       disabled={Object.keys(statsData.monthlyStats.classStats).length === 0}
                     >
                       <Download className="h-4 w-4 mr-1" />
-                      导出{selectedMonth === 'all' ? '全部' : selectedMonth || ''}
+                      导出{selectedMonth === 'all' || selectedMonth === '' ? '全部' : selectedMonth}
                     </Button>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {selectedMonth === 'all' ? (
+                {selectedMonth === 'all' || selectedMonth === '' ? (
                   // 显示全部月份汇总
                   <div className="border rounded-lg overflow-hidden">
                     <Table>

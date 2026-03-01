@@ -26,6 +26,9 @@ export async function DELETE() {
     
     transaction();
     
+    // 执行 VACUUM 回收磁盘空间
+    db.exec('VACUUM');
+    
     return NextResponse.json({ 
       success: true,
       message: '所有数据已清空（包含收费和支出数据）'

@@ -166,14 +166,22 @@ export async function GET() {
     };
 
     // 4. 月度缴费统计
+    // 注意：需要处理不同的日期格式（YYYY-MM-DD 和 YYYY/M/D）
     const monthlyStats = db.prepare(`
       SELECT 
-        strftime('%Y-%m', payment_date) as month,
+        CASE 
+          WHEN payment_date LIKE '%/%' THEN 
+            strftime('%Y-%m', date(payment_date))
+          ELSE 
+            strftime('%Y-%m', payment_date)
+        END as month,
         fee_type,
         SUM(amount) as total_amount,
         COUNT(*) as payment_count
       FROM payment_records
-      GROUP BY strftime('%Y-%m', payment_date), fee_type
+      WHERE payment_date IS NOT NULL AND payment_date != ''
+      GROUP BY month, fee_type
+      HAVING month IS NOT NULL
       ORDER BY month DESC, fee_type
     `).all() as Array<{
       month: string;

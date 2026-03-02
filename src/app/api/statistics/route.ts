@@ -172,8 +172,8 @@ export async function GET() {
         const gradePart = match[1]; // "一年"、"二年" 等
         const classNum = parseInt(match[2], 10); // 班级号
         
-        // 从年级部分提取年级数字（取最后一个字符）
-        const gradeChar = gradePart.slice(-1); // "年"前面的字符
+        // 从年级部分提取年级数字（取第一个字符，如"一"、"二"）
+        const gradeChar = gradePart.charAt(0); // "年"前面的字符（第一个）
         const gradeNum = gradeOrder[gradeChar] || 99;
         
         return { gradeNum, classNum };

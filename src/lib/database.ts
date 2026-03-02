@@ -345,6 +345,16 @@ export function initDatabase() {
     console.log(`Migrated ${studentsWithoutAgencyPaymentRecords.length} agency payment records`);
   }
 
+  // 迁移旧支出记录的类别字段（从 'daily'/'personnel' 更新为完整名称）
+  const oldCategoryRecords = db.prepare(`SELECT COUNT(*) as count FROM expense_records WHERE category IN ('daily', 'personnel')`).get() as { count: number };
+  
+  if (oldCategoryRecords.count > 0) {
+    console.log('Migrating old expense category values...');
+    db.exec(`UPDATE expense_records SET category = '日常公用支出' WHERE category = 'daily'`);
+    db.exec(`UPDATE expense_records SET category = '人员支出' WHERE category = 'personnel'`);
+    console.log(`Migrated ${oldCategoryRecords.count} expense records with old category values`);
+  }
+
   // 初始化支出类别和子项目（如果表为空）
   const categoryCount = db.prepare('SELECT COUNT(*) as count FROM expense_categories').get() as { count: number };
   

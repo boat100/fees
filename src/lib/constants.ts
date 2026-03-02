@@ -1,4 +1,4 @@
-// 费用类型映射（默认值，可从API动态获取）
+// 费用类型映射
 export const FEE_TYPE_MAP: Record<string, string> = {
   tuition: '学费',
   lunch: '午餐费',
@@ -18,7 +18,7 @@ export const FEE_TYPE_REVERSE_MAP: Record<string, string> = {
   '代办费': 'agency',
 };
 
-// 费用项目定义（默认值，可从API动态获取）
+// 费用项目定义
 export const FEE_ITEMS = [
   { key: 'tuition', label: '学费', field: 'tuition_fee' },
   { key: 'lunch', label: '午餐费', field: 'lunch_fee' },
@@ -27,31 +27,6 @@ export const FEE_ITEMS = [
   { key: 'club', label: '社团费', field: 'club_fee' },
   { key: 'agency', label: '代办费', field: 'agency_fee' },
 ] as const;
-
-// 费用项目接口
-export interface FeeItem {
-  key: string;
-  label: string;
-  sort_order?: number;
-}
-
-// 从API获取的费用项目格式
-export interface FeeItemFromAPI {
-  id: number;
-  key: string;
-  name: string;
-  sort_order: number;
-  is_active: number;
-}
-
-// 将API返回的费用项目转换为前端格式
-export function convertFeeItemsFromAPI(items: FeeItemFromAPI[]): FeeItem[] {
-  return items.map(item => ({
-    key: item.key,
-    label: item.name,
-    sort_order: item.sort_order,
-  }));
-}
 
 // 代办费扣除项目类型
 export const AGENCY_FEE_ITEM_TYPES: Record<string, string> = {

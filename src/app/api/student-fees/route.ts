@@ -118,26 +118,8 @@ export async function GET(request: NextRequest) {
       updated_at: string | null;
     }>;
     
-    // 获取所有收费项目
-    const feeItems = db.prepare(`
-      SELECT key, name FROM fee_items WHERE is_active = 1 ORDER BY sort_order
-    `).all() as Array<{ key: string; name: string }>;
-    
-    // 获取每个学生的费用值和已交费汇总
+    // 获取每个学生的已交费汇总和代办费余额
     const studentsWithPayments = students.map(student => {
-      // 获取学生的各项费用应交金额（从student_fee_values表）
-      const feeValues = db.prepare(`
-        SELECT fee_item_key, expected_amount
-        FROM student_fee_values
-        WHERE student_id = ?
-      `).all(student.id) as Array<{ fee_item_key: string; expected_amount: number }>;
-      
-      const feeValueMap: Record<string, number> = {};
-      feeValues.forEach(fv => {
-        feeValueMap[fv.fee_item_key] = fv.expected_amount;
-      });
-      
-      // 获取已交费汇总
       const payments = db.prepare(`
         SELECT fee_type, SUM(amount) as total_paid
         FROM payment_records
@@ -155,41 +137,22 @@ export async function GET(request: NextRequest) {
         SELECT COALESCE(SUM(amount), 0) as total FROM agency_fee_items WHERE student_id = ?
       `).get(student.id) as { total: number };
       
-      // 构建动态费用对象
-      const feeValuesDynamic: Record<string, number> = {};
-      const feePaidDynamic: Record<string, number> = {};
-      
-      // 优先使用新表数据，如果没有则使用旧字段（兼容迁移）
-      for (const item of feeItems) {
-        // 应交金额：优先新表，其次旧字段
-        if (feeValueMap[item.key] !== undefined) {
-          feeValuesDynamic[item.key] = feeValueMap[item.key];
-        } else {
-          // 兼容旧字段
-          const oldField = `${item.key}_fee` as keyof typeof student;
-          feeValuesDynamic[item.key] = (student[oldField] as number) || 0;
-        }
-        
-        // 已交金额
-        feePaidDynamic[item.key] = paymentMap[item.key] || 0;
-      }
-      
-      // agency_paid 和 agency_balance 特殊处理
-      const agencyPaid = student.agency_paid ?? feeValuesDynamic['agency'] ?? 600;
+      // agency_balance = agency_paid - 已扣除
+      const agencyPaid = student.agency_paid ?? student.agency_fee ?? 600;
       
       return {
         ...student,
-        feeValues: feeValuesDynamic,
-        feePaid: feePaidDynamic,
+        tuition_paid: paymentMap['tuition'] || 0,
+        lunch_paid: paymentMap['lunch'] || 0,
+        nap_paid: paymentMap['nap'] || 0,
+        after_school_paid: paymentMap['after_school'] || 0,
+        club_paid: paymentMap['club'] || 0,
         agency_paid: agencyPaid,
-        agency_balance: agencyPaid - agencyUsed.total,
+        agency_balance: agencyPaid - agencyUsed.total, // 剩余 = 已交 - 已扣除
       };
     });
     
-    return NextResponse.json({ 
-      data: studentsWithPayments,
-      feeItems: feeItems
-    });
+    return NextResponse.json({ data: studentsWithPayments });
   } catch (error) {
     console.error('Error fetching data:', error);
     return NextResponse.json(
@@ -207,8 +170,13 @@ export async function POST(request: NextRequest) {
       className,
       studentName,
       gender = '男',
+      tuitionFee = 0,
+      lunchFee = 0,
+      napFee = 0,
+      afterSchoolFee = 0,
+      clubFee = 0,
+      agencyFee = 600, // 默认代办费600元
       remark = null,
-      feeValues, // 新格式：动态费用项目 { tuition: 1000, lunch: 500, ... }
     } = body;
     
     // 验证必填字段
@@ -219,40 +187,12 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // 获取所有收费项目
-    const feeItems = db.prepare(`
-      SELECT key, name FROM fee_items WHERE is_active = 1 ORDER BY sort_order
-    `).all() as Array<{ key: string; name: string }>;
-    
-    // 兼容旧格式：从单独字段获取费用值
-    const legacyFeeValues: Record<string, number> = {
-      tuition: body.tuitionFee ?? 0,
-      lunch: body.lunchFee ?? 0,
-      nap: body.napFee ?? 0,
-      after_school: body.afterSchoolFee ?? 0,
-      club: body.clubFee ?? 0,
-      agency: body.agencyFee ?? 600,
-    };
-    
-    // 合并费用值（新格式优先）
-    const finalFeeValues: Record<string, number> = {};
-    for (const item of feeItems) {
-      if (feeValues && feeValues[item.key] !== undefined) {
-        finalFeeValues[item.key] = feeValues[item.key];
-      } else if (legacyFeeValues[item.key] !== undefined) {
-        finalFeeValues[item.key] = legacyFeeValues[item.key];
-      } else {
-        finalFeeValues[item.key] = item.key === 'agency' ? 600 : 0;
-      }
-    }
-    
-    // 根据午餐费或午托费自动判断午托状态
-    const napStatus = (finalFeeValues['lunch'] > 0 || finalFeeValues['nap'] > 0) ? '午托' : '走读';
+    // 根据午托费自动判断午托状态
+    const napStatus = napFee > 0 ? '午托' : '走读';
     
     // agencyPaid 默认等于 agencyFee（视为一次性收齐）
-    const agencyPaidValue = body.agencyPaid ?? finalFeeValues['agency'] ?? 600;
+    const agencyPaidValue = body.agencyPaid ?? agencyFee;
     
-    // 插入学生记录（保持旧字段兼容性）
     const stmt = db.prepare(`
       INSERT INTO student_fees 
       (class_name, student_name, gender, nap_status, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, agency_fee, agency_paid, remark)
@@ -264,35 +204,19 @@ export async function POST(request: NextRequest) {
       studentName,
       gender,
       napStatus,
-      finalFeeValues['tuition'] ?? 0,
-      finalFeeValues['lunch'] ?? 0,
-      finalFeeValues['nap'] ?? 0,
-      finalFeeValues['after_school'] ?? 0,
-      finalFeeValues['club'] ?? 0,
-      finalFeeValues['agency'] ?? 600,
+      tuitionFee,
+      lunchFee,
+      napFee,
+      afterSchoolFee,
+      clubFee,
+      agencyFee,
       agencyPaidValue,
       remark
     );
     
-    const studentId = result.lastInsertRowid as number;
+    const newStudent = db.prepare('SELECT * FROM student_fees WHERE id = ?').get(result.lastInsertRowid);
     
-    // 插入费用值到新表
-    const insertFeeValue = db.prepare(
-      'INSERT OR REPLACE INTO student_fee_values (student_id, fee_item_key, expected_amount) VALUES (?, ?, ?)'
-    );
-    
-    for (const [key, value] of Object.entries(finalFeeValues)) {
-      if (value > 0) {
-        insertFeeValue.run(studentId, key, value);
-      }
-    }
-    
-    const newStudent = db.prepare('SELECT * FROM student_fees WHERE id = ?').get(studentId);
-    
-    return NextResponse.json({ 
-      data: newStudent,
-      feeValues: finalFeeValues
-    }, { status: 201 });
+    return NextResponse.json({ data: newStudent }, { status: 201 });
   } catch (error: unknown) {
     console.error('Error creating student fee:', error);
     return NextResponse.json(
@@ -302,7 +226,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - 批量导入数据（覆盖重复学生，支持已交费用和动态费用项目）
+// PUT - 批量导入数据（覆盖重复学生，支持已交费用）
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
@@ -315,33 +239,27 @@ export async function PUT(request: NextRequest) {
       );
     }
     
-    // 获取所有收费项目
-    const feeItems = db.prepare(`
-      SELECT key, name FROM fee_items WHERE is_active = 1 ORDER BY sort_order
-    `).all() as Array<{ key: string; name: string }>;
-    
-    // 构建费用字段映射（用于兼容旧格式）
-    const feeFieldMap: Record<string, string> = {
-      tuition: 'tuitionFee',
-      lunch: 'lunchFee',
-      nap: 'napFee',
-      after_school: 'afterSchoolFee',
-      club: 'clubFee',
-      agency: 'agencyFee',
-    };
-    
     // 验证并处理每条记录
-    interface ValidRecord {
+    const validRecords: Array<{
       className: string;
       studentName: string;
       gender: string;
-      feeValues: Record<string, number>;
-      feePaid: Record<string, number>;
+      tuitionFee: number;
+      tuitionPaid: number;
+      lunchFee: number;
+      lunchPaid: number;
+      napFee: number;
+      napPaid: number;
+      afterSchoolFee: number;
+      afterSchoolPaid: number;
+      clubFee: number;
+      clubPaid: number;
+      agencyFee: number;
+      agencyPaid: number;
       paymentDate: string;
       remark: string;
-    }
+    }> = [];
     
-    const validRecords: ValidRecord[] = [];
     const errors: Array<{ row: number; error: string }> = [];
     
     // 日期格式验证正则
@@ -372,38 +290,50 @@ export async function PUT(request: NextRequest) {
         continue;
       }
       
-      // 验证各项金额（动态）
-      const feeValues: Record<string, number> = {};
-      const feePaid: Record<string, number> = {};
-      let hasInvalidAmount = false;
-      const invalidFields: string[] = [];
+      // 验证各项金额（必须为非负数）
+      const validateAmount = (value: unknown, fieldName: string): number => {
+        const num = Number(value);
+        if (isNaN(num) || num < 0) {
+          return -1; // 标记为无效
+        }
+        return num;
+      };
       
-      for (const item of feeItems) {
-        // 尝试多种字段名格式
-        const fieldName = feeFieldMap[item.key] || item.key;
-        
-        // 应交金额
-        const expectedValue = student[`${fieldName}`] ?? student[`fee_${item.key}`] ?? student[item.key] ?? 0;
-        const expectedNum = Number(expectedValue);
-        if (isNaN(expectedNum) || expectedNum < 0) {
-          hasInvalidAmount = true;
-          invalidFields.push(`${item.name}应交`);
-        } else {
-          feeValues[item.key] = expectedNum;
-        }
-        
-        // 已交金额
-        const paidValue = student[`${fieldName}Paid`] ?? student[`${item.key}Paid`] ?? student[`paid_${item.key}`] ?? 0;
-        const paidNum = Number(paidValue);
-        if (isNaN(paidNum) || paidNum < 0) {
-          hasInvalidAmount = true;
-          invalidFields.push(`${item.name}已交`);
-        } else {
-          feePaid[item.key] = paidNum;
-        }
+      const tuitionFee = validateAmount(student.tuitionFee, '学费应交');
+      const lunchFee = validateAmount(student.lunchFee, '午餐费应交');
+      const napFee = validateAmount(student.napFee, '午托费应交');
+      const afterSchoolFee = validateAmount(student.afterSchoolFee, '课后服务费应交');
+      const clubFee = validateAmount(student.clubFee, '社团费应交');
+      const agencyFee = validateAmount(student.agencyFee, '代办费应交');
+      
+      if (tuitionFee < 0 || lunchFee < 0 || napFee < 0 || afterSchoolFee < 0 || clubFee < 0 || agencyFee < 0) {
+        const invalidFields: string[] = [];
+        if (tuitionFee < 0) invalidFields.push('学费应交');
+        if (lunchFee < 0) invalidFields.push('午餐费应交');
+        if (napFee < 0) invalidFields.push('午托费应交');
+        if (afterSchoolFee < 0) invalidFields.push('课后服务费应交');
+        if (clubFee < 0) invalidFields.push('社团费应交');
+        if (agencyFee < 0) invalidFields.push('代办费应交');
+        errors.push({ row: rowNum, error: `${invalidFields.join('、')}金额无效，必须为非负数` });
+        continue;
       }
       
-      if (hasInvalidAmount) {
+      // 验证已交金额（必须为非负数）
+      const tuitionPaid = validateAmount(student.tuitionPaid, '学费已交');
+      const lunchPaid = validateAmount(student.lunchPaid, '午餐费已交');
+      const napPaid = validateAmount(student.napPaid, '午托费已交');
+      const afterSchoolPaid = validateAmount(student.afterSchoolPaid, '课后服务费已交');
+      const clubPaid = validateAmount(student.clubPaid, '社团费已交');
+      const agencyPaid = validateAmount(student.agencyPaid, '代办费已交');
+      
+      if (tuitionPaid < 0 || lunchPaid < 0 || napPaid < 0 || afterSchoolPaid < 0 || clubPaid < 0 || agencyPaid < 0) {
+        const invalidFields: string[] = [];
+        if (tuitionPaid < 0) invalidFields.push('学费已交');
+        if (lunchPaid < 0) invalidFields.push('午餐费已交');
+        if (napPaid < 0) invalidFields.push('午托费已交');
+        if (afterSchoolPaid < 0) invalidFields.push('课后服务费已交');
+        if (clubPaid < 0) invalidFields.push('社团费已交');
+        if (agencyPaid < 0) invalidFields.push('代办费已交');
         errors.push({ row: rowNum, error: `${invalidFields.join('、')}金额无效，必须为非负数` });
         continue;
       }
@@ -420,8 +350,18 @@ export async function PUT(request: NextRequest) {
         className,
         studentName,
         gender,
-        feeValues,
-        feePaid,
+        tuitionFee,
+        tuitionPaid,
+        lunchFee,
+        lunchPaid,
+        napFee,
+        napPaid,
+        afterSchoolFee,
+        afterSchoolPaid,
+        clubFee,
+        clubPaid,
+        agencyFee,
+        agencyPaid,
         paymentDate: paymentDate || new Date().toISOString().split('T')[0],
         remark: String(student.remark || '').trim(),
       });
@@ -465,15 +405,10 @@ export async function PUT(request: NextRequest) {
       DELETE FROM payment_records WHERE student_id = ?
     `);
     
-    const insertFeeValueStmt = db.prepare(`
-      INSERT OR REPLACE INTO student_fee_values (student_id, fee_item_key, expected_amount)
-      VALUES (?, ?, ?)
-    `);
-    
-    const importMany = db.transaction((students: ValidRecord[]) => {
+    const importMany = db.transaction((students: typeof validRecords) => {
       for (const student of students) {        
         // 根据午餐费或午托费自动判断午托状态
-        const napStatus = (student.feeValues['lunch'] > 0 || student.feeValues['nap'] > 0) ? '午托' : '走读';
+        const napStatus = (student.lunchFee > 0 || student.napFee > 0) ? '午托' : '走读';
         
         // 检查学生是否已存在
         const existing = db.prepare(
@@ -487,13 +422,13 @@ export async function PUT(request: NextRequest) {
           updateStmt.run(
             student.gender,
             napStatus,
-            student.feeValues['tuition'] ?? 0,
-            student.feeValues['lunch'] ?? 0,
-            student.feeValues['nap'] ?? 0,
-            student.feeValues['after_school'] ?? 0,
-            student.feeValues['club'] ?? 0,
-            student.feeValues['agency'] ?? 600,
-            student.feePaid['agency'] ?? student.feeValues['agency'] ?? 600,
+            student.tuitionFee,
+            student.lunchFee,
+            student.napFee,
+            student.afterSchoolFee,
+            student.clubFee,
+            student.agencyFee,
+            student.agencyPaid,
             student.className,
             student.studentName
           );
@@ -506,39 +441,59 @@ export async function PUT(request: NextRequest) {
             student.studentName,
             student.gender,
             napStatus,
-            student.feeValues['tuition'] ?? 0,
-            student.feeValues['lunch'] ?? 0,
-            student.feeValues['nap'] ?? 0,
-            student.feeValues['after_school'] ?? 0,
-            student.feeValues['club'] ?? 0,
-            student.feeValues['agency'] ?? 600,
-            student.feePaid['agency'] ?? student.feeValues['agency'] ?? 600,
-            null
+            student.tuitionFee,
+            student.lunchFee,
+            student.napFee,
+            student.afterSchoolFee,
+            student.clubFee,
+            student.agencyFee,
+            student.agencyPaid,
+            null  // 备注不存入费用明细，只用于缴费记录
           );
           studentId = result.lastInsertRowid as number;
           insertCount++;
         }
         
-        // 更新费用值到新表
-        for (const [key, value] of Object.entries(student.feeValues)) {
-          insertFeeValueStmt.run(studentId, key, value);
-        }
-        
         // 处理已交费用（如果有任何已交金额）
-        const hasPaidAmounts = Object.values(student.feePaid).some(v => v > 0);
+        const hasPaidAmounts = 
+          student.tuitionPaid > 0 ||
+          student.lunchPaid > 0 ||
+          student.napPaid > 0 ||
+          student.afterSchoolPaid > 0 ||
+          student.clubPaid > 0 ||
+          student.agencyPaid > 0;
         
         if (hasPaidAmounts) {
           // 删除该学生之前的所有交费记录
           deletePaymentsStmt.run(studentId);
           
           const paymentDate = student.paymentDate;
+          // 使用导入的备注，如果没有则为空
           const paymentRemark = student.remark || null;
           
-          for (const [feeType, amount] of Object.entries(student.feePaid)) {
-            if (amount > 0) {
-              insertPaymentStmt.run(studentId, feeType, amount, paymentDate, paymentRemark);
-              paymentCount++;
-            }
+          if (student.tuitionPaid > 0) {
+            insertPaymentStmt.run(studentId, 'tuition', student.tuitionPaid, paymentDate, paymentRemark);
+            paymentCount++;
+          }
+          if (student.lunchPaid > 0) {
+            insertPaymentStmt.run(studentId, 'lunch', student.lunchPaid, paymentDate, paymentRemark);
+            paymentCount++;
+          }
+          if (student.napPaid > 0) {
+            insertPaymentStmt.run(studentId, 'nap', student.napPaid, paymentDate, paymentRemark);
+            paymentCount++;
+          }
+          if (student.afterSchoolPaid > 0) {
+            insertPaymentStmt.run(studentId, 'after_school', student.afterSchoolPaid, paymentDate, paymentRemark);
+            paymentCount++;
+          }
+          if (student.clubPaid > 0) {
+            insertPaymentStmt.run(studentId, 'club', student.clubPaid, paymentDate, paymentRemark);
+            paymentCount++;
+          }
+          if (student.agencyPaid > 0) {
+            insertPaymentStmt.run(studentId, 'agency', student.agencyPaid, paymentDate, paymentRemark);
+            paymentCount++;
           }
         }
       }

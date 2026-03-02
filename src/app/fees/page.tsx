@@ -60,15 +60,6 @@ import {
   Square
 } from 'lucide-react';
 
-// 收费项目类型
-interface FeeItem {
-  id: number;
-  key: string;
-  name: string;
-  sort_order: number;
-  is_active: number;
-}
-
 // 类型定义
 interface StudentFee {
   id: number;
@@ -92,9 +83,6 @@ interface StudentFee {
   remark: string | null;
   created_at: string;
   updated_at: string | null;
-  // 动态费用值
-  feeValues?: Record<string, number>;
-  feePaid?: Record<string, number>;
 }
 
 interface FeeTotals {
@@ -193,24 +181,8 @@ function FeesContent() {
     errors?: Array<{ row: number; error: string }>;
   } | null>(null);
   
-  // 动态收费项目
-  const [feeItems, setFeeItems] = useState<FeeItem[]>([]);
-  
   // 表单数据
-  const [formData, setFormData] = useState<{
-    className: string;
-    studentName: string;
-    gender: string;
-    tuitionFee: number;
-    lunchFee: number;
-    napFee: number;
-    afterSchoolFee: number;
-    clubFee: number;
-    agencyFee: number;
-    agencyPaid: number;
-    remark: string;
-    feeValues: Record<string, number>;
-  }>({
+  const [formData, setFormData] = useState({
     className: '',
     studentName: '',
     gender: '男',
@@ -222,7 +194,6 @@ function FeesContent() {
     agencyFee: 600,
     agencyPaid: 600,
     remark: '',
-    feeValues: {},
   });
   
   // 表单校验警告
@@ -254,19 +225,6 @@ function FeesContent() {
     }
   };
 
-  // 获取收费项目列表
-  const fetchFeeItems = async () => {
-    try {
-      const response = await authFetch('/api/fee-items');
-      const result = await response.json();
-      if (result.data) {
-        setFeeItems(result.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch fee items:', error);
-    }
-  };
-
   // 获取学生费用列表
   const fetchStudents = async () => {
     if (!selectedClass) return;
@@ -288,7 +246,6 @@ function FeesContent() {
   // 初始化加载
   useEffect(() => {
     fetchClasses();
-    fetchFeeItems();
   }, []);
 
   // 班级变化时重新加载
@@ -336,23 +293,12 @@ function FeesContent() {
 
   // 计算单个学生总费用
   const calculateStudentTotals = (student: StudentFee) => {
-    // 使用动态费用项目计算
-    let totalFee = 0;
-    let totalPaid = 0;
-    
-    feeItems.filter(item => item.key !== 'agency').forEach(item => {
-      const fee = student.feeValues?.[item.key] ?? 
-                  student[`${item.key}_fee` as keyof StudentFee] as number ?? 0;
-      const paid = student.feePaid?.[item.key] ?? 
-                  student[`${item.key}_paid` as keyof StudentFee] as number ?? 0;
-      totalFee += fee;
-      totalPaid += paid;
-    });
-    
-    // 添加代办费
-    totalFee += student.agency_fee || 0;
-    totalPaid += student.agency_paid || 0;
-    
+    const totalFee = 
+      (student.tuition_fee || 0) + (student.lunch_fee || 0) + (student.nap_fee || 0) +
+      (student.after_school_fee || 0) + (student.club_fee || 0) + (student.agency_fee || 0);
+    const totalPaid = 
+      (student.tuition_paid || 0) + (student.lunch_paid || 0) + (student.nap_paid || 0) +
+      (student.after_school_paid || 0) + (student.club_paid || 0) + (student.agency_paid || 0);
     return { totalFee, totalPaid };
   };
 
@@ -363,13 +309,6 @@ function FeesContent() {
       return;
     }
     setSelectedStudent(null);
-    
-    // 初始化空的动态费用值
-    const feeValues: Record<string, number> = {};
-    feeItems.filter(item => item.key !== 'agency').forEach(item => {
-      feeValues[item.key] = 0;
-    });
-    
     setFormData({
       className: selectedClass,
       studentName: '',
@@ -382,7 +321,6 @@ function FeesContent() {
       agencyFee: 600,
       agencyPaid: 600,
       remark: '',
-      feeValues,
     });
     setFormWarnings({});
     setStudentDialogOpen(true);
@@ -415,14 +353,6 @@ function FeesContent() {
   // 打开修改对话框
   const handleEditStudent = (student: StudentFee) => {
     setSelectedStudent(student);
-    
-    // 构建动态费用值
-    const feeValues: Record<string, number> = {};
-    feeItems.filter(item => item.key !== 'agency').forEach(item => {
-      feeValues[item.key] = student.feeValues?.[item.key] ?? 
-                            student[`${item.key}_fee` as keyof StudentFee] as number ?? 0;
-    });
-    
     setFormData({
       className: student.class_name,
       studentName: student.student_name,
@@ -435,7 +365,6 @@ function FeesContent() {
       agencyFee: student.agency_fee || 600,
       agencyPaid: student.agency_paid ?? student.agency_fee ?? 600,
       remark: student.remark || '',
-      feeValues,
     });
     setFormWarnings({});
     setStudentDialogOpen(true);
@@ -455,13 +384,6 @@ function FeesContent() {
     const agencyPaidValue = selectedStudent 
       ? (formData.agencyPaid ?? formData.agencyFee ?? 0)
       : 0;
-    
-    // 准备动态费用值
-    const feeValues: Record<string, number> = {};
-    feeItems.filter(item => item.key !== 'agency').forEach(item => {
-      const oldValue = formData[`${item.key}Fee` as keyof typeof formData] as number;
-      feeValues[item.key] = formData.feeValues[item.key] ?? oldValue ?? 0;
-    });
     
     // 准备学生数据
     const studentData = {
@@ -484,7 +406,6 @@ function FeesContent() {
       remark: formData.remark || null,
       created_at: new Date().toISOString(),
       updated_at: null,
-      feeValues,
     };
     
     // 乐观更新：先更新本地状态
@@ -529,7 +450,6 @@ function FeesContent() {
           agencyFee: Number(formData.agencyFee),
           agencyPaid: agencyPaidValue,
           remark: formData.remark || null,
-          feeValues, // 添加动态费用值
         }),
       });
       
@@ -1053,16 +973,14 @@ function FeesContent() {
   const totals = calculateTotals();
 
   // 渲染费用单元格（应交/已交格式）
-  const renderFeeCell = (fee: number | undefined | null, paid: number | undefined | null) => {
-    const safeFee = fee ?? 0;
-    const safePaid = paid ?? 0;
-    const isPaid = safePaid > 0;
-    const isFull = safePaid >= safeFee && safeFee > 0;
+  const renderFeeCell = (fee: number, paid: number) => {
+    const isPaid = paid > 0;
+    const isFull = paid >= fee && fee > 0;
     
     return (
       <div className="text-right">
         <div className={isFull ? 'text-green-600 font-medium' : ''}>
-          {safeFee.toFixed(0)}/{safePaid.toFixed(0)}
+          {fee.toFixed(0)}/{paid.toFixed(0)}
         </div>
       </div>
     );
@@ -1333,12 +1251,11 @@ function FeesContent() {
                       <TableHead className="font-semibold bg-gray-100">姓名</TableHead>
                       <TableHead className="font-semibold text-center bg-gray-100">性别</TableHead>
                       <TableHead className="font-semibold text-center bg-gray-100">午托</TableHead>
-                      {/* 动态渲染收费项目列表头 */}
-                      {feeItems.filter(item => item.key !== 'agency').map(item => (
-                        <TableHead key={item.key} className="font-semibold text-right bg-gray-100">
-                          {item.name}<br/><span className="font-normal text-xs text-gray-500">应交/已交</span>
-                        </TableHead>
-                      ))}
+                      <TableHead className="font-semibold text-right bg-gray-100">学费<br/><span className="font-normal text-xs text-gray-500">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right bg-gray-100">午餐费<br/><span className="font-normal text-xs text-gray-500">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right bg-gray-100">午托费<br/><span className="font-normal text-xs text-gray-500">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right bg-gray-100">课后服务费<br/><span className="font-normal text-xs text-gray-500">应交/已交</span></TableHead>
+                      <TableHead className="font-semibold text-right bg-gray-100">社团费<br/><span className="font-normal text-xs text-gray-500">应交/已交</span></TableHead>
                       <TableHead className="font-semibold text-right bg-gray-100">代办费<br/><span className="font-normal text-xs text-gray-500">应交/已交/剩余</span></TableHead>
                       <TableHead className="font-semibold text-right bg-gray-100">合计<br/><span className="font-normal text-xs text-gray-500">应交/已交</span></TableHead>
                       <TableHead className="font-semibold bg-gray-100">备注</TableHead>
@@ -1382,19 +1299,11 @@ function FeesContent() {
                               {(student.lunch_fee > 0 || student.nap_fee > 0) ? '午托' : '走读'}
                             </span>
                           </TableCell>
-                          {/* 动态渲染费用项目单元格 */}
-                          {feeItems.filter(item => item.key !== 'agency').map(item => {
-                            // 优先从 feeValues 读取，其次从旧字段读取
-                            const fee = student.feeValues?.[item.key] ?? 
-                                        student[`${item.key}_fee` as keyof StudentFee] as number ?? 0;
-                            const paid = student.feePaid?.[item.key] ?? 
-                                        student[`${item.key}_paid` as keyof StudentFee] as number ?? 0;
-                            return (
-                              <TableCell key={item.key}>
-                                {renderFeeCell(fee, paid)}
-                              </TableCell>
-                            );
-                          })}
+                          <TableCell>{renderFeeCell(student.tuition_fee, student.tuition_paid)}</TableCell>
+                          <TableCell>{renderFeeCell(student.lunch_fee, student.lunch_paid)}</TableCell>
+                          <TableCell>{renderFeeCell(student.nap_fee, student.nap_paid)}</TableCell>
+                          <TableCell>{renderFeeCell(student.after_school_fee, student.after_school_paid)}</TableCell>
+                          <TableCell>{renderFeeCell(student.club_fee, student.club_paid)}</TableCell>
                           <TableCell className="text-right">
                             <span className="text-purple-600 font-medium">
                               {student.agency_fee ?? 0}/{student.agency_paid ?? 0}/{student.agency_balance ?? 0}
@@ -1444,18 +1353,21 @@ function FeesContent() {
                     {/* 合计行 */}
                     <TableRow className="bg-blue-50 font-semibold">
                       <TableCell colSpan={selectMode ? 5 : 4} className="text-center">合计</TableCell>
-                      {/* 动态渲染费用项目合计 */}
-                      {feeItems.filter(item => item.key !== 'agency').map(item => {
-                        const feeKey = `${item.key}_fee` as keyof FeeTotals;
-                        const paidKey = `${item.key}_paid` as keyof FeeTotals;
-                        const fee = (totals[feeKey] as number) ?? 0;
-                        const paid = (totals[paidKey] as number) ?? 0;
-                        return (
-                          <TableCell key={item.key} className="text-right">
-                            <div>{fee.toFixed(0)}/{paid.toFixed(0)}</div>
-                          </TableCell>
-                        );
-                      })}
+                      <TableCell className="text-right">
+                        <div>{totals.tuition_fee.toFixed(0)}/{totals.tuition_paid.toFixed(0)}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div>{totals.lunch_fee.toFixed(0)}/{totals.lunch_paid.toFixed(0)}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div>{totals.nap_fee.toFixed(0)}/{totals.nap_paid.toFixed(0)}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div>{totals.after_school_fee.toFixed(0)}/{totals.after_school_paid.toFixed(0)}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div>{totals.club_fee.toFixed(0)}/{totals.club_paid.toFixed(0)}</div>
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="text-purple-600">{totals.agency_fee.toFixed(0)}/{totals.agency_paid.toFixed(0)}/{totals.agency_balance.toFixed(0)}</div>
                       </TableCell>
@@ -1525,34 +1437,69 @@ function FeesContent() {
               </Select>
             </div>
             
-            {/* 动态渲染费用项目输入框 */}
-            <div className="border-t pt-4">
-              {feeItems.filter(item => item.key !== 'agency').map(item => {
-                // 兼容旧字段和新的 feeValues
-                const oldValue = formData[`${item.key}Fee` as keyof typeof formData] as number;
-                const feeValue = formData.feeValues[item.key] ?? oldValue ?? 0;
-                return (
-                  <div key={item.key} className="grid grid-cols-4 items-center gap-4 mb-3">
-                    <Label className="text-right font-semibold text-blue-600">{item.name}</Label>
-                    <div className="col-span-3">
-                      <Input
-                        type="number"
-                        value={feeValue || ''}
-                        onChange={(e) => {
-                          const value = Number(e.target.value);
-                          // 同时更新旧字段和新的 feeValues
-                          setFormData(prev => ({
-                            ...prev,
-                            [`${item.key}Fee`]: value,
-                            feeValues: { ...prev.feeValues, [item.key]: value }
-                          }));
-                        }}
-                        placeholder={`请输入${item.name}金额`}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            {/* 学费 */}
+            <div className="grid grid-cols-4 items-center gap-4 border-t pt-4">
+              <Label className="text-right font-semibold text-blue-600">学费</Label>
+              <div className="col-span-3">
+                <Input
+                  type="number"
+                  value={formData.tuitionFee || ''}
+                  onChange={(e) => setFormData({ ...formData, tuitionFee: Number(e.target.value) })}
+                  placeholder="请输入学费金额"
+                />
+              </div>
+            </div>
+            
+            {/* 午餐费 */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right font-semibold text-blue-600">午餐费</Label>
+              <div className="col-span-3">
+                <Input
+                  type="number"
+                  value={formData.lunchFee || ''}
+                  onChange={(e) => setFormData({ ...formData, lunchFee: Number(e.target.value) })}
+                  placeholder="请输入午餐费金额"
+                />
+              </div>
+            </div>
+            
+            {/* 午托费 */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right font-semibold text-blue-600">午托费</Label>
+              <div className="col-span-3">
+                <Input
+                  type="number"
+                  value={formData.napFee || ''}
+                  onChange={(e) => setFormData({ ...formData, napFee: Number(e.target.value) })}
+                  placeholder="请输入午托费金额"
+                />
+              </div>
+            </div>
+            
+            {/* 课后服务费 */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right font-semibold text-blue-600">课后服务费</Label>
+              <div className="col-span-3">
+                <Input
+                  type="number"
+                  value={formData.afterSchoolFee || ''}
+                  onChange={(e) => setFormData({ ...formData, afterSchoolFee: Number(e.target.value) })}
+                  placeholder="请输入课后服务费金额"
+                />
+              </div>
+            </div>
+            
+            {/* 社团费 */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right font-semibold text-blue-600">社团费</Label>
+              <div className="col-span-3">
+                <Input
+                  type="number"
+                  value={formData.clubFee || ''}
+                  onChange={(e) => setFormData({ ...formData, clubFee: Number(e.target.value) })}
+                  placeholder="请输入社团费金额"
+                />
+              </div>
             </div>
             
             {/* 代办费 */}

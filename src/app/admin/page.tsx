@@ -23,7 +23,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FeeItemsManager } from '@/components/FeeItemsManager';
 import { 
   AlertTriangle,
   ArrowLeft,
@@ -194,9 +193,6 @@ export default function AdminPage() {
       {/* 主内容区域 */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          
-          {/* 收费项目管理 */}
-          <FeeItemsManager />
           
           {/* 数据库备份卡片 */}
           <Card>

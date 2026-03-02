@@ -137,6 +137,7 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
   // 代办费交费对话框状态
   const [agencyPaymentDialogOpen, setAgencyPaymentDialogOpen] = useState(false);
   const [agencyPaymentAmount, setAgencyPaymentAmount] = useState<number>(0);
+  const [agencyPaymentDate, setAgencyPaymentDate] = useState<string>('');
   const [agencyPaymentWarning, setAgencyPaymentWarning] = useState<string>('');
   
   // 获取学生详情
@@ -202,6 +203,7 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
   // 打开代办费交费对话框
   const openAgencyPaymentDialog = () => {
     setAgencyPaymentAmount(0);
+    setAgencyPaymentDate(getTodayString());
     setAgencyPaymentWarning('');
     setAgencyPaymentDialogOpen(true);
   };
@@ -228,6 +230,11 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
       return;
     }
     
+    if (!agencyPaymentDate) {
+      toast.error('请选择交费日期');
+      return;
+    }
+    
     const newAgencyPaid = (student?.agency_paid ?? 0) + agencyPaymentAmount;
     
     // 乐观更新
@@ -246,7 +253,7 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
           studentId: resolvedParams.id,
           feeType: 'agency',
           amount: agencyPaymentAmount,
-          paymentDate: new Date().toISOString().split('T')[0],
+          paymentDate: agencyPaymentDate,
           remark: '代办费交费',
         }),
       });
@@ -1201,6 +1208,15 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                 placeholder="请输入交费金额"
               />
             </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">交费日期 *</Label>
+              <Input
+                type="date"
+                value={agencyPaymentDate}
+                onChange={(e) => setAgencyPaymentDate(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
             {agencyPaymentWarning && (
               <div className="col-span-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
                 <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -1214,7 +1230,7 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
             </Button>
             <Button 
               onClick={submitAgencyPayment}
-              disabled={agencyPaymentAmount <= 0}
+              disabled={agencyPaymentAmount <= 0 || !agencyPaymentDate}
               className="bg-green-600 hover:bg-green-700"
             >
               确认交费

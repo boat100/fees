@@ -287,6 +287,34 @@ export function initDatabase() {
   // 删除 other 类型的交费记录（已改为代办费，不需要交费记录）
   db.exec(`DELETE FROM payment_records WHERE fee_type = 'other'`);
 
+  // 迁移：为 agency_paid > 0 但没有对应交费记录的学生创建代办费交费记录
+  // 这是因为之前的迁移逻辑直接设置了 agency_paid 但没有创建 payment_records
+  const studentsWithoutAgencyPaymentRecords = db.prepare(`
+    SELECT sf.id, sf.agency_paid, sf.created_at
+    FROM student_fees sf
+    WHERE sf.agency_paid > 0
+    AND NOT EXISTS (
+      SELECT 1 FROM payment_records pr 
+      WHERE pr.student_id = sf.id AND pr.fee_type = 'agency'
+    )
+  `).all() as Array<{ id: number; agency_paid: number; created_at: string }>;
+  
+  if (studentsWithoutAgencyPaymentRecords.length > 0) {
+    const insertPayment = db.prepare(`
+      INSERT INTO payment_records (student_id, fee_type, amount, payment_date, remark)
+      VALUES (?, 'agency', ?, ?, '代办费交费（历史数据迁移）')
+    `);
+    
+    for (const student of studentsWithoutAgencyPaymentRecords) {
+      // 使用学生创建日期作为交费日期，如果没有则使用当前日期
+      const paymentDate = student.created_at 
+        ? student.created_at.split('T')[0] 
+        : new Date().toISOString().split('T')[0];
+      insertPayment.run(student.id, student.agency_paid, paymentDate);
+    }
+    console.log(`Migrated ${studentsWithoutAgencyPaymentRecords.length} agency payment records`);
+  }
+
   console.log('Database initialized successfully');
 }
 

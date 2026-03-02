@@ -395,15 +395,6 @@ export function initDatabase() {
     console.log('Default expense categories and items initialized');
   }
 
-  // 迁移旧数据：将英文类别更新为中文名称（幂等操作，可重复执行）
-  console.log('Checking for old expense category values...');
-  const updateCategory = db.prepare('UPDATE expense_records SET category = ? WHERE category = ?');
-  const dailyResult = updateCategory.run('日常公用支出', 'daily');
-  const personnelResult = updateCategory.run('人员支出', 'personnel');
-  if (dailyResult.changes > 0 || personnelResult.changes > 0) {
-    console.log(`Migrated ${dailyResult.changes} daily records and ${personnelResult.changes} personnel records to Chinese category names`);
-  }
-
   console.log('Database initialized successfully');
 }
 

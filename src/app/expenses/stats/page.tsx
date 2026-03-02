@@ -27,6 +27,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  LabelList,
 } from 'recharts';
 
 // 时间类型
@@ -277,7 +278,7 @@ export default function ExpensesStatsPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={statsData.categoryData}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                        margin={{ top: 40, right: 30, left: 20, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis 
@@ -295,7 +296,14 @@ export default function ExpensesStatsPage() {
                           name="金额" 
                           fill="#ef4444" 
                           radius={[4, 4, 0, 0]}
-                        />
+                        >
+                          <LabelList 
+                            dataKey="totalAmount" 
+                            position="top" 
+                            formatter={(value: number) => `¥${formatAmount(value)}`}
+                            style={{ fontSize: 12, fill: '#666' }}
+                          />
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -329,7 +337,7 @@ export default function ExpensesStatsPage() {
                           <BarChart
                             data={itemData}
                             layout="vertical"
-                            margin={{ top: 20, right: 30, left: 120, bottom: 5 }}
+                            margin={{ top: 20, right: 80, left: 120, bottom: 5 }}
                           >
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis 
@@ -350,7 +358,14 @@ export default function ExpensesStatsPage() {
                               name="金额" 
                               fill={color}
                               radius={[0, 4, 4, 0]}
-                            />
+                            >
+                              <LabelList 
+                                dataKey="totalAmount" 
+                                position="right" 
+                                formatter={(value: number) => `¥${formatAmount(value)}`}
+                                style={{ fontSize: 11, fill: '#666' }}
+                              />
+                            </Bar>
                           </BarChart>
                         </ResponsiveContainer>
                       </div>

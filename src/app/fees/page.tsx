@@ -973,14 +973,16 @@ function FeesContent() {
   const totals = calculateTotals();
 
   // 渲染费用单元格（应交/已交格式）
-  const renderFeeCell = (fee: number, paid: number) => {
-    const isPaid = paid > 0;
-    const isFull = paid >= fee && fee > 0;
+  const renderFeeCell = (fee: number | undefined | null, paid: number | undefined | null) => {
+    const safeFee = fee ?? 0;
+    const safePaid = paid ?? 0;
+    const isPaid = safePaid > 0;
+    const isFull = safePaid >= safeFee && safeFee > 0;
     
     return (
       <div className="text-right">
         <div className={isFull ? 'text-green-600 font-medium' : ''}>
-          {fee.toFixed(0)}/{paid.toFixed(0)}
+          {safeFee.toFixed(0)}/{safePaid.toFixed(0)}
         </div>
       </div>
     );

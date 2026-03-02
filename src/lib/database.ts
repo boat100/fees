@@ -405,6 +405,39 @@ export function initDatabase() {
     console.log('Default expense categories and items initialized');
   }
 
+  // 数据一致性检查：确保支出记录中的类别名称与类别表一致
+  // 如果类别名称被修改但支出记录未同步，这里会检测并修复
+  const categoriesForCheck = db.prepare('SELECT id, name FROM expense_categories').all() as Array<{ id: number; name: string }>;
+  const categoryNames = categoriesForCheck.map(c => c.name);
+  
+  // 检查支出记录中是否有不在类别表中的类别名称
+  const orphanCategories = db.prepare(`
+    SELECT DISTINCT category FROM expense_records 
+    WHERE category NOT IN (${categoryNames.map(() => '?').join(',')})
+  `).all(...categoryNames) as Array<{ category: string }>;
+  
+  if (orphanCategories.length > 0) {
+    console.log(`Found ${orphanCategories.length} orphan categories in expense_records:`, orphanCategories.map(o => o.category));
+    // 尝试根据历史记录修复（如果有重命名记录，这里无法自动修复，需要提示用户）
+    // 对于已知的历史类别名称，尝试映射到新名称
+    const categoryMapping: Record<string, string> = {};
+    // 建立映射：如果有类似的类别名称（包含关系），则映射
+    for (const orphan of orphanCategories) {
+      const matchingCategory = categoryNames.find(name => 
+        name.includes(orphan.category) || orphan.category.includes(name)
+      );
+      if (matchingCategory) {
+        categoryMapping[orphan.category] = matchingCategory;
+      }
+    }
+    
+    // 执行修复
+    for (const [oldCat, newCat] of Object.entries(categoryMapping)) {
+      const result = db.prepare('UPDATE expense_records SET category = ? WHERE category = ?').run(newCat, oldCat);
+      console.log(`Fixed ${result.changes} records: "${oldCat}" -> "${newCat}"`);
+    }
+  }
+
   console.log('Database initialized successfully');
 }
 

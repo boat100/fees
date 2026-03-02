@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, initDatabase, FEE_TYPE_MAP } from '@/lib/database';
+import { db, initDatabase } from '@/lib/database';
 
 // 初始化数据库
 initDatabase();
@@ -34,6 +34,35 @@ export async function GET(
       return NextResponse.json({ error: '记录不存在' }, { status: 404 });
     }
     
+    // 获取所有收费项目
+    const feeItems = db.prepare(`
+      SELECT key, name FROM fee_items WHERE is_active = 1 ORDER BY sort_order
+    `).all() as Array<{ key: string; name: string }>;
+    
+    // 获取学生的各项费用应交金额（从student_fee_values表）
+    const feeValues = db.prepare(`
+      SELECT fee_item_key, expected_amount
+      FROM student_fee_values
+      WHERE student_id = ?
+    `).all(id) as Array<{ fee_item_key: string; expected_amount: number }>;
+    
+    const feeValueMap: Record<string, number> = {};
+    feeValues.forEach(fv => {
+      feeValueMap[fv.fee_item_key] = fv.expected_amount;
+    });
+    
+    // 构建动态费用值对象
+    const feeValuesDynamic: Record<string, number> = {};
+    for (const item of feeItems) {
+      if (feeValueMap[item.key] !== undefined) {
+        feeValuesDynamic[item.key] = feeValueMap[item.key];
+      } else {
+        // 兼容旧字段
+        const oldField = `${item.key}_fee` as keyof typeof student;
+        feeValuesDynamic[item.key] = (student[oldField] as number) || 0;
+      }
+    }
+    
     // 获取所有交费记录
     const paymentRecords = db.prepare(`
       SELECT * FROM payment_records 
@@ -51,14 +80,20 @@ export async function GET(
     
     // 按费用类型分组并计算已交总额
     const paymentsByType: Record<string, { records: typeof paymentRecords; total: number }> = {};
-    Object.keys(FEE_TYPE_MAP).forEach(key => {
-      paymentsByType[key] = { records: [], total: 0 };
+    feeItems.forEach(item => {
+      paymentsByType[item.key] = { records: [], total: 0 };
     });
     
     paymentRecords.forEach(record => {
       if (paymentsByType[record.fee_type]) {
         paymentsByType[record.fee_type].records.push(record);
         paymentsByType[record.fee_type].total += record.amount;
+      } else {
+        // 动态项目可能不在feeItems中（已停用），也要显示
+        paymentsByType[record.fee_type] = { 
+          records: [record], 
+          total: record.amount 
+        };
       }
     });
     
@@ -79,18 +114,20 @@ export async function GET(
     
     // 计算代办费余额（剩余 = 已交 - 已扣除）
     const agencyUsed = agencyFeeItems.reduce((sum, item) => sum + item.amount, 0);
-    const agencyPaid = student.agency_paid ?? student.agency_fee ?? 600;
+    const agencyPaid = student.agency_paid ?? feeValuesDynamic['agency'] ?? 600;
     const agencyBalance = agencyPaid - agencyUsed;
     
     return NextResponse.json({ 
       data: {
         ...student,
+        feeValues: feeValuesDynamic,
         paymentsByType,
         paymentRecords,
         agencyFeeItems,
         agencyUsed,
         agencyBalance,
-      }
+      },
+      feeItems: feeItems
     });
   } catch (error) {
     console.error('Error fetching student fee:', error);
@@ -114,19 +151,44 @@ export async function PUT(
       className,
       studentName,
       gender,
-      tuitionFee,
-      lunchFee,
-      napFee,
-      afterSchoolFee,
-      clubFee,
-      agencyFee,
-      agencyPaid,
       remark,
+      feeValues, // 新格式：动态费用项目 { tuition: 1000, lunch: 500, ... }
     } = body;
     
-    // 根据午托费自动判断午托状态
-    const napStatus = (napFee ?? 0) > 0 ? '午托' : '走读';
+    // 获取所有收费项目
+    const feeItems = db.prepare(`
+      SELECT key, name FROM fee_items WHERE is_active = 1 ORDER BY sort_order
+    `).all() as Array<{ key: string; name: string }>;
     
+    // 兼容旧格式：从单独字段获取费用值
+    const legacyFeeValues: Record<string, number> = {
+      tuition: body.tuitionFee ?? 0,
+      lunch: body.lunchFee ?? 0,
+      nap: body.napFee ?? 0,
+      after_school: body.afterSchoolFee ?? 0,
+      club: body.clubFee ?? 0,
+      agency: body.agencyFee ?? 600,
+    };
+    
+    // 合并费用值（新格式优先）
+    const finalFeeValues: Record<string, number> = {};
+    for (const item of feeItems) {
+      if (feeValues && feeValues[item.key] !== undefined) {
+        finalFeeValues[item.key] = feeValues[item.key];
+      } else if (legacyFeeValues[item.key] !== undefined) {
+        finalFeeValues[item.key] = legacyFeeValues[item.key];
+      } else {
+        finalFeeValues[item.key] = 0;
+      }
+    }
+    
+    // 根据午餐费或午托费自动判断午托状态
+    const napStatus = (finalFeeValues['lunch'] > 0 || finalFeeValues['nap'] > 0) ? '午托' : '走读';
+    
+    // agencyPaid 处理
+    const agencyPaidValue = body.agencyPaid ?? finalFeeValues['agency'] ?? 600;
+    
+    // 更新学生记录
     const stmt = db.prepare(`
       UPDATE student_fees 
       SET class_name = ?, student_name = ?, gender = ?, nap_status = ?,
@@ -141,13 +203,13 @@ export async function PUT(
       studentName,
       gender ?? '男',
       napStatus,
-      tuitionFee ?? 0,
-      lunchFee ?? 0,
-      napFee ?? 0,
-      afterSchoolFee ?? 0,
-      clubFee ?? 0,
-      agencyFee ?? 600,
-      agencyPaid ?? agencyFee ?? 600,
+      finalFeeValues['tuition'] ?? 0,
+      finalFeeValues['lunch'] ?? 0,
+      finalFeeValues['nap'] ?? 0,
+      finalFeeValues['after_school'] ?? 0,
+      finalFeeValues['club'] ?? 0,
+      finalFeeValues['agency'] ?? 600,
+      agencyPaidValue,
       remark || null,
       new Date().toISOString(),
       id
@@ -157,9 +219,21 @@ export async function PUT(
       return NextResponse.json({ error: '记录不存在' }, { status: 404 });
     }
     
+    // 更新费用值到新表
+    const updateFeeValue = db.prepare(
+      'INSERT OR REPLACE INTO student_fee_values (student_id, fee_item_key, expected_amount) VALUES (?, ?, ?)'
+    );
+    
+    for (const [key, value] of Object.entries(finalFeeValues)) {
+      updateFeeValue.run(Number(id), key, value);
+    }
+    
     const updatedStudent = db.prepare('SELECT * FROM student_fees WHERE id = ?').get(id);
     
-    return NextResponse.json({ data: updatedStudent });
+    return NextResponse.json({ 
+      data: updatedStudent,
+      feeValues: finalFeeValues
+    });
   } catch (error) {
     console.error('Error updating student fee:', error);
     return NextResponse.json(
@@ -182,6 +256,9 @@ export async function DELETE(
     
     // 删除代办费扣除项目
     db.prepare('DELETE FROM agency_fee_items WHERE student_id = ?').run(id);
+    
+    // 删除费用值
+    db.prepare('DELETE FROM student_fee_values WHERE student_id = ?').run(id);
     
     // 再删除学生
     const result = db.prepare('DELETE FROM student_fees WHERE id = ?').run(id);

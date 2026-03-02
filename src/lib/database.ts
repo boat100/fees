@@ -162,6 +162,41 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_agency_fee_items_student_id ON agency_fee_items(student_id);
   `);
 
+  // 创建收费项目配置表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS fee_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME
+    )
+  `);
+
+  // 创建学生费用值表（存储每个学生每个费用项目的应交金额）
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS student_fee_values (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER NOT NULL,
+      fee_item_key TEXT NOT NULL,
+      expected_amount REAL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME,
+      FOREIGN KEY (student_id) REFERENCES student_fees(id) ON DELETE CASCADE,
+      UNIQUE(student_id, fee_item_key)
+    )
+  `);
+
+  // 创建收费项目相关索引
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_fee_items_key ON fee_items(key);
+    CREATE INDEX IF NOT EXISTS idx_fee_items_sort_order ON fee_items(sort_order);
+    CREATE INDEX IF NOT EXISTS idx_student_fee_values_student_id ON student_fee_values(student_id);
+    CREATE INDEX IF NOT EXISTS idx_student_fee_values_fee_item_key ON student_fee_values(fee_item_key);
+  `);
+
   // 创建支出记录表
   db.exec(`
     CREATE TABLE IF NOT EXISTS expense_records (
@@ -313,6 +348,62 @@ export function initDatabase() {
       insertPayment.run(student.id, student.agency_paid, paymentDate);
     }
     console.log(`Migrated ${studentsWithoutAgencyPaymentRecords.length} agency payment records`);
+  }
+
+  // 初始化默认收费项目（如果 fee_items 表为空）
+  const existingFeeItems = db.prepare('SELECT COUNT(*) as count FROM fee_items').get() as { count: number };
+  if (existingFeeItems.count === 0) {
+    const defaultFeeItems = [
+      { key: 'tuition', name: '学费', sort_order: 1 },
+      { key: 'lunch', name: '午餐费', sort_order: 2 },
+      { key: 'nap', name: '午托费', sort_order: 3 },
+      { key: 'after_school', name: '课后服务费', sort_order: 4 },
+      { key: 'club', name: '社团费', sort_order: 5 },
+      { key: 'agency', name: '代办费', sort_order: 6 },
+    ];
+    
+    const insertFeeItem = db.prepare(
+      'INSERT INTO fee_items (key, name, sort_order) VALUES (?, ?, ?)'
+    );
+    
+    for (const item of defaultFeeItems) {
+      insertFeeItem.run(item.key, item.name, item.sort_order);
+    }
+    console.log('Initialized default fee items');
+  }
+
+  // 迁移：从固定字段迁移到 student_fee_values 表
+  const existingFeeValues = db.prepare('SELECT COUNT(*) as count FROM student_fee_values').get() as { count: number };
+  if (existingFeeValues.count === 0) {
+    // 检查 student_fees 表是否有固定字段数据
+    const studentsWithFees = db.prepare(`
+      SELECT id, tuition_fee, lunch_fee, nap_fee, after_school_fee, club_fee, agency_fee
+      FROM student_fees
+    `).all() as Array<{
+      id: number;
+      tuition_fee: number;
+      lunch_fee: number;
+      nap_fee: number;
+      after_school_fee: number;
+      club_fee: number;
+      agency_fee: number;
+    }>;
+    
+    if (studentsWithFees.length > 0) {
+      const insertFeeValue = db.prepare(
+        'INSERT OR IGNORE INTO student_fee_values (student_id, fee_item_key, expected_amount) VALUES (?, ?, ?)'
+      );
+      
+      for (const student of studentsWithFees) {
+        if (student.tuition_fee > 0) insertFeeValue.run(student.id, 'tuition', student.tuition_fee);
+        if (student.lunch_fee > 0) insertFeeValue.run(student.id, 'lunch', student.lunch_fee);
+        if (student.nap_fee > 0) insertFeeValue.run(student.id, 'nap', student.nap_fee);
+        if (student.after_school_fee > 0) insertFeeValue.run(student.id, 'after_school', student.after_school_fee);
+        if (student.club_fee > 0) insertFeeValue.run(student.id, 'club', student.club_fee);
+        if (student.agency_fee > 0) insertFeeValue.run(student.id, 'agency', student.agency_fee);
+      }
+      console.log(`Migrated fee values for ${studentsWithFees.length} students`);
+    }
   }
 
   console.log('Database initialized successfully');

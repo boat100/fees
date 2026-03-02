@@ -44,7 +44,7 @@ import {
   LogOut,
   FileText
 } from 'lucide-react';
-import { FEE_TYPE_MAP, FEE_ITEMS, AGENCY_FEE_ITEMS, AGENCY_FEE_ITEM_TYPE_MAP } from '@/lib/constants';
+import { FEE_TYPE_MAP, FEE_ITEMS, AGENCY_FEE_ITEMS, AGENCY_FEE_ITEM_TYPE_MAP, FeeItem } from '@/lib/constants';
 
 interface StudentDetail {
   id: number;
@@ -67,6 +67,7 @@ interface StudentDetail {
   agencyFeeItems: AgencyFeeItem[];
   agencyUsed: number;
   agencyBalance: number;
+  feeValues?: Record<string, number>; // 动态费用项目应交金额
 }
 
 interface AgencyFeeItem {
@@ -98,6 +99,7 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const returnClass = searchParams.get('class');
   
   const [student, setStudent] = useState<StudentDetail | null>(null);
+  const [feeItems, setFeeItems] = useState<FeeItem[]>([]);
   const [loading, setLoading] = useState(true);
   
   // 操作状态
@@ -150,6 +152,13 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
         setStudent(result.data);
         // 同时获取代办费扣除项目
         fetchAgencyFeeItems();
+        // 获取收费项目列表
+        if (result.feeItems) {
+          setFeeItems(result.feeItems.map((item: { key: string; name: string }) => ({
+            key: item.key,
+            label: item.name,
+          })));
+        }
       } else {
         toast.error('学生不存在');
         router.push('/');
@@ -276,10 +285,14 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const checkPaymentAmount = (amount: number) => {
     if (!student || !selectedFeeType) return;
     
-    const feeItem = FEE_ITEMS.find(item => item.key === selectedFeeType);
+    // 优先使用动态获取的费用项目，其次使用默认值
+    const feeItem = feeItems.find(item => item.key === selectedFeeType) || 
+                    FEE_ITEMS.find(item => item.key === selectedFeeType);
     if (!feeItem) return;
     
-    const expectedFee = student[feeItem.field] as number;
+    // 获取应交金额（优先使用动态数据，其次使用旧字段）
+    const expectedFee = student.feeValues?.[selectedFeeType] ?? 
+                        student[`${selectedFeeType}_fee` as keyof typeof student] as number ?? 0;
     const currentPaid = student.paymentsByType[selectedFeeType]?.total || 0;
     const newTotal = currentPaid + amount;
     
@@ -719,8 +732,11 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {FEE_ITEMS.filter(item => item.key !== 'agency').map(item => {
-                    const expected = student[item.field] as number;
+                  {/* 使用动态获取的费用项目，如果没有则使用默认值 */}
+                  {(feeItems.length > 0 ? feeItems.filter(item => item.key !== 'agency') : FEE_ITEMS.filter(item => item.key !== 'agency')).map(item => {
+                    // 获取应交金额（优先使用动态数据，其次使用旧字段）
+                    const expected = student.feeValues?.[item.key] ?? 
+                                     student[`${item.key}_fee` as keyof typeof student] as number ?? 0;
                     const paid = student.paymentsByType[item.key]?.total || 0;
                     const remaining = expected - paid;
                     const isFull = expected > 0 && paid >= expected;
@@ -768,17 +784,17 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   {/* 代办费行（与其他费用相同的显示格式） */}
                   <TableRow className="bg-purple-50">
                     <TableCell className="font-medium">代办费</TableCell>
-                    <TableCell className="text-right">{(student.agency_fee || 0).toFixed(2)}</TableCell>
-                    <TableCell className={`text-right ${((student.agency_fee || 0) > 0 && (student.agency_paid ?? 0) >= (student.agency_fee || 0)) ? 'text-green-600 font-semibold' : ''}`}>
+                    <TableCell className="text-right">{((student.feeValues?.agency ?? student.agency_fee) ?? 0).toFixed(2)}</TableCell>
+                    <TableCell className={`text-right ${(((student.feeValues?.agency ?? student.agency_fee) ?? 0) > 0 && (student.agency_paid ?? 0) >= ((student.feeValues?.agency ?? student.agency_fee) ?? 0)) ? 'text-green-600 font-semibold' : ''}`}>
                       {(student.agency_paid ?? 0).toFixed(2)}
                     </TableCell>
-                    <TableCell className={`text-right ${((student.agency_fee || 0) - (student.agency_paid ?? 0)) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      {Math.max(0, (student.agency_fee || 0) - (student.agency_paid ?? 0)).toFixed(2)}
+                    <TableCell className={`text-right ${(((student.feeValues?.agency ?? student.agency_fee) ?? 0) - (student.agency_paid ?? 0)) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {Math.max(0, ((student.feeValues?.agency ?? student.agency_fee) ?? 0) - (student.agency_paid ?? 0)).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-center">
-                      {(student.agency_fee || 0) === 0 ? (
+                      {((student.feeValues?.agency ?? student.agency_fee) ?? 0) === 0 ? (
                         <span className="text-gray-400">-</span>
-                      ) : (student.agency_paid ?? 0) >= (student.agency_fee || 0) ? (
+                      ) : (student.agency_paid ?? 0) >= ((student.feeValues?.agency ?? student.agency_fee) ?? 0) ? (
                         <span className="inline-flex items-center gap-1 text-green-600">
                           <CheckCircle className="h-4 w-4" />
                           已缴清
@@ -806,17 +822,34 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   <TableRow className="bg-blue-50 font-semibold">
                     <TableCell>合计</TableCell>
                     <TableCell className="text-right text-blue-700">
-                      {(FEE_ITEMS.reduce((sum, item) => sum + (student[item.field] as number), 0)).toFixed(2)}
+                      {/* 使用动态获取的费用项目计算合计 */}
+                      {(() => {
+                        const itemsToUse = feeItems.length > 0 ? feeItems : FEE_ITEMS;
+                        return itemsToUse.reduce((sum, item) => {
+                          const expected = student.feeValues?.[item.key] ?? 
+                                           student[`${item.key}_fee` as keyof typeof student] as number ?? 0;
+                          return sum + expected;
+                        }, 0).toFixed(2);
+                      })()}
                     </TableCell>
                     <TableCell className="text-right text-green-600">
-                      {(FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => sum + (student.paymentsByType[item.key]?.total || 0), 0) + (student.agency_paid ?? 0)).toFixed(2)}
+                      {(() => {
+                        const itemsToUse = feeItems.length > 0 ? feeItems.filter(i => i.key !== 'agency') : FEE_ITEMS.filter(i => i.key !== 'agency');
+                        return (itemsToUse.reduce((sum, item) => sum + (student.paymentsByType[item.key]?.total || 0), 0) + (student.agency_paid ?? 0)).toFixed(2);
+                      })()}
                     </TableCell>
                     <TableCell className="text-right text-red-600">
-                      {(FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => {
-                        const expected = student[item.field] as number;
-                        const paid = student.paymentsByType[item.key]?.total || 0;
-                        return sum + Math.max(0, expected - paid);
-                      }, 0) + Math.max(0, (student.agency_fee || 0) - (student.agency_paid ?? 0))).toFixed(2)}
+                      {(() => {
+                        const itemsToUse = feeItems.length > 0 ? feeItems.filter(i => i.key !== 'agency') : FEE_ITEMS.filter(i => i.key !== 'agency');
+                        const regularRemaining = itemsToUse.reduce((sum, item) => {
+                          const expected = student.feeValues?.[item.key] ?? 
+                                           student[`${item.key}_fee` as keyof typeof student] as number ?? 0;
+                          const paid = student.paymentsByType[item.key]?.total || 0;
+                          return sum + Math.max(0, expected - paid);
+                        }, 0);
+                        const agencyRemaining = Math.max(0, ((student.feeValues?.agency ?? student.agency_fee) ?? 0) - (student.agency_paid ?? 0));
+                        return (regularRemaining + agencyRemaining).toFixed(2);
+                      })()}
                     </TableCell>
                     <TableCell colSpan={2}></TableCell>
                   </TableRow>
@@ -853,7 +886,14 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{FEE_TYPE_MAP[record.fee_type]}</span>
+                        <span className="font-medium">
+                          {/* 优先从动态费用项目中查找，其次使用默认映射 */}
+                          {(() => {
+                            const dynamicItem = feeItems.find(item => item.key === record.fee_type);
+                            if (dynamicItem) return dynamicItem.label;
+                            return FEE_TYPE_MAP[record.fee_type];
+                          })()}
+                        </span>
                         <span className="text-green-600 font-semibold">+{record.amount.toFixed(2)} 元</span>
                       </div>
                       {record.remark && (
@@ -955,18 +995,33 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
           <DialogHeader>
             <DialogTitle>添加交费记录</DialogTitle>
             <DialogDescription>
-              为 {FEE_TYPE_MAP[selectedFeeType]} 添加交费记录
+              为 {(() => {
+                const dynamicItem = feeItems.find(item => item.key === selectedFeeType);
+                if (dynamicItem) return dynamicItem.label;
+                return FEE_TYPE_MAP[selectedFeeType];
+              })()} 添加交费记录
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">费用类型</Label>
-              <div className="col-span-3 font-semibold">{FEE_TYPE_MAP[selectedFeeType]}</div>
+              <div className="col-span-3 font-semibold">
+                {(() => {
+                  const dynamicItem = feeItems.find(item => item.key === selectedFeeType);
+                  if (dynamicItem) return dynamicItem.label;
+                  return FEE_TYPE_MAP[selectedFeeType];
+                })()}
+              </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">应交金额</Label>
               <div className="col-span-3">
-                {student && (student[FEE_ITEMS.find(i => i.key === selectedFeeType)?.field || 'tuition_fee'] as number)?.toFixed(2)} 元
+                {(() => {
+                  if (!student) return '0.00 元';
+                  const expected = student.feeValues?.[selectedFeeType] ?? 
+                                   student[`${selectedFeeType}_fee` as keyof typeof student] as number ?? 0;
+                  return `${expected.toFixed(2)} 元`;
+                })()}
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">

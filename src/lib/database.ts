@@ -187,6 +187,36 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_expense_records_occur_date ON expense_records(occur_date);
   `);
 
+  // 创建支出类别表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS expense_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      sort_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME
+    )
+  `);
+
+  // 创建支出子项目表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS expense_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME,
+      FOREIGN KEY (category_id) REFERENCES expense_categories(id) ON DELETE CASCADE,
+      UNIQUE(category_id, name)
+    )
+  `);
+
+  // 创建支出子项目索引
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_expense_items_category_id ON expense_items(category_id);
+  `);
+
   // 检查并添加新字段（兼容旧数据库）
   const tableInfo = db.prepare('PRAGMA table_info(student_fees)').all() as Array<{ name: string }>;
   const existingColumns = tableInfo.map(col => col.name);
@@ -313,6 +343,56 @@ export function initDatabase() {
       insertPayment.run(student.id, student.agency_paid, paymentDate);
     }
     console.log(`Migrated ${studentsWithoutAgencyPaymentRecords.length} agency payment records`);
+  }
+
+  // 初始化支出类别和子项目（如果表为空）
+  const categoryCount = db.prepare('SELECT COUNT(*) as count FROM expense_categories').get() as { count: number };
+  
+  if (categoryCount.count === 0) {
+    console.log('Initializing default expense categories and items...');
+    
+    // 插入默认类别
+    const insertCategory = db.prepare('INSERT INTO expense_categories (name, sort_order) VALUES (?, ?)');
+    insertCategory.run('日常公用支出', 1);
+    insertCategory.run('人员支出', 2);
+    
+    // 获取类别ID
+    const categories = db.prepare('SELECT id, name FROM expense_categories').all() as Array<{ id: number; name: string }>;
+    const dailyCategoryId = categories.find(c => c.name === '日常公用支出')?.id;
+    const personnelCategoryId = categories.find(c => c.name === '人员支出')?.id;
+    
+    // 插入默认子项目
+    const insertItem = db.prepare('INSERT INTO expense_items (category_id, name, sort_order) VALUES (?, ?, ?)');
+    
+    // 日常公用支出子项目
+    const dailyItems = [
+      '办公费用', '财务费', '通讯费', '交通费', '交际费',
+      '学生用药（防控物资）', '垃圾处理费', '日常费用', '水电费',
+      '固定资产', '安保经费', '装修费或工程', '学生退费：包括膳食费',
+      '学生餐费', '活动基金', '教学业务费', '代办费', '社团',
+      '维修材料及维修费', '校服、书包', '租金'
+    ];
+    
+    if (dailyCategoryId) {
+      dailyItems.forEach((item, index) => {
+        insertItem.run(dailyCategoryId, item, index + 1);
+      });
+    }
+    
+    // 人员支出子项目
+    const personnelItems = [
+      '教职工工资', '课后服务、社团劳务费', '福利费', '医社保费',
+      '住房公积金', '工作餐', '工会经费', '老师培训费',
+      '外聘老师工资', '外教工资', '晚托补贴及餐费', '代理记账工资'
+    ];
+    
+    if (personnelCategoryId) {
+      personnelItems.forEach((item, index) => {
+        insertItem.run(personnelCategoryId, item, index + 1);
+      });
+    }
+    
+    console.log('Default expense categories and items initialized');
   }
 
   console.log('Database initialized successfully');

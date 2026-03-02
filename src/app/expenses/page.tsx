@@ -57,36 +57,26 @@ import {
   Upload,
   ChevronLeft,
   ChevronRight,
-  BarChart3
+  BarChart3,
+  Settings
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-// 支出类别
-const EXPENSE_CATEGORIES = {
-  DAILY: 'daily',
-  PERSONNEL: 'personnel'
-} as const;
+// 支出类别接口
+interface ExpenseCategory {
+  id: number;
+  name: string;
+  sort_order: number;
+  items: ExpenseItem[];
+}
 
-const CATEGORY_NAMES: Record<string, string> = {
-  [EXPENSE_CATEGORIES.DAILY]: '日常公用支出',
-  [EXPENSE_CATEGORIES.PERSONNEL]: '人员支出'
-};
-
-// 日常公用支出子项目
-const DAILY_ITEMS = [
-  '办公费用', '财务费', '通讯费', '交通费', '交际费',
-  '学生用药（防控物资）', '垃圾处理费', '日常费用', '水电费',
-  '固定资产', '安保经费', '装修费或工程', '学生退费：包括膳食费',
-  '学生餐费', '活动基金', '教学业务费', '代办费', '社团',
-  '维修材料及维修费', '校服、书包', '租金'
-];
-
-// 人员支出子项目
-const PERSONNEL_ITEMS = [
-  '教职工工资', '课后服务、社团劳务费', '福利费', '医社保费',
-  '住房公积金', '工作餐', '工会经费', '老师培训费',
-  '外聘老师工资', '外教工资', '晚托补贴及餐费', '代理记账工资'
-];
+// 支出子项目接口
+interface ExpenseItem {
+  id: number;
+  category_id: number;
+  name: string;
+  sort_order: number;
+}
 
 interface ExpenseRecord {
   id: number;
@@ -110,17 +100,18 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   
+  // 动态类别和子项目
+  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  
   // 筛选状态
   const [filterCategory, setFilterCategory] = useState<string>('');
   const [filterItem, setFilterItem] = useState<string>('');
   const [filterYearMonth, setFilterYearMonth] = useState<string>('');
   
   // 根据筛选类别获取对应的子项目列表
-  const filterItems = filterCategory === EXPENSE_CATEGORIES.DAILY 
-    ? DAILY_ITEMS 
-    : filterCategory === EXPENSE_CATEGORIES.PERSONNEL 
-      ? PERSONNEL_ITEMS 
-      : [...DAILY_ITEMS, ...PERSONNEL_ITEMS];
+  const filterItems = categories.find(c => c.name === filterCategory)?.items.map(i => i.name) || [];
+  const allItems = categories.flatMap(c => c.items.map(i => i.name));
   
   // 对话框状态
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -158,7 +149,7 @@ export default function ExpensesPage() {
   
   // 表单状态
   const [formData, setFormData] = useState<{
-    category: 'daily' | 'personnel';
+    category: string;
     item: string;
     reportDate: string;
     occurDate: string;
@@ -167,8 +158,8 @@ export default function ExpensesPage() {
     summary: string;
     remark: string;
   }>({
-    category: EXPENSE_CATEGORIES.DAILY,
-    item: DAILY_ITEMS[0],
+    category: '',
+    item: '',
     reportDate: '',
     occurDate: '',
     invoiceNo: '',
@@ -176,6 +167,22 @@ export default function ExpensesPage() {
     summary: '',
     remark: ''
   });
+  
+  // 获取支出类别和子项目
+  const fetchCategories = useCallback(async () => {
+    setCategoriesLoading(true);
+    try {
+      const response = await authFetch('/api/expense-categories?withItems=true');
+      const result = await response.json();
+      if (response.ok) {
+        setCategories(result.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch expense categories:', error);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, []);
 
   // 处理筛选类别变化 - 联动重置子项目
   const handleFilterCategoryChange = (value: string) => {
@@ -224,16 +231,23 @@ export default function ExpensesPage() {
       router.push('/login');
       return;
     }
+    fetchCategories();
     fetchRecords();
-  }, [router, fetchRecords]);
+  }, [router, fetchCategories, fetchRecords]);
 
   // 打开新增对话框
   const openAddDialog = () => {
+    if (categories.length === 0) {
+      toast.error('请先添加支出类别');
+      return;
+    }
     setSelectedRecord(null);
     const today = getTodayString();
+    const firstCategory = categories[0];
+    const firstItem = firstCategory?.items?.[0]?.name || '';
     setFormData({
-      category: EXPENSE_CATEGORIES.DAILY,
-      item: DAILY_ITEMS[0],
+      category: firstCategory.name,
+      item: firstItem,
       reportDate: today,
       occurDate: today,
       invoiceNo: '',
@@ -248,7 +262,7 @@ export default function ExpensesPage() {
   const openEditDialog = (record: ExpenseRecord) => {
     setSelectedRecord(record);
     setFormData({
-      category: record.category as 'daily' | 'personnel',
+      category: record.category,
       item: record.item,
       reportDate: record.report_date,
       occurDate: record.occur_date,
@@ -261,12 +275,13 @@ export default function ExpensesPage() {
   };
 
   // 类别变化时更新子项目
-  const handleCategoryChange = (category: 'daily' | 'personnel') => {
-    const items = category === EXPENSE_CATEGORIES.DAILY ? DAILY_ITEMS : PERSONNEL_ITEMS;
+  const handleCategoryChange = (categoryName: string) => {
+    const category = categories.find(c => c.name === categoryName);
+    const firstItem = category?.items?.[0]?.name || '';
     setFormData({
       ...formData,
-      category,
-      item: items[0]
+      category: categoryName,
+      item: firstItem
     });
   };
 
@@ -419,7 +434,7 @@ export default function ExpensesPage() {
       // 生成文件名后缀
       let fileNameSuffix = '';
       if (filterCategory) {
-        fileNameSuffix += `_${CATEGORY_NAMES[filterCategory]}`;
+        fileNameSuffix += `_${filterCategory}`;
       }
       if (filterItem) {
         fileNameSuffix += `_${filterItem}`;
@@ -437,7 +452,7 @@ export default function ExpensesPage() {
         const data: (string | number)[][] = [headers];
         categoryRecords.forEach((r: ExpenseRecord) => {
           data.push([
-            CATEGORY_NAMES[r.category],
+            r.category,
             r.item,
             r.report_date,
             r.occur_date,
@@ -457,18 +472,18 @@ export default function ExpensesPage() {
           { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
           { wch: 15 }, { wch: 12 }, { wch: 30 }, { wch: 20 }
         ];
-        XLSX.utils.book_append_sheet(workbook, sheet, CATEGORY_NAMES[filterCategory]);
+        XLSX.utils.book_append_sheet(workbook, sheet, filterCategory);
       } else {
         // 未筛选类别，按类别分组生成工作表
-        const dailyRecords = exportRecords.filter((r: ExpenseRecord) => r.category === EXPENSE_CATEGORIES.DAILY);
-        const personnelRecords = exportRecords.filter((r: ExpenseRecord) => r.category === EXPENSE_CATEGORIES.PERSONNEL);
+        categories.forEach((category) => {
+          const categoryRecords = exportRecords.filter((r: ExpenseRecord) => r.category === category.name);
+          if (categoryRecords.length === 0) return;
 
         // 日常公用支出工作表
-        if (dailyRecords.length > 0) {
-          const dailyData: (string | number)[][] = [headers];
-          dailyRecords.forEach((r: ExpenseRecord) => {
-            dailyData.push([
-              CATEGORY_NAMES[r.category],
+          const categoryData: (string | number)[][] = [headers];
+          categoryRecords.forEach((r: ExpenseRecord) => {
+            categoryData.push([
+              r.category,
               r.item,
               r.report_date,
               r.occur_date,
@@ -479,71 +494,41 @@ export default function ExpensesPage() {
             ]);
           });
           // 添加合计
-          const dailyTotal = dailyRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
-          dailyData.push([]);
-          dailyData.push(['合计', '', '', '', '', dailyTotal, '', '']);
+          const categoryTotal = categoryRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
+          categoryData.push([]);
+          categoryData.push(['合计', '', '', '', '', categoryTotal, '', '']);
 
-          const dailySheet = XLSX.utils.aoa_to_sheet(dailyData);
-          dailySheet['!cols'] = [
+          const categorySheet = XLSX.utils.aoa_to_sheet(categoryData);
+          categorySheet['!cols'] = [
             { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
             { wch: 15 }, { wch: 12 }, { wch: 30 }, { wch: 20 }
           ];
-          XLSX.utils.book_append_sheet(workbook, dailySheet, '日常公用支出');
-        }
-
-        // 人员支出工作表
-        if (personnelRecords.length > 0) {
-          const personnelData: (string | number)[][] = [headers];
-          personnelRecords.forEach((r: ExpenseRecord) => {
-            personnelData.push([
-              CATEGORY_NAMES[r.category],
-              r.item,
-              r.report_date,
-              r.occur_date,
-              r.invoice_no || '',
-              r.amount,
-              r.summary || '',
-              r.remark || ''
-            ]);
-          });
-          // 添加合计
-          const personnelTotal = personnelRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
-          personnelData.push([]);
-          personnelData.push(['合计', '', '', '', '', personnelTotal, '', '']);
-
-          const personnelSheet = XLSX.utils.aoa_to_sheet(personnelData);
-          personnelSheet['!cols'] = [
-            { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
-            { wch: 15 }, { wch: 12 }, { wch: 30 }, { wch: 20 }
-          ];
-          XLSX.utils.book_append_sheet(workbook, personnelSheet, '人员支出');
-        }
+          XLSX.utils.book_append_sheet(workbook, categorySheet, category.name);
+        });
       }
 
       // 汇总工作表
-      const dailyRecords = exportRecords.filter((r: ExpenseRecord) => r.category === EXPENSE_CATEGORIES.DAILY);
-      const personnelRecords = exportRecords.filter((r: ExpenseRecord) => r.category === EXPENSE_CATEGORIES.PERSONNEL);
-      const dailyTotal = dailyRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
-      const personnelTotal = personnelRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
-
       const summaryData: (string | number)[][] = [
         ['支出汇总'],
         [],
         ['筛选条件:'],
-        ['类别', filterCategory ? CATEGORY_NAMES[filterCategory] : '全部'],
+        ['类别', filterCategory || '全部'],
         ['子项目', filterItem || '全部'],
         ['年月', filterYearMonth || '全部'],
         [],
         ['类别', '记录数', '金额合计']
       ];
-      if (dailyRecords.length > 0) {
-        summaryData.push(['日常公用支出', dailyRecords.length, dailyTotal]);
-      }
-      if (personnelRecords.length > 0) {
-        summaryData.push(['人员支出', personnelRecords.length, personnelTotal]);
-      }
+      let grandTotal = 0;
+      categories.forEach((category) => {
+        const categoryRecords = exportRecords.filter((r: ExpenseRecord) => r.category === category.name);
+        if (categoryRecords.length > 0) {
+          const total = categoryRecords.reduce((sum: number, r: ExpenseRecord) => sum + r.amount, 0);
+          summaryData.push([category.name, categoryRecords.length, total]);
+          grandTotal += total;
+        }
+      });
       summaryData.push([]);
-      summaryData.push(['总计', exportRecords.length, dailyTotal + personnelTotal]);
+      summaryData.push(['总计', exportRecords.length, grandTotal]);
 
       const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
       summarySheet['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 15 }];
@@ -767,59 +752,46 @@ export default function ExpensesPage() {
 
   // 下载导入模板
   const downloadImportTemplate = () => {
+    if (categories.length === 0) {
+      toast.error('请先添加支出类别');
+      return;
+    }
+
     // 创建工作簿
     const workbook = XLSX.utils.book_new();
 
-    // 日常公用支出模板
-    const dailyTemplate = [
-      ['类别', '子项目', '报账时间', '发生时间', '发票号', '金额', '摘要', '备注'],
-      ['日常公用支出', '办公费用', '2024-01-15', '2024-01', 'INV001', 100.00, '购买办公用品示例', '示例备注'],
-      ['日常公用支出', '水电费', '2024-01-16', '2024-01', 'INV002', 500.00, '本月水电费', ''],
-      ['', '', '', '', '', '', '', ''],
-      ['说明：'],
-      ['1. 类别填写"日常公用支出"或"人员支出"'],
-      ['2. 子项目必须与系统预设一致（详见"子项目参考"工作表）'],
-      ['3. 报账时间格式：YYYY-MM-DD；发生时间格式：YYYY-MM 或 YYYY-MM-DD'],
-      ['4. 金额必须为大于0的数字'],
-      ['5. 发票号、摘要、备注为选填项'],
-    ];
-    const dailySheet = XLSX.utils.aoa_to_sheet(dailyTemplate);
-    dailySheet['!cols'] = [
-      { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
-      { wch: 15 }, { wch: 12 }, { wch: 25 }, { wch: 15 }
-    ];
-    XLSX.utils.book_append_sheet(workbook, dailySheet, '日常公用支出模板');
-
-    // 人员支出模板
-    const personnelTemplate = [
-      ['类别', '子项目', '报账时间', '发生时间', '发票号', '金额', '摘要', '备注'],
-      ['人员支出', '教职工工资', '2024-01-20', '2024-01', '', 10000.00, '1月份工资', ''],
-      ['人员支出', '外聘老师工资', '2024-01-20', '2024-01', '', 5000.00, '外聘教师工资', ''],
-      ['', '', '', '', '', '', '', ''],
-      ['说明：'],
-      ['1. 类别填写"日常公用支出"或"人员支出"'],
-      ['2. 子项目必须与系统预设一致（详见"子项目参考"工作表）'],
-      ['3. 报账时间格式：YYYY-MM-DD；发生时间格式：YYYY-MM 或 YYYY-MM-DD'],
-      ['4. 金额必须为大于0的数字'],
-      ['5. 发票号、摘要、备注为选填项'],
-    ];
-    const personnelSheet = XLSX.utils.aoa_to_sheet(personnelTemplate);
-    personnelSheet['!cols'] = [
-      { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
-      { wch: 15 }, { wch: 12 }, { wch: 25 }, { wch: 15 }
-    ];
-    XLSX.utils.book_append_sheet(workbook, personnelSheet, '人员支出模板');
+    // 为每个类别创建模板工作表
+    categories.forEach((category) => {
+      const firstItem = category.items[0]?.name || '';
+      const template = [
+        ['类别', '子项目', '报账时间', '发生时间', '发票号', '金额', '摘要', '备注'],
+        [category.name, firstItem, '2024-01-15', '2024-01', 'INV001', 100.00, '示例摘要', '示例备注'],
+        ['', '', '', '', '', '', '', ''],
+        ['说明：'],
+        ['1. 类别填写系统中的类别名称'],
+        ['2. 子项目必须与系统预设一致（详见"子项目参考"工作表）'],
+        ['3. 报账时间格式：YYYY-MM-DD；发生时间格式：YYYY-MM 或 YYYY-MM-DD'],
+        ['4. 金额必须为大于0的数字'],
+        ['5. 发票号、摘要、备注为选填项'],
+      ];
+      const sheet = XLSX.utils.aoa_to_sheet(template);
+      sheet['!cols'] = [
+        { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+        { wch: 15 }, { wch: 12 }, { wch: 25 }, { wch: 15 }
+      ];
+      // 工作表名称最多31个字符
+      const sheetName = `${category.name}模板`.substring(0, 31);
+      XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+    });
 
     // 子项目参考
-    const maxRows = Math.max(DAILY_ITEMS.length, PERSONNEL_ITEMS.length);
-    const referenceData: (string | number)[][] = [
-      ['日常公用支出子项目', '人员支出子项目'],
-    ];
+    const maxRows = Math.max(...categories.map(c => c.items.length), 1);
+    const referenceHeader = categories.map(c => `${c.name}子项目`);
+    const referenceData: (string | number)[][] = [referenceHeader];
+    
     for (let i = 0; i < maxRows; i++) {
-      referenceData.push([
-        DAILY_ITEMS[i] || '',
-        PERSONNEL_ITEMS[i] || ''
-      ]);
+      const row = categories.map(c => c.items[i]?.name || '');
+      referenceData.push(row);
     }
     referenceData.push([]);
     referenceData.push(['提示：复制子项目名称到对应模板中使用']);
@@ -872,7 +844,7 @@ export default function ExpensesPage() {
   };
 
   // 获取当前类别的子项目列表
-  const currentItems = formData.category === EXPENSE_CATEGORIES.DAILY ? DAILY_ITEMS : PERSONNEL_ITEMS;
+  const currentItems = categories.find(c => c.name === formData.category)?.items.map(i => i.name) || [];
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -897,6 +869,14 @@ export default function ExpensesPage() {
             </div>
             
             <div className="flex items-center gap-2">
+              <Button 
+                onClick={() => router.push('/expenses/categories')} 
+                variant="outline" 
+                size="sm"
+              >
+                <Settings className="h-4 w-4 mr-1" />
+                类别管理
+              </Button>
               <Button 
                 onClick={() => router.push('/expenses/stats')} 
                 variant="outline" 
@@ -958,8 +938,9 @@ export default function ExpensesPage() {
                   </SelectTrigger>
                   <SelectContent position="popper">
                     <SelectItem value="all">全部</SelectItem>
-                    <SelectItem value={EXPENSE_CATEGORIES.DAILY}>日常公用支出</SelectItem>
-                    <SelectItem value={EXPENSE_CATEGORIES.PERSONNEL}>人员支出</SelectItem>
+                    {categories.map(category => (
+                      <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -972,22 +953,15 @@ export default function ExpensesPage() {
                   </SelectTrigger>
                   <SelectContent position="popper">
                     <SelectItem value="all">全部</SelectItem>
-                    {!filterCategory && (
-                      <>
-                        <SelectItem value="__group_daily__" disabled>—— 日常公用支出 ——</SelectItem>
-                        {DAILY_ITEMS.map(item => (
-                          <SelectItem key={item} value={item}>{item}</SelectItem>
+                    {!filterCategory && categories.map(category => (
+                      <div key={category.id}>
+                        <SelectItem value={`__group_${category.id}__`} disabled>—— {category.name} ——</SelectItem>
+                        {category.items.map(item => (
+                          <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>
                         ))}
-                        <SelectItem value="__group_personnel__" disabled>—— 人员支出 ——</SelectItem>
-                        {PERSONNEL_ITEMS.map(item => (
-                          <SelectItem key={item} value={item}>{item}</SelectItem>
-                        ))}
-                      </>
-                    )}
-                    {filterCategory === EXPENSE_CATEGORIES.DAILY && DAILY_ITEMS.map(item => (
-                      <SelectItem key={item} value={item}>{item}</SelectItem>
+                      </div>
                     ))}
-                    {filterCategory === EXPENSE_CATEGORIES.PERSONNEL && PERSONNEL_ITEMS.map(item => (
+                    {filterCategory && filterItems.map(item => (
                       <SelectItem key={item} value={item}>{item}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1068,7 +1042,7 @@ export default function ExpensesPage() {
                             className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
                           />
                         </TableCell>
-                        <TableCell>{CATEGORY_NAMES[record.category]}</TableCell>
+                        <TableCell>{record.category}</TableCell>
                         <TableCell>{record.item}</TableCell>
                         <TableCell>{record.report_date}</TableCell>
                         <TableCell>{record.occur_date?.substring(0, 7)}</TableCell>
@@ -1223,11 +1197,12 @@ export default function ExpensesPage() {
               <Label className="text-right">类别 *</Label>
               <Select value={formData.category} onValueChange={handleCategoryChange}>
                 <SelectTrigger className="col-span-3">
-                  <SelectValue />
+                  <SelectValue placeholder="请选择类别" />
                 </SelectTrigger>
                 <SelectContent position="popper">
-                  <SelectItem value={EXPENSE_CATEGORIES.DAILY}>日常公用支出</SelectItem>
-                  <SelectItem value={EXPENSE_CATEGORIES.PERSONNEL}>人员支出</SelectItem>
+                  {categories.map(category => (
+                    <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -1236,7 +1211,7 @@ export default function ExpensesPage() {
               <Label className="text-right">子项目 *</Label>
               <Select value={formData.item} onValueChange={(v) => setFormData({ ...formData, item: v })}>
                 <SelectTrigger className="col-span-3">
-                  <SelectValue />
+                  <SelectValue placeholder="请选择子项目" />
                 </SelectTrigger>
                 <SelectContent position="popper">
                   {currentItems.map(item => (

@@ -1,45 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, initDatabase, EXPENSE_CATEGORIES, DAILY_EXPENSE_ITEMS, PERSONNEL_EXPENSE_ITEMS } from '@/lib/database';
+import { db, initDatabase } from '@/lib/database';
 import { isAuthenticated } from '@/lib/auth';
 
 // 初始化数据库
 initDatabase();
 
-// 类别名称映射
-const CATEGORY_MAP: Record<string, string> = {
-  '日常公用支出': EXPENSE_CATEGORIES.DAILY,
-  '人员支出': EXPENSE_CATEGORIES.PERSONNEL,
-  '日常公用': EXPENSE_CATEGORIES.DAILY,
-  '人员': EXPENSE_CATEGORIES.PERSONNEL,
-};
+// 获取所有类别和子项目
+function getCategoriesWithItems() {
+  const categories = db.prepare(`
+    SELECT id, name FROM expense_categories ORDER BY sort_order, id
+  `).all() as Array<{ id: number; name: string }>;
 
-// 验证并获取类别
-function getCategory(categoryStr: string): string | null {
+  const items = db.prepare(`
+    SELECT id, category_id, name FROM expense_items ORDER BY sort_order, id
+  `).all() as Array<{ id: number; category_id: number; name: string }>;
+
+  return categories.map(cat => ({
+    ...cat,
+    items: items.filter(item => item.category_id === cat.id).map(i => i.name)
+  }));
+}
+
+// 验证并获取类别名称
+function getCategoryName(categoryStr: string, categories: Array<{ name: string }>): string | null {
   // 直接匹配
-  if (CATEGORY_MAP[categoryStr]) {
-    return CATEGORY_MAP[categoryStr];
+  for (const cat of categories) {
+    if (cat.name === categoryStr) return cat.name;
   }
   
   // 模糊匹配
   const normalized = categoryStr.trim().toLowerCase();
-  if (normalized.includes('日常') || normalized.includes('公用')) {
-    return EXPENSE_CATEGORIES.DAILY;
-  }
-  if (normalized.includes('人员')) {
-    return EXPENSE_CATEGORIES.PERSONNEL;
+  for (const cat of categories) {
+    if (cat.name.toLowerCase().includes(normalized) || normalized.includes(cat.name.toLowerCase())) {
+      return cat.name;
+    }
   }
   
   return null;
 }
 
 // 验证子项目
-function validateItem(category: string, item: string): boolean {
-  if (category === EXPENSE_CATEGORIES.DAILY) {
-    return (DAILY_EXPENSE_ITEMS as readonly string[]).includes(item);
-  } else if (category === EXPENSE_CATEGORIES.PERSONNEL) {
-    return (PERSONNEL_EXPENSE_ITEMS as readonly string[]).includes(item);
-  }
-  return false;
+function validateItem(categoryName: string, itemName: string, categories: Array<{ name: string; items: string[] }>): boolean {
+  const category = categories.find(c => c.name === categoryName);
+  if (!category) return false;
+  return category.items.includes(itemName);
 }
 
 // POST - 批量导入支出记录
@@ -55,6 +59,9 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(records) || records.length === 0) {
       return NextResponse.json({ error: '没有可导入的数据' }, { status: 400 });
     }
+
+    // 获取所有类别和子项目
+    const categories = getCategoriesWithItems();
 
     // 验证并处理每条记录
     const validRecords: Array<{
@@ -75,17 +82,19 @@ export async function POST(request: NextRequest) {
       const rowNum = i + 2; // Excel行号从2开始（第1行是表头）
 
       // 验证类别
-      const category = getCategory(record.category || '');
-      if (!category) {
-        errors.push({ row: rowNum, error: `类别"${record.category}"无效，应为"日常公用支出"或"人员支出"` });
+      const categoryName = getCategoryName(record.category || '', categories);
+      if (!categoryName) {
+        const validCategories = categories.map(c => c.name).join('、');
+        errors.push({ row: rowNum, error: `类别"${record.category}"无效，有效值为: ${validCategories}` });
         continue;
       }
 
       // 验证子项目
       const item = record.item?.trim();
-      if (!item || !validateItem(category, item)) {
-        const validItems = category === EXPENSE_CATEGORIES.DAILY ? DAILY_EXPENSE_ITEMS : PERSONNEL_EXPENSE_ITEMS;
-        errors.push({ row: rowNum, error: `子项目"${item}"无效，有效值为: ${validItems.join('、')}` });
+      if (!item || !validateItem(categoryName, item, categories)) {
+        const category = categories.find(c => c.name === categoryName);
+        const validItems = category?.items.join('、') || '';
+        errors.push({ row: rowNum, error: `子项目"${item}"无效，有效值为: ${validItems}` });
         continue;
       }
 
@@ -114,7 +123,7 @@ export async function POST(request: NextRequest) {
 
       // 验证通过，添加到有效记录列表
       validRecords.push({
-        category,
+        category: categoryName,
         item,
         reportDate,
         occurDate: occurDateNormalized,

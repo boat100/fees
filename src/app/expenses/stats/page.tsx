@@ -133,9 +133,6 @@ export default function ExpensesStatsPage() {
     return amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  // 柱状图标签格式化函数
-  const barLabelFormatter = (value: number) => `¥${formatAmount(value)}`;
-
   // 图表Tooltip格式化
   const CustomTooltip = ({ active, payload, label }: {
     active?: boolean;
@@ -298,7 +295,6 @@ export default function ExpensesStatsPage() {
                           name="金额" 
                           fill="#ef4444" 
                           radius={[4, 4, 0, 0]}
-                          label={{ position: 'top', formatter: barLabelFormatter, fill: '#374151', fontSize: 12 }}
                         />
                       </BarChart>
                     </ResponsiveContainer>
@@ -333,7 +329,7 @@ export default function ExpensesStatsPage() {
                           <BarChart
                             data={itemData}
                             layout="vertical"
-                            margin={{ top: 20, right: 80, left: 120, bottom: 5 }}
+                            margin={{ top: 20, right: 30, left: 120, bottom: 5 }}
                           >
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis 
@@ -354,7 +350,6 @@ export default function ExpensesStatsPage() {
                               name="金额" 
                               fill={color}
                               radius={[0, 4, 4, 0]}
-                              label={{ position: 'right', formatter: barLabelFormatter, fill: '#374151', fontSize: 11 }}
                             />
                           </BarChart>
                         </ResponsiveContainer>

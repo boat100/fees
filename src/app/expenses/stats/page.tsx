@@ -47,8 +47,8 @@ interface ItemStat {
 
 interface StatsData {
   categoryData: CategoryStat[];
-  dailyItemData: ItemStat[];
-  personnelItemData: ItemStat[];
+  itemDataByCategory: Record<string, ItemStat[]>;
+  categoryNames: string[];
   yearList: string[];
   monthList: string[];
   totalAmount: number;
@@ -307,103 +307,62 @@ export default function ExpensesStatsPage() {
               </CardContent>
             </Card>
 
-            {/* 图表二：日常公用支出子项目统计 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingDown className="h-5 w-5 text-orange-500" />
-                  日常公用支出明细统计
-                </CardTitle>
-                <CardDescription>日常公用支出各子项目金额分布</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {statsData?.dailyItemData && statsData.dailyItemData.length > 0 ? (
-                  <div className="h-96">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={statsData.dailyItemData}
-                        layout="vertical"
-                        margin={{ top: 20, right: 30, left: 100, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          type="number"
-                          tickFormatter={(value) => formatAmount(value)}
-                          tick={{ fontSize: 12 }}
-                        />
-                        <YAxis 
-                          type="category" 
-                          dataKey="item"
-                          tick={{ fontSize: 11 }}
-                          width={90}
-                        />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend />
-                        <Bar 
-                          dataKey="totalAmount" 
-                          name="金额" 
-                          fill="#f97316" 
-                          radius={[0, 4, 4, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="h-32 flex items-center justify-center text-gray-500">
-                    暂无数据
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* 图表三：人员支出子项目统计 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingDown className="h-5 w-5 text-blue-500" />
-                  人员支出明细统计
-                </CardTitle>
-                <CardDescription>人员支出各子项目金额分布</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {statsData?.personnelItemData && statsData.personnelItemData.length > 0 ? (
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={statsData.personnelItemData}
-                        layout="vertical"
-                        margin={{ top: 20, right: 30, left: 120, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          type="number"
-                          tickFormatter={(value) => formatAmount(value)}
-                          tick={{ fontSize: 12 }}
-                        />
-                        <YAxis 
-                          type="category" 
-                          dataKey="item"
-                          tick={{ fontSize: 11 }}
-                          width={110}
-                        />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend />
-                        <Bar 
-                          dataKey="totalAmount" 
-                          name="金额" 
-                          fill="#3b82f6" 
-                          radius={[0, 4, 4, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="h-32 flex items-center justify-center text-gray-500">
-                    暂无数据
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* 动态类别子项目统计图表 */}
+            {statsData?.categoryNames && statsData.categoryNames.map((categoryName, index) => {
+              const itemData = statsData.itemDataByCategory?.[categoryName] || [];
+              const colors = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899'];
+              const color = colors[index % colors.length];
+              
+              return (
+                <Card key={categoryName}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingDown className="h-5 w-5" style={{ color }} />
+                      {categoryName}明细统计
+                    </CardTitle>
+                    <CardDescription>{categoryName}各子项目金额分布</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {itemData.length > 0 ? (
+                      <div className="h-96">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={itemData}
+                            layout="vertical"
+                            margin={{ top: 20, right: 30, left: 120, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis 
+                              type="number"
+                              tickFormatter={(value) => formatAmount(value)}
+                              tick={{ fontSize: 12 }}
+                            />
+                            <YAxis 
+                              type="category" 
+                              dataKey="item"
+                              tick={{ fontSize: 11 }}
+                              width={110}
+                            />
+                            <Tooltip content={<CustomTooltip />} />
+                            <Legend />
+                            <Bar 
+                              dataKey="totalAmount" 
+                              name="金额" 
+                              fill={color}
+                              radius={[0, 4, 4, 0]}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-32 flex items-center justify-center text-gray-500">
+                        暂无数据
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </main>

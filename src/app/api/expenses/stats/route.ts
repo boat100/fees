@@ -5,6 +5,14 @@ import { isAuthenticated } from '@/lib/auth';
 // 初始化数据库
 initDatabase();
 
+// 获取类别名称列表
+function getCategoryNames(): string[] {
+  const categories = db.prepare(`
+    SELECT name FROM expense_categories ORDER BY sort_order, id
+  `).all() as Array<{ name: string }>;
+  return categories.map(c => c.name);
+}
+
 // GET - 获取支出统计数据
 export async function GET(request: NextRequest) {
   if (!(await isAuthenticated())) {
@@ -16,6 +24,9 @@ export async function GET(request: NextRequest) {
     const timeType = searchParams.get('timeType') || 'all'; // all, year, month
     const year = searchParams.get('year');
     const month = searchParams.get('month');
+
+    // 获取动态类别名称
+    const categoryNames = getCategoryNames();
 
     // 构建时间筛选条件
     let timeCondition = '';
@@ -31,7 +42,7 @@ export async function GET(request: NextRequest) {
       params.push(yearPart, monthPart);
     }
 
-    // 1. 按类别统计（日常公用支出 vs 人员支出）
+    // 1. 按类别统计（使用动态类别）
     const categoryStats = db.prepare(`
       SELECT 
         category,
@@ -47,64 +58,40 @@ export async function GET(request: NextRequest) {
       record_count: number;
     }>;
 
-    // 类别名称映射
-    const categoryNames: Record<string, string> = {
-      'daily': '日常公用支出',
-      'personnel': '人员支出'
-    };
-
     const categoryData = categoryStats.map(stat => ({
-      category: categoryNames[stat.category] || stat.category,
+      category: stat.category,
       categoryKey: stat.category,
       totalAmount: stat.total_amount,
       recordCount: stat.record_count
     }));
 
-    // 2. 日常公用支出子项目统计
-    const dailyItemStats = db.prepare(`
-      SELECT 
-        item,
-        SUM(amount) as total_amount,
-        COUNT(*) as record_count
-      FROM expense_records
-      WHERE category = 'daily' ${timeCondition}
-      GROUP BY item
-      ORDER BY total_amount DESC
-    `).all(...params) as Array<{
-      item: string;
-      total_amount: number;
-      record_count: number;
-    }>;
+    // 2. 按类别统计子项目
+    const itemDataByCategory: Record<string, Array<{ item: string; totalAmount: number; recordCount: number }>> = {};
+    
+    for (const categoryName of categoryNames) {
+      const itemStats = db.prepare(`
+        SELECT 
+          item,
+          SUM(amount) as total_amount,
+          COUNT(*) as record_count
+        FROM expense_records
+        WHERE category = ? ${timeCondition}
+        GROUP BY item
+        ORDER BY total_amount DESC
+      `).all(categoryName, ...params) as Array<{
+        item: string;
+        total_amount: number;
+        record_count: number;
+      }>;
 
-    const dailyItemData = dailyItemStats.map(stat => ({
-      item: stat.item,
-      totalAmount: stat.total_amount,
-      recordCount: stat.record_count
-    }));
+      itemDataByCategory[categoryName] = itemStats.map(stat => ({
+        item: stat.item,
+        totalAmount: stat.total_amount,
+        recordCount: stat.record_count
+      }));
+    }
 
-    // 3. 人员支出子项目统计
-    const personnelItemStats = db.prepare(`
-      SELECT 
-        item,
-        SUM(amount) as total_amount,
-        COUNT(*) as record_count
-      FROM expense_records
-      WHERE category = 'personnel' ${timeCondition}
-      GROUP BY item
-      ORDER BY total_amount DESC
-    `).all(...params) as Array<{
-      item: string;
-      total_amount: number;
-      record_count: number;
-    }>;
-
-    const personnelItemData = personnelItemStats.map(stat => ({
-      item: stat.item,
-      totalAmount: stat.total_amount,
-      recordCount: stat.record_count
-    }));
-
-    // 4. 获取可用的年份列表
+    // 3. 获取可用的年份列表
     const yearList = db.prepare(`
       SELECT DISTINCT strftime('%Y', occur_date) as year
       FROM expense_records
@@ -112,7 +99,7 @@ export async function GET(request: NextRequest) {
       ORDER BY year DESC
     `).all() as Array<{ year: string }>;
 
-    // 5. 获取可用的月份列表
+    // 4. 获取可用的月份列表
     const monthList = db.prepare(`
       SELECT DISTINCT strftime('%Y-%m', occur_date) as month
       FROM expense_records
@@ -120,7 +107,7 @@ export async function GET(request: NextRequest) {
       ORDER BY month DESC
     `).all() as Array<{ month: string }>;
 
-    // 6. 计算总计
+    // 5. 计算总计
     const totalStats = db.prepare(`
       SELECT 
         SUM(amount) as total_amount,
@@ -132,12 +119,18 @@ export async function GET(request: NextRequest) {
       record_count: number | null;
     };
 
+    // 构建类别统计对象（兼容旧格式）
+    const categoryStatsMap: Record<string, number> = {};
+    for (const stat of categoryStats) {
+      categoryStatsMap[stat.category] = stat.total_amount;
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         categoryData,
-        dailyItemData,
-        personnelItemData,
+        itemDataByCategory,
+        categoryNames,
         yearList: yearList.map(y => y.year),
         monthList: monthList.map(m => m.month),
         totalAmount: totalStats.total_amount || 0,
@@ -146,10 +139,7 @@ export async function GET(request: NextRequest) {
       // 为保持与 stats 页面的兼容性，同时返回扁平格式
       total: totalStats.total_amount || 0,
       count: totalStats.record_count || 0,
-      categoryStats: {
-        daily: categoryStats.find(c => c.category === 'daily')?.total_amount || 0,
-        personnel: categoryStats.find(c => c.category === 'personnel')?.total_amount || 0
-      }
+      categoryStats: categoryStatsMap
     });
   } catch (error) {
     console.error('Error fetching expense stats:', error);

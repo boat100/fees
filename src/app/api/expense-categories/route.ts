@@ -111,11 +111,13 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: '类别名称不能为空' }, { status: 400 });
     }
 
-    // 检查是否存在
-    const existing = db.prepare('SELECT id FROM expense_categories WHERE id = ?').get(id);
+    // 检查是否存在，并获取旧名称
+    const existing = db.prepare('SELECT id, name FROM expense_categories WHERE id = ?').get(id) as { id: number; name: string } | undefined;
     if (!existing) {
       return NextResponse.json({ error: '类别不存在' }, { status: 404 });
     }
+
+    const oldName = existing.name;
 
     // 检查名称是否与其他类别重复
     const duplicate = db.prepare('SELECT id FROM expense_categories WHERE name = ? AND id != ?').get(name.trim(), id);
@@ -123,10 +125,27 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: '类别名称已存在' }, { status: 400 });
     }
 
-    const stmt = db.prepare('UPDATE expense_categories SET name = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-    stmt.run(name.trim(), sortOrder || 0, id);
+    // 使用事务确保数据一致性
+    const updateCategory = db.transaction(() => {
+      // 更新类别名称
+      db.prepare('UPDATE expense_categories SET name = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(name.trim(), sortOrder || 0, id);
+      
+      // 同步更新支出记录中的类别字段
+      if (oldName !== name.trim()) {
+        const result = db.prepare('UPDATE expense_records SET category = ?, updated_at = CURRENT_TIMESTAMP WHERE category = ?').run(name.trim(), oldName);
+        return { updatedRecords: result.changes };
+      }
+      return { updatedRecords: 0 };
+    });
 
-    return NextResponse.json({ success: true, message: '类别更新成功' });
+    const { updatedRecords } = updateCategory();
+
+    return NextResponse.json({ 
+      success: true, 
+      message: updatedRecords > 0 
+        ? `类别更新成功，已同步更新 ${updatedRecords} 条支出记录` 
+        : '类别更新成功' 
+    });
   } catch (error) {
     console.error('Error updating expense category:', error);
     return NextResponse.json({ error: '更新支出类别失败' }, { status: 500 });
@@ -142,16 +161,19 @@ export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
+    const force = searchParams.get('force') === 'true'; // 是否强制删除（包括关联的支出记录）
 
     if (!id) {
       return NextResponse.json({ error: '缺少类别ID' }, { status: 400 });
     }
 
-    // 检查是否存在
-    const existing = db.prepare('SELECT id FROM expense_categories WHERE id = ?').get(id);
+    // 检查类别是否存在，并获取类别名称
+    const existing = db.prepare('SELECT id, name FROM expense_categories WHERE id = ?').get(id) as { id: number; name: string } | undefined;
     if (!existing) {
       return NextResponse.json({ error: '类别不存在' }, { status: 404 });
     }
+
+    const categoryName = existing.name;
 
     // 检查是否有子项目
     const itemCount = db.prepare('SELECT COUNT(*) as count FROM expense_items WHERE category_id = ?').get(id) as { count: number };
@@ -159,9 +181,38 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: '该类别下还有子项目，请先删除子项目' }, { status: 400 });
     }
 
-    db.prepare('DELETE FROM expense_categories WHERE id = ?').run(id);
+    // 检查是否有支出记录
+    const recordCount = db.prepare('SELECT COUNT(*) as count FROM expense_records WHERE category = ?').get(categoryName) as { count: number };
 
-    return NextResponse.json({ success: true, message: '类别删除成功' });
+    // 如果有支出记录但不是强制删除，返回提示信息
+    if (recordCount.count > 0 && !force) {
+      return NextResponse.json({ 
+        error: '该类别下有支出记录',
+        hasRecords: true,
+        recordCount: recordCount.count,
+        message: `该类别下有 ${recordCount.count} 条支出记录，删除类别将同时删除这些记录，是否继续？`
+      }, { status: 400 });
+    }
+
+    // 使用事务确保数据一致性
+    const deleteCategory = db.transaction(() => {
+      // 删除关联的支出记录
+      if (recordCount.count > 0) {
+        db.prepare('DELETE FROM expense_records WHERE category = ?').run(categoryName);
+      }
+      // 删除类别
+      db.prepare('DELETE FROM expense_categories WHERE id = ?').run(id);
+    });
+
+    deleteCategory();
+
+    return NextResponse.json({ 
+      success: true, 
+      message: recordCount.count > 0 
+        ? `类别删除成功，已同时删除 ${recordCount.count} 条支出记录` 
+        : '类别删除成功',
+      deletedRecords: recordCount.count
+    });
   } catch (error) {
     console.error('Error deleting expense category:', error);
     return NextResponse.json({ error: '删除支出类别失败' }, { status: 500 });

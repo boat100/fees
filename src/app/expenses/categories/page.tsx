@@ -75,6 +75,8 @@ export default function ExpenseCategoriesPage() {
   const [categoryForm, setCategoryForm] = useState({ name: '', sortOrder: 0 });
   const [deleteCategoryDialogOpen, setDeleteCategoryDialogOpen] = useState(false);
   const [deletingCategoryId, setDeletingCategoryId] = useState<number | null>(null);
+  const [categoryRecordCount, setCategoryRecordCount] = useState(0); // 受影响的支出记录数
+  const [forceDeleteCategory, setForceDeleteCategory] = useState(false); // 是否强制删除
   
   // 子项目对话框状态
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
@@ -82,6 +84,8 @@ export default function ExpenseCategoriesPage() {
   const [itemForm, setItemForm] = useState({ categoryId: 0, name: '', sortOrder: 0 });
   const [deleteItemDialogOpen, setDeleteItemDialogOpen] = useState(false);
   const [deletingItem, setDeletingItem] = useState<ExpenseItem | null>(null);
+  const [itemRecordCount, setItemRecordCount] = useState(0); // 受影响的支出记录数
+  const [forceDeleteItem, setForceDeleteItem] = useState(false); // 是否强制删除
 
   // 获取类别数据
   const fetchCategories = useCallback(async () => {
@@ -181,17 +185,25 @@ export default function ExpenseCategoriesPage() {
 
     setSubmitting(true);
     try {
-      const response = await authFetch(`/api/expense-categories?id=${deletingCategoryId}`, {
+      const forceParam = forceDeleteCategory ? '&force=true' : '';
+      const response = await authFetch(`/api/expense-categories?id=${deletingCategoryId}${forceParam}`, {
         method: 'DELETE'
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        toast.success('类别删除成功');
+        toast.success(result.message || '类别删除成功');
         setDeleteCategoryDialogOpen(false);
         setDeletingCategoryId(null);
+        setCategoryRecordCount(0);
+        setForceDeleteCategory(false);
         fetchCategories();
+      } else if (result.hasRecords) {
+        // 有支出记录，需要用户确认
+        setCategoryRecordCount(result.recordCount);
+        setForceDeleteCategory(true);
+        // 不关闭对话框，让用户再次确认
       } else {
         toast.error(result.error || '删除失败');
       }
@@ -275,17 +287,25 @@ export default function ExpenseCategoriesPage() {
 
     setSubmitting(true);
     try {
-      const response = await authFetch(`/api/expense-items?id=${deletingItem.id}`, {
+      const forceParam = forceDeleteItem ? '&force=true' : '';
+      const response = await authFetch(`/api/expense-items?id=${deletingItem.id}${forceParam}`, {
         method: 'DELETE'
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        toast.success('子项目删除成功');
+        toast.success(result.message || '子项目删除成功');
         setDeleteItemDialogOpen(false);
         setDeletingItem(null);
+        setItemRecordCount(0);
+        setForceDeleteItem(false);
         fetchCategories();
+      } else if (result.hasRecords) {
+        // 有支出记录，需要用户确认
+        setItemRecordCount(result.recordCount);
+        setForceDeleteItem(true);
+        // 不关闭对话框，让用户再次确认
       } else {
         toast.error(result.error || '删除失败');
       }
@@ -565,12 +585,24 @@ export default function ExpenseCategoriesPage() {
       </Dialog>
 
       {/* 删除类别确认对话框 */}
-      <AlertDialog open={deleteCategoryDialogOpen} onOpenChange={setDeleteCategoryDialogOpen}>
+      <AlertDialog open={deleteCategoryDialogOpen} onOpenChange={(open) => {
+        setDeleteCategoryDialogOpen(open);
+        if (!open) {
+          setCategoryRecordCount(0);
+          setForceDeleteCategory(false);
+        }
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除该类别吗？如果类别下有子项目，需要先删除子项目。
+              {categoryRecordCount > 0 ? (
+                <span className="text-red-600 font-medium">
+                  ⚠️ 该类别下有 {categoryRecordCount} 条支出记录，删除类别将同时删除这些记录！此操作不可恢复，是否继续？
+                </span>
+              ) : (
+                '确定要删除该类别吗？如果类别下有子项目，需要先删除子项目。'
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -580,19 +612,31 @@ export default function ExpenseCategoriesPage() {
               disabled={submitting}
               className="bg-red-600 hover:bg-red-700"
             >
-              {submitting ? '删除中...' : '确认删除'}
+              {submitting ? '删除中...' : categoryRecordCount > 0 ? '确认删除（包含支出记录）' : '确认删除'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* 删除子项目确认对话框 */}
-      <AlertDialog open={deleteItemDialogOpen} onOpenChange={setDeleteItemDialogOpen}>
+      <AlertDialog open={deleteItemDialogOpen} onOpenChange={(open) => {
+        setDeleteItemDialogOpen(open);
+        if (!open) {
+          setItemRecordCount(0);
+          setForceDeleteItem(false);
+        }
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除子项目"{deletingItem?.name}"吗？
+              {itemRecordCount > 0 ? (
+                <span className="text-red-600 font-medium">
+                  ⚠️ 子项目"{deletingItem?.name}"下有 {itemRecordCount} 条支出记录，删除子项目将同时删除这些记录！此操作不可恢复，是否继续？
+                </span>
+              ) : (
+                `确定要删除子项目"${deletingItem?.name}"吗？`
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -602,7 +646,7 @@ export default function ExpenseCategoriesPage() {
               disabled={submitting}
               className="bg-red-600 hover:bg-red-700"
             >
-              {submitting ? '删除中...' : '确认删除'}
+              {submitting ? '删除中...' : itemRecordCount > 0 ? '确认删除（包含支出记录）' : '确认删除'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -72,9 +72,13 @@ ENV COZE_WORKSPACE_PATH=/app
 # 暴露端口
 EXPOSE 5000
 
-# 健康检查（增加启动等待时间，适应群晖等资源受限环境）
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:5000 || exit 1
+# 健康检查（静默错误输出，避免警告显示）
+# --start-period=90s: 容器启动后90秒才开始健康检查（适应群晖等资源受限环境）
+# --interval=30s: 每30秒检查一次
+# --timeout=10s: 每次检查超时时间10秒
+# --retries=3: 连续3次失败才标记为unhealthy
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+    CMD curl -sf http://localhost:5000/api/health > /dev/null 2>&1 || exit 1
 
 # 启动命令
 CMD ["node", "server.js"]

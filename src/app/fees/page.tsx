@@ -980,7 +980,7 @@ function FeesContent() {
     return (
       <div className="text-right">
         <div className={isFull ? 'text-green-600 font-medium' : ''}>
-          {fee.toFixed(0)}/{paid.toFixed(0)}
+          {fee.toFixed(2)}/{paid.toFixed(2)}
         </div>
       </div>
     );
@@ -1311,7 +1311,7 @@ function FeesContent() {
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             <div className={totalPaid >= totalFee && totalFee > 0 ? 'text-green-600' : 'text-blue-600'}>
-                              {totalFee.toFixed(0)}/{totalPaid.toFixed(0)}
+                              {totalFee.toFixed(2)}/{totalPaid.toFixed(2)}
                             </div>
                           </TableCell>
                           <TableCell className="max-w-[100px]">
@@ -1354,25 +1354,25 @@ function FeesContent() {
                     <TableRow className="bg-blue-50 font-semibold">
                       <TableCell colSpan={selectMode ? 5 : 4} className="text-center">合计</TableCell>
                       <TableCell className="text-right">
-                        <div>{totals.tuition_fee.toFixed(0)}/{totals.tuition_paid.toFixed(0)}</div>
+                        <div>{totals.tuition_fee.toFixed(2)}/{totals.tuition_paid.toFixed(2)}</div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div>{totals.lunch_fee.toFixed(0)}/{totals.lunch_paid.toFixed(0)}</div>
+                        <div>{totals.lunch_fee.toFixed(2)}/{totals.lunch_paid.toFixed(2)}</div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div>{totals.nap_fee.toFixed(0)}/{totals.nap_paid.toFixed(0)}</div>
+                        <div>{totals.nap_fee.toFixed(2)}/{totals.nap_paid.toFixed(2)}</div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div>{totals.after_school_fee.toFixed(0)}/{totals.after_school_paid.toFixed(0)}</div>
+                        <div>{totals.after_school_fee.toFixed(2)}/{totals.after_school_paid.toFixed(2)}</div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div>{totals.club_fee.toFixed(0)}/{totals.club_paid.toFixed(0)}</div>
+                        <div>{totals.club_fee.toFixed(2)}/{totals.club_paid.toFixed(2)}</div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="text-purple-600">{totals.agency_fee.toFixed(0)}/{totals.agency_paid.toFixed(0)}/{totals.agency_balance.toFixed(0)}</div>
+                        <div className="text-purple-600">{totals.agency_fee.toFixed(2)}/{totals.agency_paid.toFixed(2)}/{totals.agency_balance.toFixed(2)}</div>
                       </TableCell>
                       <TableCell className="text-right text-blue-700">
-                        {totals.total_fee.toFixed(0)}/{totals.total_paid.toFixed(0)}
+                        {totals.total_fee.toFixed(2)}/{totals.total_paid.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-center">-</TableCell>
                       <TableCell className="text-center">-</TableCell>

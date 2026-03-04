@@ -1094,7 +1094,7 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                       <div className="flex-1">
                         <div className="font-medium">{item.label}</div>
                         <div className="text-xs text-gray-500">
-                          应交: {expected.toFixed(0)} | 已交: {paid.toFixed(0)} | 欠费: {remaining > 0 ? remaining.toFixed(0) : '0'}
+                          应交: {expected.toFixed(2)} | 已交: {paid.toFixed(2)} | 欠费: {remaining > 0 ? remaining.toFixed(2) : '0'}
                         </div>
                       </div>
                       <Input

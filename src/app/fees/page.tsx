@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
+import { formatAmount } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -980,7 +981,7 @@ function FeesContent() {
     return (
       <div className="text-right">
         <div className={isFull ? 'text-green-600 font-medium' : ''}>
-          {fee.toFixed(2)}/{paid.toFixed(2)}
+          {formatAmount(fee)}/{formatAmount(paid)}
         </div>
       </div>
     );
@@ -1311,7 +1312,7 @@ function FeesContent() {
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             <div className={totalPaid >= totalFee && totalFee > 0 ? 'text-green-600' : 'text-blue-600'}>
-                              {totalFee.toFixed(2)}/{totalPaid.toFixed(2)}
+                              {formatAmount(totalFee)}/{formatAmount(totalPaid)}
                             </div>
                           </TableCell>
                           <TableCell className="max-w-[100px]">
@@ -1354,25 +1355,25 @@ function FeesContent() {
                     <TableRow className="bg-blue-50 font-semibold">
                       <TableCell colSpan={selectMode ? 5 : 4} className="text-center">合计</TableCell>
                       <TableCell className="text-right">
-                        <div>{totals.tuition_fee.toFixed(2)}/{totals.tuition_paid.toFixed(2)}</div>
+                        <div>{formatAmount(totals.tuition_fee)}/{formatAmount(totals.tuition_paid)}</div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div>{totals.lunch_fee.toFixed(2)}/{totals.lunch_paid.toFixed(2)}</div>
+                        <div>{formatAmount(totals.lunch_fee)}/{formatAmount(totals.lunch_paid)}</div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div>{totals.nap_fee.toFixed(2)}/{totals.nap_paid.toFixed(2)}</div>
+                        <div>{formatAmount(totals.nap_fee)}/{formatAmount(totals.nap_paid)}</div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div>{totals.after_school_fee.toFixed(2)}/{totals.after_school_paid.toFixed(2)}</div>
+                        <div>{formatAmount(totals.after_school_fee)}/{formatAmount(totals.after_school_paid)}</div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div>{totals.club_fee.toFixed(2)}/{totals.club_paid.toFixed(2)}</div>
+                        <div>{formatAmount(totals.club_fee)}/{formatAmount(totals.club_paid)}</div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="text-purple-600">{totals.agency_fee.toFixed(2)}/{totals.agency_paid.toFixed(2)}/{totals.agency_balance.toFixed(2)}</div>
+                        <div className="text-purple-600">{formatAmount(totals.agency_fee)}/{formatAmount(totals.agency_paid)}/{formatAmount(totals.agency_balance)}</div>
                       </TableCell>
                       <TableCell className="text-right text-blue-700">
-                        {totals.total_fee.toFixed(2)}/{totals.total_paid.toFixed(2)}
+                        {formatAmount(totals.total_fee)}/{formatAmount(totals.total_paid)}
                       </TableCell>
                       <TableCell className="text-center">-</TableCell>
                       <TableCell className="text-center">-</TableCell>

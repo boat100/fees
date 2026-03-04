@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
+import { formatAmount } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -145,7 +146,7 @@ function StatsContent() {
 
   // 格式化金额
   const formatMoney = (amount: number) => {
-    return amount.toFixed(2);
+    return formatAmount(amount);
   };
 
   return (
@@ -472,13 +473,13 @@ function StatsContent() {
                                 <TableRow key={`${month}-${className}`}>
                                   <TableCell className="font-medium">{idx === 0 ? month : ''}</TableCell>
                                   <TableCell>{className}</TableCell>
-                                  <TableCell className="text-right">{classData.payments['tuition']?.amount.toFixed(2) || '-'}</TableCell>
-                                  <TableCell className="text-right">{classData.payments['lunch']?.amount.toFixed(2) || '-'}</TableCell>
-                                  <TableCell className="text-right">{classData.payments['nap']?.amount.toFixed(2) || '-'}</TableCell>
-                                  <TableCell className="text-right">{classData.payments['after_school']?.amount.toFixed(2) || '-'}</TableCell>
-                                  <TableCell className="text-right">{classData.payments['club']?.amount.toFixed(2) || '-'}</TableCell>
-                                  <TableCell className="text-right">{classData.payments['agency']?.amount.toFixed(2) || '-'}</TableCell>
-                                  <TableCell className="text-right font-semibold text-green-600">¥{classData.total.toFixed(2)}</TableCell>
+                                  <TableCell className="text-right">{classData.payments['tuition']?.amount}</TableCell>
+                                  <TableCell className="text-right">{classData.payments['lunch']?.amount}</TableCell>
+                                  <TableCell className="text-right">{classData.payments['nap']?.amount}</TableCell>
+                                  <TableCell className="text-right">{classData.payments['after_school']?.amount}</TableCell>
+                                  <TableCell className="text-right">{classData.payments['club']?.amount}</TableCell>
+                                  <TableCell className="text-right">{classData.payments['agency']?.amount}</TableCell>
+                                  <TableCell className="text-right font-semibold text-green-600">¥{formatAmount(classData.total)}</TableCell>
                                 </TableRow>
                               );
                             });
@@ -493,13 +494,13 @@ function StatsContent() {
                             rows.push(
                               <TableRow key={`${month}-total`} className="bg-gray-50">
                                 <TableCell colSpan={2} className="font-semibold text-gray-600">{month} 合计</TableCell>
-                                <TableCell className="text-right font-semibold">¥{monthTotals['tuition'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-semibold">¥{monthTotals['lunch'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-semibold">¥{monthTotals['nap'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-semibold">¥{monthTotals['after_school'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-semibold">¥{monthTotals['club'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-semibold">¥{monthTotals['agency'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-semibold text-blue-600">¥{monthTotal.toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-semibold">¥{formatAmount(monthTotals['tuition'])}</TableCell>
+                                <TableCell className="text-right font-semibold">¥{formatAmount(monthTotals['lunch'])}</TableCell>
+                                <TableCell className="text-right font-semibold">¥{formatAmount(monthTotals['nap'])}</TableCell>
+                                <TableCell className="text-right font-semibold">¥{formatAmount(monthTotals['after_school'])}</TableCell>
+                                <TableCell className="text-right font-semibold">¥{formatAmount(monthTotals['club'])}</TableCell>
+                                <TableCell className="text-right font-semibold">¥{formatAmount(monthTotals['agency'])}</TableCell>
+                                <TableCell className="text-right font-semibold text-blue-600">¥{formatAmount(monthTotal)}</TableCell>
                               </TableRow>
                             );
                           });
@@ -509,13 +510,13 @@ function StatsContent() {
                             rows.push(
                               <TableRow key="grand-total" className="bg-blue-100">
                                 <TableCell colSpan={2} className="font-bold text-blue-800">总计</TableCell>
-                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotals['tuition'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotals['lunch'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotals['nap'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotals['after_school'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotals['club'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotals['agency'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-bold text-blue-800">¥{grandTotal.toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{formatAmount(grandTotals['tuition'])}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{formatAmount(grandTotals['lunch'])}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{formatAmount(grandTotals['nap'])}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{formatAmount(grandTotals['after_school'])}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{formatAmount(grandTotals['club'])}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{formatAmount(grandTotals['agency'])}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-800">¥{formatAmount(grandTotal)}</TableCell>
                               </TableRow>
                             );
                           }
@@ -575,25 +576,25 @@ function StatsContent() {
                                 return (
                                   <TableRow key={className}>
                                     <TableCell className="font-medium">{className}</TableCell>
-                                    <TableCell className="text-right">{classData.payments['tuition']?.amount.toFixed(2) || '-'}</TableCell>
-                                    <TableCell className="text-right">{classData.payments['lunch']?.amount.toFixed(2) || '-'}</TableCell>
-                                    <TableCell className="text-right">{classData.payments['nap']?.amount.toFixed(2) || '-'}</TableCell>
-                                    <TableCell className="text-right">{classData.payments['after_school']?.amount.toFixed(2) || '-'}</TableCell>
-                                    <TableCell className="text-right">{classData.payments['club']?.amount.toFixed(2) || '-'}</TableCell>
-                                    <TableCell className="text-right">{classData.payments['agency']?.amount.toFixed(2) || '-'}</TableCell>
-                                    <TableCell className="text-right font-semibold text-green-600">¥{classData.total.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right">{classData.payments['tuition']?.amount}</TableCell>
+                                    <TableCell className="text-right">{classData.payments['lunch']?.amount}</TableCell>
+                                    <TableCell className="text-right">{classData.payments['nap']?.amount}</TableCell>
+                                    <TableCell className="text-right">{classData.payments['after_school']?.amount}</TableCell>
+                                    <TableCell className="text-right">{classData.payments['club']?.amount}</TableCell>
+                                    <TableCell className="text-right">{classData.payments['agency']?.amount}</TableCell>
+                                    <TableCell className="text-right font-semibold text-green-600">¥{formatAmount(classData.total)}</TableCell>
                                   </TableRow>
                                 );
                               })}
                               <TableRow className="bg-blue-50 font-semibold">
                                 <TableCell>本月合计</TableCell>
-                                <TableCell className="text-right text-blue-600">¥{totals['tuition'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right text-blue-600">¥{totals['lunch'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right text-blue-600">¥{totals['nap'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right text-blue-600">¥{totals['after_school'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right text-blue-600">¥{totals['club'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right text-blue-600">¥{totals['agency'].toFixed(2)}</TableCell>
-                                <TableCell className="text-right text-blue-600">¥{monthTotal.toFixed(2)}</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{formatAmount(totals['tuition'])}</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{formatAmount(totals['lunch'])}</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{formatAmount(totals['nap'])}</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{formatAmount(totals['after_school'])}</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{formatAmount(totals['club'])}</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{formatAmount(totals['agency'])}</TableCell>
+                                <TableCell className="text-right text-blue-600">¥{formatAmount(monthTotal)}</TableCell>
                               </TableRow>
                             </>
                           );

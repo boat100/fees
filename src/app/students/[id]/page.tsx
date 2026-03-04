@@ -4,6 +4,7 @@ import { useState, useEffect, use, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
+import { formatAmount } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -729,12 +730,12 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                     return (
                       <TableRow key={item.key}>
                         <TableCell className="font-medium">{item.label}</TableCell>
-                        <TableCell className="text-right">{expected.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{formatAmount(expected)}</TableCell>
                         <TableCell className={`text-right ${isFull ? 'text-green-600 font-semibold' : ''}`}>
-                          {paid.toFixed(2)}
+                          {formatAmount(paid)}
                         </TableCell>
                         <TableCell className={`text-right ${remaining > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {remaining > 0 ? remaining.toFixed(2) : '0.00'}
+                          {remaining > 0 ? formatAmount(remaining) : '0.00'}
                         </TableCell>
                         <TableCell className="text-center">
                           {expected === 0 ? (
@@ -768,12 +769,12 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   {/* 代办费行（与其他费用相同的显示格式） */}
                   <TableRow className="bg-purple-50">
                     <TableCell className="font-medium">代办费</TableCell>
-                    <TableCell className="text-right">{(student.agency_fee || 0).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{formatAmount(student.agency_fee || 0)}</TableCell>
                     <TableCell className={`text-right ${((student.agency_fee || 0) > 0 && (student.agency_paid ?? 0) >= (student.agency_fee || 0)) ? 'text-green-600 font-semibold' : ''}`}>
-                      {(student.agency_paid ?? 0).toFixed(2)}
+                      {formatAmount(student.agency_paid ?? 0)}
                     </TableCell>
                     <TableCell className={`text-right ${((student.agency_fee || 0) - (student.agency_paid ?? 0)) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      {Math.max(0, (student.agency_fee || 0) - (student.agency_paid ?? 0)).toFixed(2)}
+                      {formatAmount(Math.max(0, (student.agency_fee || 0) - (student.agency_paid ?? 0)))}
                     </TableCell>
                     <TableCell className="text-center">
                       {(student.agency_fee || 0) === 0 ? (
@@ -806,17 +807,17 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   <TableRow className="bg-blue-50 font-semibold">
                     <TableCell>合计</TableCell>
                     <TableCell className="text-right text-blue-700">
-                      {(FEE_ITEMS.reduce((sum, item) => sum + (student[item.field] as number), 0)).toFixed(2)}
+                      {formatAmount(FEE_ITEMS.reduce((sum, item) => sum + (student[item.field] as number), 0))}
                     </TableCell>
                     <TableCell className="text-right text-green-600">
-                      {(FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => sum + (student.paymentsByType[item.key]?.total || 0), 0) + (student.agency_paid ?? 0)).toFixed(2)}
+                      {formatAmount(FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => sum + (student.paymentsByType[item.key]?.total || 0), 0) + (student.agency_paid ?? 0))}
                     </TableCell>
                     <TableCell className="text-right text-red-600">
-                      {(FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => {
+                      {formatAmount(FEE_ITEMS.filter(i => i.key !== 'agency').reduce((sum, item) => {
                         const expected = student[item.field] as number;
                         const paid = student.paymentsByType[item.key]?.total || 0;
                         return sum + Math.max(0, expected - paid);
-                      }, 0) + Math.max(0, (student.agency_fee || 0) - (student.agency_paid ?? 0))).toFixed(2)}
+                      }, 0) + Math.max(0, (student.agency_fee || 0) - (student.agency_paid ?? 0)))}
                     </TableCell>
                     <TableCell colSpan={2}></TableCell>
                   </TableRow>
@@ -855,7 +856,7 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{FEE_TYPE_MAP[record.fee_type]}</span>
-                          <span className="text-green-600 font-semibold">+{record.amount.toFixed(2)} 元</span>
+                          <span className="text-green-600 font-semibold">+{formatAmount(record.amount)} 元</span>
                         </div>
                         {record.remark && (
                           <Tooltip>
@@ -910,9 +911,9 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
               </Button>
             </CardTitle>
             <CardDescription>
-              应交: {(student.agency_fee || 0).toFixed(2)} 元 | 
-              已交: {(student.agency_paid ?? student.agency_fee ?? 0).toFixed(2)} 元 | 
-              剩余: {(student.agencyBalance || 0).toFixed(2)} 元
+              应交: {formatAmount(student.agency_fee || 0)} 元 | 
+              已交: {formatAmount(student.agency_paid ?? student.agency_fee ?? 0)} 元 | 
+              剩余: {formatAmount(student.agencyBalance || 0)} 元
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -936,7 +937,7 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                     <TableRow key={item.id}>
                       <TableCell className="text-gray-500">{formatDate(item.item_date)}</TableCell>
                       <TableCell className="font-medium">{AGENCY_FEE_ITEM_TYPE_MAP[item.item_type]}</TableCell>
-                      <TableCell className="text-right text-red-600 font-semibold">-{item.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-red-600 font-semibold">-{formatAmount(item.amount)}</TableCell>
                       <TableCell className="text-gray-500">{item.remark || '-'}</TableCell>
                       <TableCell className="text-center">
                         <Button
@@ -975,13 +976,13 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">应交金额</Label>
               <div className="col-span-3">
-                {student && (student[FEE_ITEMS.find(i => i.key === selectedFeeType)?.field || 'tuition_fee'] as number)?.toFixed(2)} 元
+                {student && formatAmount(student[FEE_ITEMS.find(i => i.key === selectedFeeType)?.field || 'tuition_fee'] as number)} 元
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">已交金额</Label>
               <div className="col-span-3">
-                {student && (student.paymentsByType[selectedFeeType]?.total || 0)?.toFixed(2)} 元
+                {student && formatAmount(student.paymentsByType[selectedFeeType]?.total || 0)} 元
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
@@ -1094,7 +1095,7 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
                       <div className="flex-1">
                         <div className="font-medium">{item.label}</div>
                         <div className="text-xs text-gray-500">
-                          应交: {expected.toFixed(2)} | 已交: {paid.toFixed(2)} | 欠费: {remaining > 0 ? remaining.toFixed(2) : '0'}
+                          应交: {formatAmount(expected)} | 已交: {formatAmount(paid)} | 欠费: {remaining > 0 ? formatAmount(remaining) : '0'}
                         </div>
                       </div>
                       <Input
@@ -1197,11 +1198,11 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">应交金额</Label>
-              <div className="col-span-3">{(student?.agency_fee || 0).toFixed(2)} 元</div>
+              <div className="col-span-3">{formatAmount(student?.agency_fee || 0)} 元</div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">已交金额</Label>
-              <div className="col-span-3">{(student?.agency_paid ?? 0).toFixed(2)} 元</div>
+              <div className="col-span-3">{formatAmount(student?.agency_paid ?? 0)} 元</div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">本次交费 *</Label>
@@ -1257,7 +1258,7 @@ function StudentDetailContent({ params }: { params: Promise<{ id: string }> }) {
               添加代办费扣除
             </DialogTitle>
             <DialogDescription>
-              当前余额: {(student.agencyBalance || student.agency_fee || 600).toFixed(2)} 元
+              当前余额: {formatAmount(student.agencyBalance || student.agency_fee || 600)} 元
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">

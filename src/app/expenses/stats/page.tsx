@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
+import { formatAmount } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -126,12 +127,12 @@ export default function ExpensesStatsPage() {
     }
   };
 
-  // 格式化金额
-  const formatAmount = (amount: number) => {
+  // 格式化金额（大数显示"万"）
+  const formatLargeAmount = (amount: number) => {
     if (amount >= 10000) {
-      return `${(amount / 10000).toFixed(2)}万`;
+      return `${formatAmount(amount / 10000)}万`;
     }
-    return amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return formatAmount(amount);
   };
 
   // 图表Tooltip格式化
@@ -145,7 +146,7 @@ export default function ExpensesStatsPage() {
         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
           <p className="font-semibold text-gray-900 mb-1">{label}</p>
           <p className="text-red-600">
-            金额: ¥{formatAmount(payload[0].value)}
+            金额: ¥{formatLargeAmount(payload[0].value)}
           </p>
         </div>
       );

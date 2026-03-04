@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
+import { formatAmount } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1432,7 +1433,7 @@ export default function ExpensesPage() {
                             <span className="text-gray-400">-</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">{record.amount.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{formatAmount(record.amount)}</TableCell>
                         <TableCell className="max-w-[150px]">
                           {record.summary ? (
                             <Tooltip>

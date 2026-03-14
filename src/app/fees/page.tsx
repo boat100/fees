@@ -363,8 +363,9 @@ function FeesContent() {
       napFee: student.nap_fee || 0,
       afterSchoolFee: student.after_school_fee || 0,
       clubFee: student.club_fee || 0,
-      agencyFee: student.agency_fee || 600,
-      agencyPaid: student.agency_paid ?? student.agency_fee ?? 600,
+      agencyFee: student.agency_fee || 0,
+      // 已交金额只读显示，不参与修改（已交金额在学生详情页操作）
+      agencyPaid: student.agency_paid ?? 0,
       remark: student.remark || '',
     });
     setFormWarnings({});
@@ -381,9 +382,9 @@ function FeesContent() {
   const handleSubmit = async () => {
     setSubmitting(true);
     
-    // 新增时，agencyPaid 默认为 0；修改时保持原值
+    // 新增时，agencyPaid 默认为 0；修改时保持原值不变
     const agencyPaidValue = selectedStudent 
-      ? (formData.agencyPaid ?? formData.agencyFee ?? 0)
+      ? selectedStudent.agency_paid ?? 0  // 修改时保持原来的已交金额
       : 0;
     
     // 准备学生数据

@@ -101,7 +101,7 @@ export async function GET(
   }
 }
 
-// PUT - 更新学生应交费用
+// PUT - 更新学生应交费用（只修改应交金额，已交金额保持不变）
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -120,12 +120,23 @@ export async function PUT(
       afterSchoolFee,
       clubFee,
       agencyFee,
-      agencyPaid,
       remark,
     } = body;
     
+    // 获取原有记录，保持已交金额不变
+    const existingStudent = db.prepare('SELECT * FROM student_fees WHERE id = ?').get(id) as {
+      agency_paid: number | null;
+    } | undefined;
+    
+    if (!existingStudent) {
+      return NextResponse.json({ error: '记录不存在' }, { status: 404 });
+    }
+    
     // 根据午托费自动判断午托状态
     const napStatus = (napFee ?? 0) > 0 ? '午托' : '走读';
+    
+    // 保持原有的已交金额不变
+    const existingAgencyPaid = existingStudent.agency_paid ?? 0;
     
     const stmt = db.prepare(`
       UPDATE student_fees 
@@ -146,8 +157,8 @@ export async function PUT(
       napFee ?? 0,
       afterSchoolFee ?? 0,
       clubFee ?? 0,
-      agencyFee ?? 600,
-      agencyPaid ?? agencyFee ?? 600,
+      agencyFee ?? 0,
+      existingAgencyPaid,  // 保持原有已交金额
       remark || null,
       new Date().toISOString(),
       id

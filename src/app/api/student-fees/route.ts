@@ -138,7 +138,9 @@ export async function GET(request: NextRequest) {
       `).get(student.id) as { total: number };
       
       // agency_balance = agency_paid - 已扣除
-      const agencyPaid = student.agency_paid ?? student.agency_fee ?? 600;
+      // 注意：agency_paid 返回数据库原值（可能为 null），计算余额时才使用默认值
+      const agencyPaidRaw = student.agency_paid;
+      const agencyPaidForBalance = student.agency_paid ?? student.agency_fee ?? 0;
       
       return {
         ...student,
@@ -147,8 +149,8 @@ export async function GET(request: NextRequest) {
         nap_paid: paymentMap['nap'] || 0,
         after_school_paid: paymentMap['after_school'] || 0,
         club_paid: paymentMap['club'] || 0,
-        agency_paid: agencyPaid,
-        agency_balance: agencyPaid - agencyUsed.total, // 剩余 = 已交 - 已扣除
+        agency_paid: agencyPaidRaw, // 返回数据库原值
+        agency_balance: agencyPaidForBalance - agencyUsed.total, // 剩余 = 已交 - 已扣除
       };
     });
     

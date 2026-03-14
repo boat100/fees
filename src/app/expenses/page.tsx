@@ -546,9 +546,6 @@ export default function ExpensesPage() {
 
   // 将 Excel 日期序列号转换为日期字符串
   const excelDateToString = (value: unknown): string => {
-    // 调试日志
-    console.log('excelDateToString input:', value, 'type:', typeof value, value instanceof Date ? 'is Date' : '');
-    
     if (value === null || value === undefined || value === '') {
       return '';
     }
@@ -563,21 +560,31 @@ export default function ExpensesPage() {
       const year = value.getFullYear();
       const month = String(value.getMonth() + 1).padStart(2, '0');
       const day = String(value.getDate()).padStart(2, '0');
-      console.log('Date object result:', `${year}-${month}-${day}`);
       return `${year}-${month}-${day}`;
     }
     
     // 如果是数字（Excel 日期序列号）
     if (typeof value === 'number') {
-      // Excel 日期序列号：自 1899 年 12 月 30 日以来的天数
-      // 使用本地时间构造日期，避免时区问题
-      const excelEpoch = new Date(1899, 11, 30);
-      const date = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000);
+      // Excel 日期序列号转换
+      // Excel 以 1900-01-01 为第 1 天（但有个 bug：错误地认为 1900 年是闰年）
+      // 所以对于 1900-03-01 之后的日期（序列号 > 60），需要减 1 天来修正
+      // 另外还需要减 1 天，因为 Excel 从 1 开始计数，而我们从 0 开始
       
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      console.log('Number serial result:', `${year}-${month}-${day}`);
+      // 使用更简单的方法：直接用 UTC 时间计算
+      // Excel 序列号 1 = 1899-12-31（在 Excel 有 bug 的情况下）
+      // 我们使用 1900-01-01 作为基准，减去 1 天
+      const serial = value;
+      // 1900-01-01 的 UTC 时间戳
+      const baseDate = Date.UTC(1900, 0, 1);
+      // Excel 序列号从 1 开始，所以要减 1
+      // 对于序列号 > 60 的情况（1900-02-28 之后），Excel 有闰年 bug，需要额外减 1
+      const offset = serial > 60 ? serial - 2 : serial - 1;
+      const resultDate = new Date(baseDate + offset * 24 * 60 * 60 * 1000);
+      
+      const year = resultDate.getUTCFullYear();
+      const month = String(resultDate.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(resultDate.getUTCDate()).padStart(2, '0');
+      
       return `${year}-${month}-${day}`;
     }
     
@@ -592,7 +599,6 @@ export default function ExpensesPage() {
         const year = match1[1];
         const month = match1[2].padStart(2, '0');
         const day = match1[3].padStart(2, '0');
-        console.log('String match1 result:', `${year}-${month}-${day}`);
         return `${year}-${month}-${day}`;
       }
       
@@ -602,7 +608,6 @@ export default function ExpensesPage() {
         const year = match2[1];
         const month = match2[2].padStart(2, '0');
         const day = match2[3].padStart(2, '0');
-        console.log('String match2 result:', `${year}-${month}-${day}`);
         return `${year}-${month}-${day}`;
       }
       
@@ -612,7 +617,6 @@ export default function ExpensesPage() {
         const year = match3[3];
         const month = match3[2].padStart(2, '0');
         const day = match3[1].padStart(2, '0');
-        console.log('String match3 result:', `${year}-${month}-${day}`);
         return `${year}-${month}-${day}`;
       }
       
@@ -622,12 +626,10 @@ export default function ExpensesPage() {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
-        console.log('String fallback result:', `${year}-${month}-${day}`);
         return `${year}-${month}-${day}`;
       }
     }
     
-    console.log('Returning as string:', String(value));
     return String(value);
   };
 
@@ -656,11 +658,13 @@ export default function ExpensesPage() {
     
     // 如果是数字（Excel 日期序列号）
     if (typeof value === 'number') {
-      const excelEpoch = new Date(1899, 11, 30);
-      const date = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000);
+      const serial = value;
+      const baseDate = Date.UTC(1900, 0, 1);
+      const offset = serial > 60 ? serial - 2 : serial - 1;
+      const resultDate = new Date(baseDate + offset * 24 * 60 * 60 * 1000);
       
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = resultDate.getUTCFullYear();
+      const month = String(resultDate.getUTCMonth() + 1).padStart(2, '0');
       
       return `${year}-${month}`;
     }

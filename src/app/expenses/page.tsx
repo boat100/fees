@@ -555,10 +555,18 @@ export default function ExpensesPage() {
       return value;
     }
     
+    // 如果是 Date 对象（xlsx 可能返回 Date 对象）
+    if (value instanceof Date) {
+      const year = value.getFullYear();
+      const month = String(value.getMonth() + 1).padStart(2, '0');
+      const day = String(value.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    
     // 如果是数字（Excel 日期序列号）
     if (typeof value === 'number') {
       // Excel 日期序列号：自 1899 年 12 月 30 日以来的天数
-      // 需要减去 1，因为 Excel 错误地将 1900 年视为闰年
+      // 使用本地时间构造日期，避免时区问题
       const excelEpoch = new Date(1899, 11, 30);
       const date = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000);
       
@@ -601,14 +609,12 @@ export default function ExpensesPage() {
         return `${year}-${month}-${day}`;
       }
       
-      // 其他格式：尝试用 Date 解析，但使用 noon 时间避免时区偏移
+      // 其他格式：尝试用 Date 解析，但使用本地时间避免时区偏移
       const date = new Date(value);
       if (!isNaN(date.getTime())) {
-        // 使用正午时间来避免时区偏移导致的日期变化
-        const noonDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
-        const year = noonDate.getFullYear();
-        const month = String(noonDate.getMonth() + 1).padStart(2, '0');
-        const day = String(noonDate.getDate()).padStart(2, '0');
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       }
     }
@@ -630,6 +636,13 @@ export default function ExpensesPage() {
     // 如果是完整的日期格式 YYYY-MM-DD，截取年月
     if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
       return value.substring(0, 7);
+    }
+    
+    // 如果是 Date 对象（xlsx 可能返回 Date 对象）
+    if (value instanceof Date) {
+      const year = value.getFullYear();
+      const month = String(value.getMonth() + 1).padStart(2, '0');
+      return `${year}-${month}`;
     }
     
     // 如果是数字（Excel 日期序列号）
@@ -664,12 +677,11 @@ export default function ExpensesPage() {
         return `${year}-${month}`;
       }
       
-      // 其他格式：尝试用 Date 解析，使用正午时间避免时区偏移
+      // 其他格式：尝试用 Date 解析
       const date = new Date(value);
       if (!isNaN(date.getTime())) {
-        const noonDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
-        const year = noonDate.getFullYear();
-        const month = String(noonDate.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
         return `${year}-${month}`;
       }
     }
@@ -684,14 +696,15 @@ export default function ExpensesPage() {
 
     try {
       const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
+      // 使用 raw: true 获取原始值（日期会返回数字序列号），避免时区问题
+      const workbook = XLSX.read(data, { cellDates: false });
       
       // 获取第一个工作表
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
       
-      // 转换为JSON
-      const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as (string | number)[][];
+      // 转换为JSON（注意：xlsx 可能返回 Date 对象）
+      const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as (string | number | Date)[][];
       
       // 跳过表头，处理数据
       const parsedData: typeof importData = [];

@@ -550,7 +550,7 @@ export default function ExpensesPage() {
       return '';
     }
     
-    // 如果已经是有效的日期字符串格式
+    // 如果已经是有效的日期字符串格式 YYYY-MM-DD
     if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
       return value;
     }
@@ -569,13 +569,46 @@ export default function ExpensesPage() {
       return `${year}-${month}-${day}`;
     }
     
-    // 尝试解析字符串日期
+    // 解析字符串日期（手动解析避免时区问题）
     if (typeof value === 'string') {
+      const str = value.trim();
+      
+      // 尝试匹配各种日期格式
+      // 格式1: YYYY/MM/DD 或 YYYY/M/D
+      const match1 = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+      if (match1) {
+        const year = match1[1];
+        const month = match1[2].padStart(2, '0');
+        const day = match1[3].padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      
+      // 格式2: YYYY年MM月DD日
+      const match2 = str.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日?$/);
+      if (match2) {
+        const year = match2[1];
+        const month = match2[2].padStart(2, '0');
+        const day = match2[3].padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      
+      // 格式3: DD/MM/YYYY (欧洲格式)
+      const match3 = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (match3) {
+        const year = match3[3];
+        const month = match3[2].padStart(2, '0');
+        const day = match3[1].padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      
+      // 其他格式：尝试用 Date 解析，但使用 noon 时间避免时区偏移
       const date = new Date(value);
       if (!isNaN(date.getTime())) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
+        // 使用正午时间来避免时区偏移导致的日期变化
+        const noonDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
+        const year = noonDate.getFullYear();
+        const month = String(noonDate.getMonth() + 1).padStart(2, '0');
+        const day = String(noonDate.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       }
     }
@@ -589,12 +622,12 @@ export default function ExpensesPage() {
       return '';
     }
     
-    // 如果已经是有效的年月格式 yyyy-mm
+    // 如果已经是有效的年月格式 YYYY-MM
     if (typeof value === 'string' && /^\d{4}-\d{2}$/.test(value)) {
       return value;
     }
     
-    // 如果是完整的日期格式 yyyy-mm-dd，截取年月
+    // 如果是完整的日期格式 YYYY-MM-DD，截取年月
     if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
       return value.substring(0, 7);
     }
@@ -610,12 +643,33 @@ export default function ExpensesPage() {
       return `${year}-${month}`;
     }
     
-    // 尝试解析字符串日期
+    // 解析字符串日期（手动解析避免时区问题）
     if (typeof value === 'string') {
+      const str = value.trim();
+      
+      // 尝试匹配各种日期格式，只提取年月
+      // 格式1: YYYY/MM/DD 或 YYYY/M/D 或 YYYY/MM 或 YYYY/M
+      const match1 = str.match(/^(\d{4})[\/\-](\d{1,2})(?:[\/\-](\d{1,2}))?$/);
+      if (match1) {
+        const year = match1[1];
+        const month = match1[2].padStart(2, '0');
+        return `${year}-${month}`;
+      }
+      
+      // 格式2: YYYY年MM月DD日 或 YYYY年MM月
+      const match2 = str.match(/^(\d{4})年(\d{1,2})月(?:\d{1,2}日?)?$/);
+      if (match2) {
+        const year = match2[1];
+        const month = match2[2].padStart(2, '0');
+        return `${year}-${month}`;
+      }
+      
+      // 其他格式：尝试用 Date 解析，使用正午时间避免时区偏移
       const date = new Date(value);
       if (!isNaN(date.getTime())) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const noonDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
+        const year = noonDate.getFullYear();
+        const month = String(noonDate.getMonth() + 1).padStart(2, '0');
         return `${year}-${month}`;
       }
     }

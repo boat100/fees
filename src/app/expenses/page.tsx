@@ -546,6 +546,9 @@ export default function ExpensesPage() {
 
   // 将 Excel 日期序列号转换为日期字符串
   const excelDateToString = (value: unknown): string => {
+    // 调试日志
+    console.log('excelDateToString input:', value, 'type:', typeof value, value instanceof Date ? 'is Date' : '');
+    
     if (value === null || value === undefined || value === '') {
       return '';
     }
@@ -560,6 +563,7 @@ export default function ExpensesPage() {
       const year = value.getFullYear();
       const month = String(value.getMonth() + 1).padStart(2, '0');
       const day = String(value.getDate()).padStart(2, '0');
+      console.log('Date object result:', `${year}-${month}-${day}`);
       return `${year}-${month}-${day}`;
     }
     
@@ -573,7 +577,7 @@ export default function ExpensesPage() {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
-      
+      console.log('Number serial result:', `${year}-${month}-${day}`);
       return `${year}-${month}-${day}`;
     }
     
@@ -588,6 +592,7 @@ export default function ExpensesPage() {
         const year = match1[1];
         const month = match1[2].padStart(2, '0');
         const day = match1[3].padStart(2, '0');
+        console.log('String match1 result:', `${year}-${month}-${day}`);
         return `${year}-${month}-${day}`;
       }
       
@@ -597,6 +602,7 @@ export default function ExpensesPage() {
         const year = match2[1];
         const month = match2[2].padStart(2, '0');
         const day = match2[3].padStart(2, '0');
+        console.log('String match2 result:', `${year}-${month}-${day}`);
         return `${year}-${month}-${day}`;
       }
       
@@ -606,6 +612,7 @@ export default function ExpensesPage() {
         const year = match3[3];
         const month = match3[2].padStart(2, '0');
         const day = match3[1].padStart(2, '0');
+        console.log('String match3 result:', `${year}-${month}-${day}`);
         return `${year}-${month}-${day}`;
       }
       
@@ -615,10 +622,12 @@ export default function ExpensesPage() {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
+        console.log('String fallback result:', `${year}-${month}-${day}`);
         return `${year}-${month}-${day}`;
       }
     }
     
+    console.log('Returning as string:', String(value));
     return String(value);
   };
 

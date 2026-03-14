@@ -544,159 +544,126 @@ export default function ExpensesPage() {
     }
   };
 
-  // 将 Excel 日期序列号转换为日期字符串
-  const excelDateToString = (value: unknown): string => {
+  // 将日期值转换为 YYYY-MM-DD 格式字符串
+  // 支持格式：YYYY-MM-DD、YYYY/M/D、Excel序列号
+  const parseDateToString = (value: unknown): string => {
     if (value === null || value === undefined || value === '') {
       return '';
     }
     
-    // 如果已经是有效的日期字符串格式 YYYY-MM-DD
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return value;
-    }
-    
-    // 如果是 Date 对象（xlsx 可能返回 Date 对象）
-    if (value instanceof Date) {
-      const year = value.getFullYear();
-      const month = String(value.getMonth() + 1).padStart(2, '0');
-      const day = String(value.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    }
-    
-    // 如果是数字（Excel 日期序列号）
-    if (typeof value === 'number') {
-      // Excel 日期序列号转换
-      // Excel 以 1900-01-01 为第 1 天（但有个 bug：错误地认为 1900 年是闰年）
-      // 所以对于 1900-03-01 之后的日期（序列号 > 60），需要减 1 天来修正
-      // 另外还需要减 1 天，因为 Excel 从 1 开始计数，而我们从 0 开始
-      
-      // 使用更简单的方法：直接用 UTC 时间计算
-      // Excel 序列号 1 = 1899-12-31（在 Excel 有 bug 的情况下）
-      // 我们使用 1900-01-01 作为基准，减去 1 天
-      const serial = value;
-      // 1900-01-01 的 UTC 时间戳
-      const baseDate = Date.UTC(1900, 0, 1);
-      // Excel 序列号从 1 开始，所以要减 1
-      // 对于序列号 > 60 的情况（1900-02-28 之后），Excel 有闰年 bug，需要额外减 1
-      const offset = serial > 60 ? serial - 2 : serial - 1;
-      const resultDate = new Date(baseDate + offset * 24 * 60 * 60 * 1000);
-      
-      const year = resultDate.getUTCFullYear();
-      const month = String(resultDate.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(resultDate.getUTCDate()).padStart(2, '0');
-      
-      return `${year}-${month}-${day}`;
-    }
-    
-    // 解析字符串日期（手动解析避免时区问题）
+    // 如果是有效的日期字符串格式 YYYY-MM-DD，直接返回
     if (typeof value === 'string') {
       const str = value.trim();
       
-      // 尝试匹配各种日期格式
-      // 格式1: YYYY/MM/DD 或 YYYY/M/D
-      const match1 = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
-      if (match1) {
-        const year = match1[1];
-        const month = match1[2].padStart(2, '0');
-        const day = match1[3].padStart(2, '0');
-        return `${year}-${month}-${day}`;
+      // YYYY-MM-DD 格式
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        return str;
       }
       
-      // 格式2: YYYY年MM月DD日
-      const match2 = str.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日?$/);
-      if (match2) {
-        const year = match2[1];
-        const month = match2[2].padStart(2, '0');
-        const day = match2[3].padStart(2, '0');
-        return `${year}-${month}-${day}`;
+      // YYYY/M/D 或 YYYY-MM-D 格式 -> 转为 YYYY-MM-DD
+      const match = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+      if (match) {
+        return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
       }
       
-      // 格式3: DD/MM/YYYY (欧洲格式)
-      const match3 = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-      if (match3) {
-        const year = match3[3];
-        const month = match3[2].padStart(2, '0');
-        const day = match3[1].padStart(2, '0');
-        return `${year}-${month}-${day}`;
+      // YYYY年M月D日 格式
+      const matchCN = str.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日?$/);
+      if (matchCN) {
+        return `${matchCN[1]}-${matchCN[2].padStart(2, '0')}-${matchCN[3].padStart(2, '0')}`;
       }
       
-      // 其他格式：尝试用 Date 解析，但使用本地时间避免时区偏移
-      const date = new Date(value);
-      if (!isNaN(date.getTime())) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+      // 其他字符串尝试解析（可能有引号前缀）
+      const cleanStr = str.replace(/^['"]/, '');
+      if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) {
+        return cleanStr;
       }
+    }
+    
+    // 如果是数字（Excel 日期序列号）- 作为后备方案
+    if (typeof value === 'number') {
+      // Excel 日期序列号：1900-01-01 为第 1 天
+      // 需要处理 Excel 1900 年闰年 bug（序列号 > 60 时额外减 1）
+      const baseDate = Date.UTC(1900, 0, 1);
+      const offset = value > 60 ? value - 2 : value - 1;
+      const date = new Date(baseDate + offset * 24 * 60 * 60 * 1000);
+      
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      
+      return `${year}-${month}-${day}`;
+    }
+    
+    // 如果是 Date 对象
+    if (value instanceof Date) {
+      const year = value.getUTCFullYear();
+      const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(value.getUTCDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
     
     return String(value);
   };
 
-  // 将 Excel 日期序列号转换为年月字符串（用于发生日期）
-  const excelDateToYearMonth = (value: unknown): string => {
+  // 将日期值转换为 YYYY-MM 格式字符串（用于发生日期）
+  const parseDateToYearMonth = (value: unknown): string => {
     if (value === null || value === undefined || value === '') {
       return '';
     }
     
-    // 如果已经是有效的年月格式 YYYY-MM
-    if (typeof value === 'string' && /^\d{4}-\d{2}$/.test(value)) {
-      return value;
-    }
-    
-    // 如果是完整的日期格式 YYYY-MM-DD，截取年月
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return value.substring(0, 7);
-    }
-    
-    // 如果是 Date 对象（xlsx 可能返回 Date 对象）
-    if (value instanceof Date) {
-      const year = value.getFullYear();
-      const month = String(value.getMonth() + 1).padStart(2, '0');
-      return `${year}-${month}`;
-    }
-    
-    // 如果是数字（Excel 日期序列号）
-    if (typeof value === 'number') {
-      const serial = value;
-      const baseDate = Date.UTC(1900, 0, 1);
-      const offset = serial > 60 ? serial - 2 : serial - 1;
-      const resultDate = new Date(baseDate + offset * 24 * 60 * 60 * 1000);
-      
-      const year = resultDate.getUTCFullYear();
-      const month = String(resultDate.getUTCMonth() + 1).padStart(2, '0');
-      
-      return `${year}-${month}`;
-    }
-    
-    // 解析字符串日期（手动解析避免时区问题）
+    // 如果是字符串
     if (typeof value === 'string') {
       const str = value.trim();
       
-      // 尝试匹配各种日期格式，只提取年月
-      // 格式1: YYYY/MM/DD 或 YYYY/M/D 或 YYYY/MM 或 YYYY/M
-      const match1 = str.match(/^(\d{4})[\/\-](\d{1,2})(?:[\/\-](\d{1,2}))?$/);
-      if (match1) {
-        const year = match1[1];
-        const month = match1[2].padStart(2, '0');
-        return `${year}-${month}`;
+      // YYYY-MM 格式，直接返回
+      if (/^\d{4}-\d{2}$/.test(str)) {
+        return str;
       }
       
-      // 格式2: YYYY年MM月DD日 或 YYYY年MM月
-      const match2 = str.match(/^(\d{4})年(\d{1,2})月(?:\d{1,2}日?)?$/);
-      if (match2) {
-        const year = match2[1];
-        const month = match2[2].padStart(2, '0');
-        return `${year}-${month}`;
+      // YYYY-MM-DD 格式，截取年月
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        return str.substring(0, 7);
       }
       
-      // 其他格式：尝试用 Date 解析
-      const date = new Date(value);
-      if (!isNaN(date.getTime())) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        return `${year}-${month}`;
+      // YYYY/M 或 YYYY/M/D 格式
+      const match = str.match(/^(\d{4})[\/\-](\d{1,2})(?:[\/\-](\d{1,2}))?$/);
+      if (match) {
+        return `${match[1]}-${match[2].padStart(2, '0')}`;
       }
+      
+      // YYYY年M月 格式
+      const matchCN = str.match(/^(\d{4})年(\d{1,2})月(?:\d{1,2}日?)?$/);
+      if (matchCN) {
+        return `${matchCN[1]}-${matchCN[2].padStart(2, '0')}`;
+      }
+      
+      // 其他字符串尝试解析（可能有引号前缀）
+      const cleanStr = str.replace(/^['"]/, '');
+      if (/^\d{4}-\d{2}$/.test(cleanStr)) {
+        return cleanStr;
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) {
+        return cleanStr.substring(0, 7);
+      }
+    }
+    
+    // 如果是数字（Excel 日期序列号）- 作为后备方案
+    if (typeof value === 'number') {
+      const baseDate = Date.UTC(1900, 0, 1);
+      const offset = value > 60 ? value - 2 : value - 1;
+      const date = new Date(baseDate + offset * 24 * 60 * 60 * 1000);
+      
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      
+      return `${year}-${month}`;
+    }
+    
+    // 如果是 Date 对象
+    if (value instanceof Date) {
+      const year = value.getUTCFullYear();
+      const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+      return `${year}-${month}`;
     }
     
     return String(value);
@@ -746,8 +713,8 @@ export default function ExpensesPage() {
           // 格式1: 包含类别
           category = firstCol;
           item = String(row[1] || '').trim();
-          reportDate = excelDateToString(row[2]);
-          occurDate = excelDateToYearMonth(row[3]);
+          reportDate = parseDateToString(row[2]);
+          occurDate = parseDateToYearMonth(row[3]);
           invoiceNo = String(row[4] || '').trim();
           amount = Number(row[5]) || 0;
           summary = String(row[6] || '').trim();
@@ -756,8 +723,8 @@ export default function ExpensesPage() {
           // 格式2: 不包含类别，默认使用日常公用支出
           category = '日常公用支出';
           item = String(row[0] || '').trim();
-          reportDate = excelDateToString(row[1]);
-          occurDate = excelDateToYearMonth(row[2]);
+          reportDate = parseDateToString(row[1]);
+          occurDate = parseDateToYearMonth(row[2]);
           invoiceNo = String(row[3] || '').trim();
           amount = Number(row[4]) || 0;
           summary = String(row[5] || '').trim();
@@ -844,9 +811,10 @@ export default function ExpensesPage() {
     // 为每个类别创建模板工作表
     categories.forEach((category) => {
       const firstItem = category.items[0]?.name || '';
+      // 日期使用文本格式（前缀单引号），避免 Excel 自动转换为日期序列号
       const template = [
         ['类别', '子项目', '报账时间', '发生时间', '发票号', '金额', '摘要', '备注'],
-        [category.name, firstItem, '2024-01-15', '2024-01', 'INV001', 100.00, '示例摘要', '示例备注'],
+        [category.name, firstItem, "'2024-01-15", "'2024-01", 'INV001', 100.00, '示例摘要', '示例备注'],
         ['', '', '', '', '', '', '', ''],
         ['说明：'],
         ['1. 类别填写系统中的类别名称'],
@@ -854,12 +822,25 @@ export default function ExpensesPage() {
         ['3. 报账时间格式：YYYY-MM-DD；发生时间格式：YYYY-MM 或 YYYY-MM-DD'],
         ['4. 金额必须为大于0的数字'],
         ['5. 发票号、摘要、备注为选填项'],
+        ['6. 从其他文档复制日期时，请在单元格前加单引号强制文本格式，如：\'2024-06-01'],
       ];
       const sheet = XLSX.utils.aoa_to_sheet(template);
+      
+      // 设置列宽
       sheet['!cols'] = [
-        { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+        { wch: 12 }, { wch: 20 }, { wch: 14 }, { wch: 14 },
         { wch: 15 }, { wch: 12 }, { wch: 25 }, { wch: 15 }
       ];
+      
+      // 设置日期列为文本格式（报账时间-第3列，发生时间-第4列）
+      // Excel 列索引从 0 开始：A=0, B=1, C=2, D=3
+      const textCells = ['C2', 'D2']; // 报账时间和发生时间的示例单元格
+      textCells.forEach(cell => {
+        if (sheet[cell]) {
+          sheet[cell].t = 's'; // 强制为字符串类型
+        }
+      });
+      
       // 工作表名称最多31个字符
       const sheetName = `${category.name}模板`.substring(0, 31);
       XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
@@ -876,6 +857,10 @@ export default function ExpensesPage() {
     }
     referenceData.push([]);
     referenceData.push(['提示：复制子项目名称到对应模板中使用']);
+    referenceData.push([]);
+    referenceData.push(['重要提示：']);
+    referenceData.push(['从其他文档复制日期数据时，可能会被 Excel 自动转换为日期序列号。']);
+    referenceData.push(['解决方法：在日期单元格前加单引号，如 \'2024-06-01，强制为文本格式。']);
     
     const referenceSheet = XLSX.utils.aoa_to_sheet(referenceData);
     referenceSheet['!cols'] = [{ wch: 25 }, { wch: 25 }];

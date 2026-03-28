@@ -310,6 +310,15 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
   const classStudents = students.filter(s => s.class_name === className);
   const classPayments = payments.filter(p => p.student_class === className);
 
+  // 获取每个学生的代办费扣除金额
+  const agencyDeductions: Record<number, number> = {};
+  for (const student of classStudents) {
+    const deduction = db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as total FROM agency_fee_items WHERE student_id = ?
+    `).get(student.id) as { total: number };
+    agencyDeductions[student.id] = deduction.total;
+  }
+
   // 学生费用明细
   const studentDetails = classStudents.map(s => {
     const studentPayments = classPayments.filter(p => p.student_id === s.id);
@@ -324,6 +333,10 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
     // 代办费已交金额：优先使用 agency_paid 字段（从 student_fees 表获取）
     // 也可以从 payment_records 计算：paidByType['agency'] = studentPayments.filter(p => p.fee_type === 'agency').reduce(...)
     const agencyPaid = s.agency_paid ?? s.agency_fee ?? 0;
+    
+    // 代办费剩余 = 已交 - 已扣除
+    const agencyDeducted = agencyDeductions[s.id] || 0;
+    const agencyBalance = agencyPaid - agencyDeducted;
 
     const totalFee = (s.tuition_fee || 0) + (s.lunch_fee || 0) + (s.nap_fee || 0) +
                      (s.after_school_fee || 0) + (s.club_fee || 0) + (s.agency_fee || 0);
@@ -345,6 +358,7 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
       社团费已交: paidByType['club'],
       代办费应交: s.agency_fee || 0,
       代办费已交: agencyPaid,
+      代办费剩余: agencyBalance,
       合计应交: totalFee,
       合计已交: totalPaid,
       待收金额: totalFee - totalPaid,
@@ -369,6 +383,7 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
     社团费已交: studentDetails.reduce((sum, s) => sum + s.社团费已交, 0),
     代办费应交: classStudents.reduce((sum, s) => sum + (s.agency_fee || 0), 0),
     代办费已交: studentDetails.reduce((sum, s) => sum + s.代办费已交, 0),
+    代办费剩余: studentDetails.reduce((sum, s) => sum + s.代办费剩余, 0),
     合计应交: studentDetails.reduce((sum, s) => sum + s.合计应交, 0),
     合计已交: studentDetails.reduce((sum, s) => sum + s.合计已交, 0),
     待收金额: studentDetails.reduce((sum, s) => sum + s.待收金额, 0),
@@ -391,7 +406,7 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
     { wch: 10 }, { wch: 10 }, // 午托费
     { wch: 12 }, { wch: 12 }, // 课后服务
     { wch: 10 }, { wch: 10 }, // 社团费
-    { wch: 10 }, { wch: 10 }, // 代办费
+    { wch: 10 }, { wch: 10 }, { wch: 10 }, // 代办费（应交、已交、剩余）
     { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, // 合计
   ];
   XLSX.utils.book_append_sheet(workbook, ws, '学生费用明细');

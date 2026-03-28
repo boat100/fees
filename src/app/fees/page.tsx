@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { authFetch, isAuthenticated, clearAuthToken } from '@/lib/auth-client';
 import { formatAmount } from '@/lib/utils';
+import { AGENCY_FEE_ITEMS } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -158,6 +159,21 @@ function FeesContent() {
       newValue: number
     }>
   }>>([]);
+  
+  // 批量代办费扣除状态
+  const [batchAgencyDialogOpen, setBatchAgencyDialogOpen] = useState(false);
+  const [batchAgencyData, setBatchAgencyData] = useState({
+    itemType: '',
+    amount: 0,
+    deductDate: '',
+    remark: '',
+  });
+  const [batchAgencyDifferences, setBatchAgencyDifferences] = useState<Array<{
+    studentId: number,
+    studentName: string,
+    balance: number,
+  }>>([]);
+  const [batchAgencyConfirmDialogOpen, setBatchAgencyConfirmDialogOpen] = useState(false);
   
   // 导出状态
   const [exportingClass, setExportingClass] = useState(false);
@@ -730,6 +746,59 @@ function FeesContent() {
       // 回滚
       setStudents(previousStudents);
       toast.error('批量更新失败，请重试', { id: 'batch-update' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 批量代办费扣除
+  const handleBatchAgencyDeduct = async (selectedStudents: StudentFee[]) => {
+    setSubmitting(true);
+    
+    setBatchAgencyDialogOpen(false);
+    setBatchAgencyConfirmDialogOpen(false);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    
+    toast.loading(`正在为 ${selectedStudents.length} 名学生扣除代办费...`, { id: 'batch-agency' });
+    
+    try {
+      // 批量为每个学生创建扣除记录
+      const deductPromises = selectedStudents.map(async (student) => {
+        const response = await authFetch('/api/agency-fee-items', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: student.id,
+            itemType: batchAgencyData.itemType,
+            amount: batchAgencyData.amount,
+            deductDate: batchAgencyData.deductDate,
+            remark: batchAgencyData.remark || `批量扣除 - ${student.student_name}`,
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `为 ${student.student_name} 扣除失败`);
+        }
+        
+        return { success: true, studentName: student.student_name };
+      });
+      
+      const results = await Promise.all(deductPromises);
+      const failedCount = results.filter(r => !r.success).length;
+      
+      if (failedCount === 0) {
+        toast.success(`成功为 ${selectedStudents.length} 名学生扣除代办费`, { id: 'batch-agency' });
+      } else {
+        toast.error(`扣除失败 ${failedCount} 条，请重试`, { id: 'batch-agency' });
+      }
+      
+      // 刷新学生列表
+      fetchStudents();
+    } catch (error) {
+      console.error('Failed to batch deduct agency fees:', error);
+      toast.error(error instanceof Error ? error.message : '批量扣除失败，请重试', { id: 'batch-agency' });
     } finally {
       setSubmitting(false);
     }
@@ -1337,6 +1406,23 @@ function FeesContent() {
                           >
                             <Edit className="h-4 w-4 mr-1.5" />
                             批量填写 ({selectedIds.size})
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setBatchAgencyData({
+                                itemType: '',
+                                amount: 0,
+                                deductDate: getTodayString(),
+                                remark: '',
+                              });
+                              setBatchAgencyDialogOpen(true);
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="text-purple-700 border-purple-300 hover:bg-purple-50"
+                          >
+                            <DollarSign className="h-4 w-4 mr-1.5" />
+                            批量代办费扣除 ({selectedIds.size})
                           </Button>
                           <Button
                             onClick={() => setBatchDeleteDialogOpen(true)}
@@ -2494,6 +2580,182 @@ function FeesContent() {
               className="bg-blue-600 hover:bg-blue-700"
             >
               确认覆盖
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 批量代办费扣除对话框 */}
+      <Dialog open={batchAgencyDialogOpen} onOpenChange={setBatchAgencyDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-purple-600" />
+              批量代办费扣除（已选 {selectedIds.size} 人）
+            </DialogTitle>
+            <DialogDescription>
+              为选中的学生批量扣除代办费
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">扣除项目 *</Label>
+              <Select
+                value={batchAgencyData.itemType}
+                onValueChange={(value) => setBatchAgencyData({ ...batchAgencyData, itemType: value })}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="请选择项目" />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {AGENCY_FEE_ITEMS.map((item) => (
+                    <SelectItem key={item.key} value={item.key}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">扣除金额 *</Label>
+              <Input
+                type="number"
+                value={batchAgencyData.amount || ''}
+                onChange={(e) => setBatchAgencyData({ ...batchAgencyData, amount: Number(e.target.value) })}
+                className="col-span-3"
+                placeholder="请输入扣除金额"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">扣除日期 *</Label>
+              <Input
+                type="date"
+                value={batchAgencyData.deductDate}
+                onChange={(e) => setBatchAgencyData({ ...batchAgencyData, deductDate: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">备注</Label>
+              <Input
+                value={batchAgencyData.remark}
+                onChange={(e) => setBatchAgencyData({ ...batchAgencyData, remark: e.target.value })}
+                className="col-span-3"
+                placeholder="备注信息（选填）"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBatchAgencyDialogOpen(false)}>
+              取消
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!batchAgencyData.itemType) {
+                  toast.error('请选择扣除项目');
+                  return;
+                }
+                if (batchAgencyData.amount <= 0) {
+                  toast.error('请输入扣除金额');
+                  return;
+                }
+                if (!batchAgencyData.deductDate) {
+                  toast.error('请选择扣除日期');
+                  return;
+                }
+
+                // 获取选中的学生
+                const selectedStudents = students.filter(s => selectedIds.has(s.id));
+
+                // 检查每个学生的代办费余额
+                const insufficient: Array<{
+                  studentId: number,
+                  studentName: string,
+                  balance: number,
+                }> = [];
+
+                // 调用 API 获取每个学生的余额
+                const balancePromises = selectedStudents.map(async (student) => {
+                  try {
+                    const response = await authFetch(`/api/student-fees/${student.id}`);
+                    const result = await response.json();
+                    if (response.ok && result.data) {
+                      return {
+                        studentId: student.id,
+                        studentName: student.student_name,
+                        balance: result.data.agencyBalance || 0,
+                      };
+                    }
+                    return null;
+                  } catch {
+                    return null;
+                  }
+                });
+
+                const balances = await Promise.all(balancePromises);
+                
+                balances.forEach((balance) => {
+                  if (balance && balance.balance < batchAgencyData.amount) {
+                    insufficient.push(balance);
+                  }
+                });
+
+                if (insufficient.length > 0) {
+                  setBatchAgencyDifferences(insufficient);
+                  setBatchAgencyConfirmDialogOpen(true);
+                } else {
+                  // 直接执行批量扣除
+                  await handleBatchAgencyDeduct(selectedStudents);
+                }
+              }}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              确认扣除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 批量代办费扣除余额不足确认对话框 */}
+      <AlertDialog open={batchAgencyConfirmDialogOpen} onOpenChange={setBatchAgencyConfirmDialogOpen}>
+        <AlertDialogContent className="max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>代办费余额不足</AlertDialogTitle>
+            <AlertDialogDescription>
+              以下学生的代办费余额不足，无法扣除 {formatAmount(batchAgencyData.amount)} 元，请确认是否继续为余额充足的学生扣除：
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-[400px] overflow-y-auto py-4">
+            {batchAgencyDifferences.map((diff, index) => (
+              <div key={diff.studentId} className="border-b last:border-0 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium text-sm text-gray-900">{diff.studentName}</div>
+                  <div className="text-xs text-red-600">
+                    余额: {formatAmount(diff.balance)} 元
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const selectedStudents = students.filter(s => selectedIds.has(s.id));
+                // 过滤掉余额不足的学生
+                const sufficientStudents = selectedStudents.filter(s => {
+                  return !batchAgencyDifferences.find(d => d.studentId === s.id);
+                });
+                if (sufficientStudents.length === 0) {
+                  toast.error('没有余额充足的学生');
+                  setBatchAgencyConfirmDialogOpen(false);
+                  return;
+                }
+                await handleBatchAgencyDeduct(sufficientStudents);
+              }}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              仅扣除余额充足的学生 ({batchAgencyDifferences.length} 名余额不足)
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -4,6 +4,112 @@ import { db, initDatabase } from '@/lib/database';
 // 初始化数据库
 initDatabase();
 
+// 代办费扣除项目类型映射
+const agencyFeeItemTypeMap: Record<string, string> = {
+  textbook: '教材教辅',
+  notebook: '簿册费',
+  autumn_trip: '秋游',
+  art_supplies: '美术用品',
+  report_manual: '报告手册',
+  daily_other: '日常其他',
+};
+
+// 获取代办费详细统计
+function getAgencyFeeStats() {
+  // 1. 各班级代办费统计（应交、已交、已扣除、剩余）
+  const classAgencyStats = db.prepare(`
+    SELECT 
+      sf.class_name,
+      COUNT(*) as student_count,
+      SUM(sf.agency_fee) as total_fee,
+      SUM(sf.agency_paid) as total_paid,
+      COALESCE(SUM(deductions.deducted_amount), 0) as total_deducted
+    FROM student_fees sf
+    LEFT JOIN (
+      SELECT 
+        student_id,
+        SUM(amount) as deducted_amount
+      FROM agency_fee_items
+      GROUP BY student_id
+    ) deductions ON sf.id = deductions.student_id
+    GROUP BY sf.class_name
+  `).all() as Array<{
+    class_name: string;
+    student_count: number;
+    total_fee: number;
+    total_paid: number;
+    total_deducted: number;
+  }>;
+
+  // 计算剩余金额并格式化
+  const classAgencyStatsWithBalance = classAgencyStats.map(c => ({
+    ...c,
+    total_deducted: c.total_deducted || 0,
+    remaining_balance: (c.total_paid || 0) - (c.total_deducted || 0),
+  }));
+
+  // 按年级排序
+  const gradeOrder: Record<string, number> = {
+    '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6,
+    '七': 7, '八': 8, '九': 9, '十': 10,
+    '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6,
+    '7': 7, '8': 8, '9': 9, '10': 10
+  };
+
+  const parseClassName = (className: string) => {
+    const match = className.match(/^(.+?)(\d+)班$/);
+    if (match) {
+      const gradeChar = match[1].charAt(0);
+      const classNum = parseInt(match[2], 10);
+      return { gradeNum: gradeOrder[gradeChar] || 99, classNum };
+    }
+    return { gradeNum: 99, classNum: 99 };
+  };
+
+  classAgencyStatsWithBalance.sort((a, b) => {
+    const parsedA = parseClassName(a.class_name);
+    const parsedB = parseClassName(b.class_name);
+    if (parsedA.gradeNum !== parsedB.gradeNum) {
+      return parsedA.gradeNum - parsedB.gradeNum;
+    }
+    return parsedA.classNum - parsedB.classNum;
+  });
+
+  // 2. 按扣除项目分类的统计
+  const itemStats = db.prepare(`
+    SELECT 
+      item_type,
+      SUM(amount) as total_amount,
+      COUNT(*) as record_count
+    FROM agency_fee_items
+    GROUP BY item_type
+    ORDER BY total_amount DESC
+  `).all() as Array<{
+    item_type: string;
+    total_amount: number;
+    record_count: number;
+  }>;
+
+  const itemStatsWithNames = itemStats.map(item => ({
+    ...item,
+    item_name: agencyFeeItemTypeMap[item.item_type] || item.item_type,
+  }));
+
+  // 3. 全校代办费汇总
+  const schoolAgencySummary = {
+    total_fee: classAgencyStatsWithBalance.reduce((sum, c) => sum + (c.total_fee || 0), 0),
+    total_paid: classAgencyStatsWithBalance.reduce((sum, c) => sum + (c.total_paid || 0), 0),
+    total_deducted: classAgencyStatsWithBalance.reduce((sum, c) => sum + (c.total_deducted || 0), 0),
+    remaining_balance: classAgencyStatsWithBalance.reduce((sum, c) => sum + c.remaining_balance, 0),
+  };
+
+  return {
+    schoolSummary: schoolAgencySummary,
+    classStats: classAgencyStatsWithBalance,
+    itemStats: itemStatsWithNames,
+  };
+}
+
 // GET - 获取统计数据
 export async function GET() {
   try {
@@ -422,6 +528,8 @@ export async function GET() {
         classStats: monthlyClassData,
       },
       feeTypeMap,
+      // 代办费详细统计
+      agencyFeeStats: getAgencyFeeStats(),
     });
   } catch (error) {
     console.error('Error fetching statistics:', error);

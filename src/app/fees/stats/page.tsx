@@ -88,12 +88,43 @@ interface MonthlyStats {
   classStats: Record<string, Record<string, MonthlyClassStat>>; // month -> class_name -> stats
 }
 
+// 代办费统计类型
+interface AgencyFeeClassStat {
+  class_name: string;
+  student_count: number;
+  total_fee: number;
+  total_paid: number;
+  total_deducted: number;
+  remaining_balance: number;
+}
+
+interface AgencyFeeItemStat {
+  item_type: string;
+  item_name: string;
+  total_amount: number;
+  record_count: number;
+}
+
+interface AgencyFeeSchoolSummary {
+  total_fee: number;
+  total_paid: number;
+  total_deducted: number;
+  remaining_balance: number;
+}
+
+interface AgencyFeeStats {
+  schoolSummary: AgencyFeeSchoolSummary;
+  classStats: AgencyFeeClassStat[];
+  itemStats: AgencyFeeItemStat[];
+}
+
 interface StatsData {
   schoolSummary: SchoolSummary;
   classStats: ClassStat[];
   projectStats: ProjectStats;
   monthlyClassStats: MonthlyStats;
   feeTypeMap: Record<string, string>;
+  agencyFeeStats: AgencyFeeStats;
 }
 
 function StatsContent() {
@@ -108,6 +139,21 @@ function StatsContent() {
       router.push('/login');
     }
   }, [router]);
+
+  // 辅助函数：根据收缴率返回对应的样式类名
+  const getCollectionRateClass = (fee: number, paid: number): string => {
+    if (fee <= 0) return 'bg-gray-100 text-gray-600';
+    const rate = (paid / fee) * 100;
+    if (rate >= 100) return 'bg-green-100 text-green-700';
+    if (rate >= 90) return 'bg-blue-100 text-blue-700';
+    return 'bg-yellow-100 text-yellow-700';
+  };
+
+  // 辅助函数：格式化收缴率
+  const formatCollectionRate = (fee: number, paid: number): string => {
+    if (fee <= 0) return '-';
+    return ((paid / fee) * 100).toFixed(1) + '%';
+  };
 
   // 获取统计数据
   const fetchStats = async () => {
@@ -601,6 +647,102 @@ function StatsContent() {
                         })()}
                       </TableBody>
                     </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 代办费详情统计 */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  代办费详情统计
+                </CardTitle>
+                <CardDescription>各班级代办费应交、已交、已扣除、剩余余额</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* 全校代办费汇总 */}
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <div className="text-2xl font-bold text-gray-700">¥{formatAmount(statsData.agencyFeeStats.schoolSummary.total_fee)}</div>
+                    <div className="text-sm text-gray-600">应交总额</div>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">¥{formatAmount(statsData.agencyFeeStats.schoolSummary.total_paid)}</div>
+                    <div className="text-sm text-gray-600">已交总额</div>
+                  </div>
+                  <div className="text-center p-4 bg-orange-50 rounded-lg">
+                    <div className="text-2xl font-bold text-orange-600">¥{formatAmount(statsData.agencyFeeStats.schoolSummary.total_deducted)}</div>
+                    <div className="text-sm text-gray-600">已扣除总额</div>
+                  </div>
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">¥{formatAmount(statsData.agencyFeeStats.schoolSummary.remaining_balance)}</div>
+                    <div className="text-sm text-gray-600">剩余余额</div>
+                  </div>
+                </div>
+
+                {/* 各班级代办费统计 */}
+                <div className="border rounded-lg overflow-x-auto mb-6">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50">
+                        <TableHead className="font-semibold sticky left-0 bg-gray-50">班级</TableHead>
+                        <TableHead className="text-center font-semibold">人数</TableHead>
+                        <TableHead className="text-center font-semibold">应交总额</TableHead>
+                        <TableHead className="text-center font-semibold">已交总额</TableHead>
+                        <TableHead className="text-center font-semibold">已扣除总额</TableHead>
+                        <TableHead className="text-center font-semibold">剩余余额</TableHead>
+                        <TableHead className="text-center font-semibold">收缴率</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {statsData.agencyFeeStats.classStats.map((c) => (
+                        <TableRow key={c.class_name}>
+                          <TableCell className="font-medium sticky left-0 bg-white">{c.class_name}</TableCell>
+                          <TableCell className="text-center">{c.student_count}</TableCell>
+                          <TableCell className="text-center">¥{formatAmount(c.total_fee)}</TableCell>
+                          <TableCell className="text-center">¥{formatAmount(c.total_paid)}</TableCell>
+                          <TableCell className="text-center">¥{formatAmount(c.total_deducted)}</TableCell>
+                          <TableCell className="text-center font-medium text-blue-600">¥{formatAmount(c.remaining_balance)}</TableCell>
+                          <TableCell className="text-center">
+                            <span className={`px-2 py-1 rounded text-sm ${getCollectionRateClass(c.total_fee, c.total_paid)}`}>
+                              {formatCollectionRate(c.total_fee, c.total_paid)}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {/* 合计行 */}
+                      <TableRow className="bg-blue-50 font-semibold">
+                        <TableCell className="sticky left-0 bg-blue-50">全校合计</TableCell>
+                        <TableCell className="text-center">{statsData.agencyFeeStats.classStats.reduce((sum, c) => sum + c.student_count, 0)}</TableCell>
+                        <TableCell className="text-center">¥{formatAmount(statsData.agencyFeeStats.schoolSummary.total_fee)}</TableCell>
+                        <TableCell className="text-center">¥{formatAmount(statsData.agencyFeeStats.schoolSummary.total_paid)}</TableCell>
+                        <TableCell className="text-center">¥{formatAmount(statsData.agencyFeeStats.schoolSummary.total_deducted)}</TableCell>
+                        <TableCell className="text-center text-blue-600">¥{formatAmount(statsData.agencyFeeStats.schoolSummary.remaining_balance)}</TableCell>
+                        <TableCell className="text-center">
+                          <span className={`px-2 py-1 rounded text-sm ${getCollectionRateClass(statsData.agencyFeeStats.schoolSummary.total_fee, statsData.agencyFeeStats.schoolSummary.total_paid)}`}>
+                            {formatCollectionRate(statsData.agencyFeeStats.schoolSummary.total_fee, statsData.agencyFeeStats.schoolSummary.total_paid)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* 按扣除项目统计 */}
+                {statsData.agencyFeeStats.itemStats.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">按扣除项目统计</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {statsData.agencyFeeStats.itemStats.map((item) => (
+                        <div key={item.item_type} className="p-3 bg-gray-50 rounded-lg">
+                          <div className="text-sm text-gray-600 mb-1">{item.item_name}</div>
+                          <div className="text-lg font-semibold text-gray-800">¥{formatAmount(item.total_amount)}</div>
+                          <div className="text-xs text-gray-500">{item.record_count} 条记录</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>

@@ -179,6 +179,7 @@ function FeesContent() {
   const [exportingClass, setExportingClass] = useState(false);
   const [exportingAgency, setExportingAgency] = useState(false);
   const [exportingSchool, setExportingSchool] = useState(false);
+  const [exportingAllAgency, setExportingAllAgency] = useState(false);
   
   // 导出班级数据对话框
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -948,6 +949,49 @@ function FeesContent() {
     }
   };
 
+  // 导出所有代办费扣除明细
+  const handleExportAllAgency = async () => {
+    setExportingAllAgency(true);
+    try {
+      const url = '/api/export/stats?type=all_agency_deductions';
+      const response = await authFetch(url);
+      
+      if (!response.ok) {
+        throw new Error('导出失败');
+      }
+      
+      // 获取文件 blob
+      const blob = await response.blob();
+      
+      // 从响应头获取文件名
+      const disposition = response.headers.get('Content-Disposition');
+      let filename = '所有代办费扣除明细.xlsx';
+      if (disposition) {
+        const filenameMatch = disposition.match(/filename\*?=['"]?(?:UTF-\d['"]*)?([^;\r\n"']*)['"]?;?/i);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = decodeURIComponent(filenameMatch[1]);
+        }
+      }
+      
+      // 创建下载链接
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      
+      // 清理
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('导出失败，请重试');
+    } finally {
+      setExportingAllAgency(false);
+    }
+  };
+
   // 解析CSV行（处理引号包裹的字段）
   const parseCSVLine = (line: string): string[] => {
     const result: string[] = [];
@@ -1242,6 +1286,20 @@ function FeesContent() {
                     <Download className="h-4 w-4 mr-1.5" />
                   )}
                   导出全校
+                </Button>
+                
+                <Button
+                  onClick={handleExportAllAgency}
+                  variant="outline"
+                  size="sm"
+                  disabled={exportingAllAgency}
+                >
+                  {exportingAllAgency ? (
+                    <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-1.5" />
+                  )}
+                  导出所有代办费明细
                 </Button>
                 
                 <Button

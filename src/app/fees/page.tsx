@@ -138,6 +138,19 @@ function FeesContent() {
   const [editFeeDialogOpen, setEditFeeDialogOpen] = useState(false);
   const [editFeeStudent, setEditFeeStudent] = useState<StudentFee | null>(null);
   
+  // 批量填写状态
+  const [batchEditDialogOpen, setBatchEditDialogOpen] = useState(false);
+  const [batchEditConfirmDialogOpen, setBatchEditConfirmDialogOpen] = useState(false);
+  const [batchEditData, setBatchEditData] = useState({
+    tuitionFee: 0, tuitionPaid: 0,
+    lunchFee: 0, lunchPaid: 0,
+    napFee: 0, napPaid: 0,
+    afterSchoolFee: 0, afterSchoolPaid: 0,
+    clubFee: 0, clubPaid: 0,
+    agencyFee: 0, agencyPaid: 0,
+  });
+  const [batchEditDifferences, setBatchEditDifferences] = useState<Array<{studentId: number, studentName: string, fields: string[]}>>([]);
+  
   // 导出状态
   const [exportingClass, setExportingClass] = useState(false);
   const [exportingAgency, setExportingAgency] = useState(false);
@@ -601,6 +614,116 @@ function FeesContent() {
       toast.error('批量删除失败，请重试', { id: 'batch-delete-student' });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // 批量更新费用
+  const handleBatchUpdate = async (selectedStudents: StudentFee[]) => {
+    setSubmitting(true);
+    
+    // 乐观更新：先更新本地状态
+    const previousStudents = [...students];
+    
+    const updatedStudents = students.map(s => {
+      if (!selectedIds.has(s.id)) return s;
+      
+      return {
+        ...s,
+        tuition_fee: batchEditData.tuitionFee > 0 ? batchEditData.tuitionFee : s.tuition_fee,
+        tuition_paid: batchEditData.tuitionPaid > 0 ? batchEditData.tuitionPaid : s.tuition_paid,
+        lunch_fee: batchEditData.lunchFee > 0 ? batchEditData.lunchFee : s.lunch_fee,
+        lunch_paid: batchEditData.lunchPaid > 0 ? batchEditData.lunchPaid : s.lunch_paid,
+        nap_fee: batchEditData.napFee > 0 ? batchEditData.napFee : s.nap_fee,
+        nap_paid: batchEditData.napPaid > 0 ? batchEditData.napPaid : s.nap_paid,
+        after_school_fee: batchEditData.afterSchoolFee > 0 ? batchEditData.afterSchoolFee : s.after_school_fee,
+        after_school_paid: batchEditData.afterSchoolPaid > 0 ? batchEditData.afterSchoolPaid : s.after_school_paid,
+        club_fee: batchEditData.clubFee > 0 ? batchEditData.clubFee : s.club_fee,
+        club_paid: batchEditData.clubPaid > 0 ? batchEditData.clubPaid : s.club_paid,
+        agency_fee: batchEditData.agencyFee > 0 ? batchEditData.agencyFee : s.agency_fee,
+        agency_paid: batchEditData.agencyPaid > 0 ? batchEditData.agencyPaid : s.agency_paid,
+      };
+    });
+    
+    setStudents(updatedStudents);
+    setBatchEditDialogOpen(false);
+    setBatchEditConfirmDialogOpen(false);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    
+    toast.loading(`正在更新 ${selectedStudents.length} 名学生的费用...`, { id: 'batch-update' });
+    
+    try {
+      // 批量更新每个学生
+      const updatePromises = selectedStudents.map(async (student) => {
+        // 准备更新数据
+        const updateData: any = {
+          className: student.class_name,
+          studentName: student.student_name,
+          gender: student.gender,
+          tuitionFee: batchEditData.tuitionFee > 0 ? batchEditData.tuitionFee : student.tuition_fee,
+          lunchFee: batchEditData.lunchFee > 0 ? batchEditData.lunchFee : student.lunch_fee,
+          napFee: batchEditData.napFee > 0 ? batchEditData.napFee : student.nap_fee,
+          afterSchoolFee: batchEditData.afterSchoolFee > 0 ? batchEditData.afterSchoolFee : student.after_school_fee,
+          clubFee: batchEditData.clubFee > 0 ? batchEditData.clubFee : student.club_fee,
+          agencyFee: batchEditData.agencyFee > 0 ? batchEditData.agencyFee : student.agency_fee,
+          remark: student.remark || null,
+        };
+        
+        // 调用更新应交金额的 API
+        const response = await authFetch(`/api/student-fees/${student.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updateData),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`更新学生 ${student.student_name} 失败`);
+        }
+        
+        // 如果有填写已交金额，调用专门的 API 更新交费记录
+        const paidFields = [
+          { type: 'tuition', value: batchEditData.tuitionPaid },
+          { type: 'lunch', value: batchEditData.lunchPaid },
+          { type: 'nap', value: batchEditData.napPaid },
+          { type: 'after_school', value: batchEditData.afterSchoolPaid },
+          { type: 'club', value: batchEditData.clubPaid },
+          { type: 'agency', value: batchEditData.agencyPaid },
+        ].filter(f => f.value > 0);
+        
+        if (paidFields.length > 0) {
+          // 调用批量更新交费记录的 API
+          const paymentResponse = await authFetch(`/api/student-fees/${student.id}/payments`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              payments: paidFields,
+            }),
+          });
+          
+          if (!paymentResponse.ok) {
+            console.warn(`更新学生 ${student.student_name} 的交费记录失败`);
+          }
+        }
+        
+        return { success: true };
+      });
+      
+      const results = await Promise.all(updatePromises);
+      const failedCount = results.filter(r => !r.success).length;
+      
+      if (failedCount === 0) {
+        toast.success(`成功更新 ${selectedStudents.length} 名学生的费用`, { id: 'batch-update' });
+      } else {
+        toast.error(`更新失败 ${failedCount} 条，请重试`, { id: 'batch-update' });
+        fetchStudents();
+      }
+    } catch (error) {
+      console.error('Failed to batch update students:', error);
+      // 回滚
+      setStudents(previousStudents);
+      toast.error('批量更新失败，请重试', { id: 'batch-update' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -1188,14 +1311,34 @@ function FeesContent() {
                       
                       {/* 多选模式下的批量操作按钮 */}
                       {selectMode && selectedIds.size > 0 && (
-                        <Button
-                          onClick={() => setBatchDeleteDialogOpen(true)}
-                          variant="destructive"
-                          size="sm"
-                        >
-                          <Trash2 className="h-4 w-4 mr-1.5" />
-                          批量删除 ({selectedIds.size})
-                        </Button>
+                        <>
+                          <Button
+                            onClick={() => {
+                              setBatchEditData({
+                                tuitionFee: 0, tuitionPaid: 0,
+                                lunchFee: 0, lunchPaid: 0,
+                                napFee: 0, napPaid: 0,
+                                afterSchoolFee: 0, afterSchoolPaid: 0,
+                                clubFee: 0, clubPaid: 0,
+                                agencyFee: 0, agencyPaid: 0,
+                              });
+                              setBatchEditDialogOpen(true);
+                            }}
+                            variant="outline"
+                            size="sm"
+                          >
+                            <Edit className="h-4 w-4 mr-1.5" />
+                            批量填写 ({selectedIds.size})
+                          </Button>
+                          <Button
+                            onClick={() => setBatchDeleteDialogOpen(true)}
+                            variant="destructive"
+                            size="sm"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1.5" />
+                            批量删除 ({selectedIds.size})
+                          </Button>
+                        </>
                       )}
                     </>
                   )}
@@ -2069,6 +2212,245 @@ function FeesContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 批量填写费用对话框 */}
+      <Dialog open={batchEditDialogOpen} onOpenChange={setBatchEditDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5 text-blue-600" />
+              批量填写费用（已选 {selectedIds.size} 人）
+            </DialogTitle>
+            <DialogDescription>
+              填写应交和已交费用，不同的金额会提示确认
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="text-sm text-gray-500 mb-2">
+              如需只修改应交金额，请将已交金额留空（保持原值）
+            </div>
+
+            {/* 学费 */}
+            <div className="grid grid-cols-3 items-center gap-3">
+              <Label className="font-medium">学费</Label>
+              <Input
+                type="number"
+                placeholder="应交"
+                value={batchEditData.tuitionFee || ''}
+                onChange={(e) => setBatchEditData({ ...batchEditData, tuitionFee: Number(e.target.value) })}
+                className="text-right"
+              />
+              <Input
+                type="number"
+                placeholder="已交"
+                value={batchEditData.tuitionPaid || ''}
+                onChange={(e) => setBatchEditData({ ...batchEditData, tuitionPaid: Number(e.target.value) })}
+                className="text-right"
+              />
+            </div>
+
+            {/* 午餐费 */}
+            <div className="grid grid-cols-3 items-center gap-3">
+              <Label className="font-medium">午餐费</Label>
+              <Input
+                type="number"
+                placeholder="应交"
+                value={batchEditData.lunchFee || ''}
+                onChange={(e) => setBatchEditData({ ...batchEditData, lunchFee: Number(e.target.value) })}
+                className="text-right"
+              />
+              <Input
+                type="number"
+                placeholder="已交"
+                value={batchEditData.lunchPaid || ''}
+                onChange={(e) => setBatchEditData({ ...batchEditData, lunchPaid: Number(e.target.value) })}
+                className="text-right"
+              />
+            </div>
+
+            {/* 午托费 */}
+            <div className="grid grid-cols-3 items-center gap-3">
+              <Label className="font-medium">午托费</Label>
+              <Input
+                type="number"
+                placeholder="应交"
+                value={batchEditData.napFee || ''}
+                onChange={(e) => setBatchEditData({ ...batchEditData, napFee: Number(e.target.value) })}
+                className="text-right"
+              />
+              <Input
+                type="number"
+                placeholder="已交"
+                value={batchEditData.napPaid || ''}
+                onChange={(e) => setBatchEditData({ ...batchEditData, napPaid: Number(e.target.value) })}
+                className="text-right"
+              />
+            </div>
+
+            {/* 课后服务费 */}
+            <div className="grid grid-cols-3 items-center gap-3">
+              <Label className="font-medium">课后服务费</Label>
+              <Input
+                type="number"
+                placeholder="应交"
+                value={batchEditData.afterSchoolFee || ''}
+                onChange={(e) => setBatchEditData({ ...batchEditData, afterSchoolFee: Number(e.target.value) })}
+                className="text-right"
+              />
+              <Input
+                type="number"
+                placeholder="已交"
+                value={batchEditData.afterSchoolPaid || ''}
+                onChange={(e) => setBatchEditData({ ...batchEditData, afterSchoolPaid: Number(e.target.value) })}
+                className="text-right"
+              />
+            </div>
+
+            {/* 社团费 */}
+            <div className="grid grid-cols-3 items-center gap-3">
+              <Label className="font-medium">社团费</Label>
+              <Input
+                type="number"
+                placeholder="应交"
+                value={batchEditData.clubFee || ''}
+                onChange={(e) => setBatchEditData({ ...batchEditData, clubFee: Number(e.target.value) })}
+                className="text-right"
+              />
+              <Input
+                type="number"
+                placeholder="已交"
+                value={batchEditData.clubPaid || ''}
+                onChange={(e) => setBatchEditData({ ...batchEditData, clubPaid: Number(e.target.value) })}
+                className="text-right"
+              />
+            </div>
+
+            {/* 代办费 */}
+            <div className="grid grid-cols-3 items-center gap-3 border-t pt-3">
+              <Label className="font-medium text-purple-600">代办费</Label>
+              <Input
+                type="number"
+                placeholder="应交"
+                value={batchEditData.agencyFee || ''}
+                onChange={(e) => setBatchEditData({ ...batchEditData, agencyFee: Number(e.target.value) })}
+                className="text-right"
+              />
+              <Input
+                type="number"
+                placeholder="已交"
+                value={batchEditData.agencyPaid || ''}
+                onChange={(e) => setBatchEditData({ ...batchEditData, agencyPaid: Number(e.target.value) })}
+                className="text-right"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBatchEditDialogOpen(false)}>
+              取消
+            </Button>
+            <Button
+              onClick={async () => {
+                // 检查是否有填写任何金额
+                const hasAnyInput = 
+                  batchEditData.tuitionFee > 0 || batchEditData.tuitionPaid > 0 ||
+                  batchEditData.lunchFee > 0 || batchEditData.lunchPaid > 0 ||
+                  batchEditData.napFee > 0 || batchEditData.napPaid > 0 ||
+                  batchEditData.afterSchoolFee > 0 || batchEditData.afterSchoolPaid > 0 ||
+                  batchEditData.clubFee > 0 || batchEditData.clubPaid > 0 ||
+                  batchEditData.agencyFee > 0 || batchEditData.agencyPaid > 0;
+
+                if (!hasAnyInput) {
+                  toast.error('请至少填写一项费用金额');
+                  return;
+                }
+
+                // 获取选中的学生
+                const selectedStudents = students.filter(s => selectedIds.has(s.id));
+                
+                // 检查每个学生是否有金额不一致的情况
+                const differences: Array<{studentId: number, studentName: string, fields: string[]}> = [];
+                const fieldNames = {
+                  tuitionFee: '学费应交', tuitionPaid: '学费已交',
+                  lunchFee: '午餐费应交', lunchPaid: '午餐费已交',
+                  napFee: '午托费应交', napPaid: '午托费已交',
+                  afterSchoolFee: '课后服务费应交', afterSchoolPaid: '课后服务费已交',
+                  clubFee: '社团费应交', clubPaid: '社团费已交',
+                  agencyFee: '代办费应交', agencyPaid: '代办费已交',
+                };
+
+                selectedStudents.forEach(student => {
+                  const diffFields: string[] = [];
+                  if (batchEditData.tuitionFee > 0 && student.tuition_fee !== batchEditData.tuitionFee) diffFields.push(fieldNames.tuitionFee);
+                  if (batchEditData.tuitionPaid > 0 && student.tuition_paid !== batchEditData.tuitionPaid) diffFields.push(fieldNames.tuitionPaid);
+                  if (batchEditData.lunchFee > 0 && student.lunch_fee !== batchEditData.lunchFee) diffFields.push(fieldNames.lunchFee);
+                  if (batchEditData.lunchPaid > 0 && student.lunch_paid !== batchEditData.lunchPaid) diffFields.push(fieldNames.lunchPaid);
+                  if (batchEditData.napFee > 0 && student.nap_fee !== batchEditData.napFee) diffFields.push(fieldNames.napFee);
+                  if (batchEditData.napPaid > 0 && student.nap_paid !== batchEditData.napPaid) diffFields.push(fieldNames.napPaid);
+                  if (batchEditData.afterSchoolFee > 0 && student.after_school_fee !== batchEditData.afterSchoolFee) diffFields.push(fieldNames.afterSchoolFee);
+                  if (batchEditData.afterSchoolPaid > 0 && student.after_school_paid !== batchEditData.afterSchoolPaid) diffFields.push(fieldNames.afterSchoolPaid);
+                  if (batchEditData.clubFee > 0 && student.club_fee !== batchEditData.clubFee) diffFields.push(fieldNames.clubFee);
+                  if (batchEditData.clubPaid > 0 && student.club_paid !== batchEditData.clubPaid) diffFields.push(fieldNames.clubPaid);
+                  if (batchEditData.agencyFee > 0 && student.agency_fee !== batchEditData.agencyFee) diffFields.push(fieldNames.agencyFee);
+                  if (batchEditData.agencyPaid > 0 && student.agency_paid !== batchEditData.agencyPaid) diffFields.push(fieldNames.agencyPaid);
+                  
+                  if (diffFields.length > 0) {
+                    differences.push({ studentId: student.id, studentName: student.student_name, fields: diffFields });
+                  }
+                });
+
+                if (differences.length > 0) {
+                  setBatchEditDifferences(differences);
+                  setBatchEditConfirmDialogOpen(true);
+                } else {
+                  // 直接执行批量更新
+                  await handleBatchUpdate(selectedStudents);
+                }
+              }}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              确认填写
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 批量填写确认对话框 */}
+      <AlertDialog open={batchEditConfirmDialogOpen} onOpenChange={setBatchEditConfirmDialogOpen}>
+        <AlertDialogContent className="max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认覆盖费用金额</AlertDialogTitle>
+            <AlertDialogDescription>
+              以下学生的费用金额将被覆盖，请确认：
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-[400px] overflow-y-auto py-4">
+            {batchEditDifferences.map((diff, index) => (
+              <div key={diff.studentId} className="border-b last:border-0 py-3">
+                <div className="font-medium text-sm mb-1">{diff.studentName}</div>
+                <div className="text-xs text-gray-500 flex flex-wrap gap-1">
+                  {diff.fields.map((field, i) => (
+                    <span key={i} className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
+                      {field}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const selectedStudents = students.filter(s => selectedIds.has(s.id));
+                await handleBatchUpdate(selectedStudents);
+              }}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              确认覆盖
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

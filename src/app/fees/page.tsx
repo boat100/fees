@@ -149,7 +149,15 @@ function FeesContent() {
     clubFee: 0, clubPaid: 0,
     agencyFee: 0, agencyPaid: 0,
   });
-  const [batchEditDifferences, setBatchEditDifferences] = useState<Array<{studentId: number, studentName: string, fields: string[]}>>([]);
+  const [batchEditDifferences, setBatchEditDifferences] = useState<Array<{
+    studentId: number,
+    studentName: string,
+    changes: Array<{
+      fieldName: string,
+      oldValue: number | null,
+      newValue: number
+    }>
+  }>>([]);
   
   // 导出状态
   const [exportingClass, setExportingClass] = useState(false);
@@ -2368,33 +2376,63 @@ function FeesContent() {
                 const selectedStudents = students.filter(s => selectedIds.has(s.id));
                 
                 // 检查每个学生是否有金额不一致的情况
-                const differences: Array<{studentId: number, studentName: string, fields: string[]}> = [];
-                const fieldNames = {
-                  tuitionFee: '学费应交', tuitionPaid: '学费已交',
-                  lunchFee: '午餐费应交', lunchPaid: '午餐费已交',
-                  napFee: '午托费应交', napPaid: '午托费已交',
-                  afterSchoolFee: '课后服务费应交', afterSchoolPaid: '课后服务费已交',
-                  clubFee: '社团费应交', clubPaid: '社团费已交',
-                  agencyFee: '代办费应交', agencyPaid: '代办费已交',
-                };
+                // 只有当原值存在（> 0 或 != null）且填写值与原值不同时，才需要确认
+                const differences: Array<{
+                  studentId: number,
+                  studentName: string,
+                  changes: Array<{fieldName: string, oldValue: number | null, newValue: number}>
+                }> = [];
+                
+                const fieldConfigs = [
+                  { key: 'tuitionFee', name: '学费应交', value: batchEditData.tuitionFee },
+                  { key: 'tuitionPaid', name: '学费已交', value: batchEditData.tuitionPaid },
+                  { key: 'lunchFee', name: '午餐费应交', value: batchEditData.lunchFee },
+                  { key: 'lunchPaid', name: '午餐费已交', value: batchEditData.lunchPaid },
+                  { key: 'napFee', name: '午托费应交', value: batchEditData.napFee },
+                  { key: 'napPaid', name: '午托费已交', value: batchEditData.napPaid },
+                  { key: 'afterSchoolFee', name: '课后服务费应交', value: batchEditData.afterSchoolFee },
+                  { key: 'afterSchoolPaid', name: '课后服务费已交', value: batchEditData.afterSchoolPaid },
+                  { key: 'clubFee', name: '社团费应交', value: batchEditData.clubFee },
+                  { key: 'clubPaid', name: '社团费已交', value: batchEditData.clubPaid },
+                  { key: 'agencyFee', name: '代办费应交', value: batchEditData.agencyFee },
+                  { key: 'agencyPaid', name: '代办费已交', value: batchEditData.agencyPaid },
+                ];
 
                 selectedStudents.forEach(student => {
-                  const diffFields: string[] = [];
-                  if (batchEditData.tuitionFee > 0 && student.tuition_fee !== batchEditData.tuitionFee) diffFields.push(fieldNames.tuitionFee);
-                  if (batchEditData.tuitionPaid > 0 && student.tuition_paid !== batchEditData.tuitionPaid) diffFields.push(fieldNames.tuitionPaid);
-                  if (batchEditData.lunchFee > 0 && student.lunch_fee !== batchEditData.lunchFee) diffFields.push(fieldNames.lunchFee);
-                  if (batchEditData.lunchPaid > 0 && student.lunch_paid !== batchEditData.lunchPaid) diffFields.push(fieldNames.lunchPaid);
-                  if (batchEditData.napFee > 0 && student.nap_fee !== batchEditData.napFee) diffFields.push(fieldNames.napFee);
-                  if (batchEditData.napPaid > 0 && student.nap_paid !== batchEditData.napPaid) diffFields.push(fieldNames.napPaid);
-                  if (batchEditData.afterSchoolFee > 0 && student.after_school_fee !== batchEditData.afterSchoolFee) diffFields.push(fieldNames.afterSchoolFee);
-                  if (batchEditData.afterSchoolPaid > 0 && student.after_school_paid !== batchEditData.afterSchoolPaid) diffFields.push(fieldNames.afterSchoolPaid);
-                  if (batchEditData.clubFee > 0 && student.club_fee !== batchEditData.clubFee) diffFields.push(fieldNames.clubFee);
-                  if (batchEditData.clubPaid > 0 && student.club_paid !== batchEditData.clubPaid) diffFields.push(fieldNames.clubPaid);
-                  if (batchEditData.agencyFee > 0 && student.agency_fee !== batchEditData.agencyFee) diffFields.push(fieldNames.agencyFee);
-                  if (batchEditData.agencyPaid > 0 && student.agency_paid !== batchEditData.agencyPaid) diffFields.push(fieldNames.agencyPaid);
+                  const changes: Array<{fieldName: string, oldValue: number | null, newValue: number}> = [];
                   
-                  if (diffFields.length > 0) {
-                    differences.push({ studentId: student.id, studentName: student.student_name, fields: diffFields });
+                  fieldConfigs.forEach(config => {
+                    // 只处理填写了值的字段
+                    if (config.value > 0) {
+                      const oldValue = (student as any)[config.key === 'tuitionFee' ? 'tuition_fee' :
+                                         config.key === 'tuitionPaid' ? 'tuition_paid' :
+                                         config.key === 'lunchFee' ? 'lunch_fee' :
+                                         config.key === 'lunchPaid' ? 'lunch_paid' :
+                                         config.key === 'napFee' ? 'nap_fee' :
+                                         config.key === 'napPaid' ? 'nap_paid' :
+                                         config.key === 'afterSchoolFee' ? 'after_school_fee' :
+                                         config.key === 'afterSchoolPaid' ? 'after_school_paid' :
+                                         config.key === 'clubFee' ? 'club_fee' :
+                                         config.key === 'clubPaid' ? 'club_paid' :
+                                         config.key === 'agencyFee' ? 'agency_fee' : 'agency_paid'];
+                      
+                      // 只有当原值存在（> 0 或 != null）且填写值与原值不同时，才需要确认
+                      if (oldValue !== null && oldValue !== undefined && oldValue > 0 && oldValue !== config.value) {
+                        changes.push({
+                          fieldName: config.name,
+                          oldValue: oldValue,
+                          newValue: config.value
+                        });
+                      }
+                    }
+                  });
+                  
+                  if (changes.length > 0) {
+                    differences.push({
+                      studentId: student.id,
+                      studentName: student.student_name,
+                      changes
+                    });
                   }
                 });
 
@@ -2426,12 +2464,21 @@ function FeesContent() {
           <div className="max-h-[400px] overflow-y-auto py-4">
             {batchEditDifferences.map((diff, index) => (
               <div key={diff.studentId} className="border-b last:border-0 py-3">
-                <div className="font-medium text-sm mb-1">{diff.studentName}</div>
-                <div className="text-xs text-gray-500 flex flex-wrap gap-1">
-                  {diff.fields.map((field, i) => (
-                    <span key={i} className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
-                      {field}
-                    </span>
+                <div className="font-medium text-sm mb-2 text-gray-900">{diff.studentName}</div>
+                <div className="space-y-1.5">
+                  {diff.changes.map((change, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded whitespace-nowrap">
+                        {change.fieldName}
+                      </span>
+                      <span className="text-red-600 font-medium">
+                        {formatAmount(change.oldValue)}
+                      </span>
+                      <span className="text-gray-400">→</span>
+                      <span className="text-green-600 font-medium">
+                        {formatAmount(change.newValue)}
+                      </span>
+                    </div>
                   ))}
                 </div>
               </div>

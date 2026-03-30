@@ -50,15 +50,14 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # 多阶段构建优化镜像大小
-          target: production
 
-      # 方案二：如果仍需要上传 Artifacts，优化压缩
-      - name: Pull and save image as tar (optimized)
+      # 从 registry 拉取镜像并保存为 tar 文件
+      - name: Pull and save image as tar
         run: |
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          # 使用 pigz 进行并行压缩（更快）
-          docker save ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest | pigz -p 4 > fees-app.tar.gz
+          docker save -o fees-app.tar ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          # 压缩以减小下载体积
+          gzip fees-app.tar
 
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
@@ -66,5 +65,3 @@ jobs:
           name: fees-app-image
           path: fees-app.tar.gz
           retention-days: 7
-          # 使用 zstd 压缩（更快更小）
-          compression-level: 9

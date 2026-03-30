@@ -39,7 +39,7 @@ COPY . .
 RUN npx next build
 
 # ==================== 运行阶段 ====================
-FROM node:20-alpine AS runner
+FROM node:20-alpine AS production
 
 # 设置工作目录
 WORKDIR /app

@@ -19,7 +19,8 @@ interface StudentData {
   agency_fee: number;
   agency_paid: number;
   total_paid: number;
-  [key: string]: number | string;
+  remark?: string;
+  [key: string]: number | string | undefined;
 }
 
 // 交费记录类型
@@ -366,7 +367,8 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
       合计应交: totalFee,
       合计已交: totalPaid,
       待收金额: totalFee - totalPaid,
-      收缴率: totalFee > 0 ? ((totalPaid / totalFee) * 100).toFixed(1) + '%' : '0%'
+      收缴率: totalFee > 0 ? ((totalPaid / totalFee) * 100).toFixed(1) + '%' : '0%',
+      备注: s.remark || ''
     };
   });
 
@@ -395,7 +397,8 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
       const total = studentDetails.reduce((sum, s) => sum + s.合计应交, 0);
       const paid = studentDetails.reduce((sum, s) => sum + s.合计已交, 0);
       return total > 0 ? ((paid / total) * 100).toFixed(1) + '%' : '0%';
-    })()
+    })(),
+    备注: ''
   };
 
   const sheetData = [...studentDetails, totalRow];
@@ -412,6 +415,7 @@ async function exportClassDetail(workbook: XLSX.WorkBook, students: StudentData[
     { wch: 10 }, { wch: 10 }, // 社团费
     { wch: 10 }, { wch: 10 }, { wch: 10 }, // 代办费（应交、已交、剩余）
     { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, // 合计
+    { wch: 30 }, // 备注
   ];
   XLSX.utils.book_append_sheet(workbook, ws, '学生费用明细');
 }
@@ -840,6 +844,7 @@ async function exportSchoolAllClasses(workbook: XLSX.WorkBook, students: Student
         合计应交: totalFee,
         合计已交: totalPaid,
         待收金额: totalFee - totalPaid,
+        备注: s.remark || ''
       };
     });
 
@@ -862,6 +867,7 @@ async function exportSchoolAllClasses(workbook: XLSX.WorkBook, students: Student
       合计应交: studentDetails.reduce((sum, s) => sum + s.合计应交, 0),
       合计已交: studentDetails.reduce((sum, s) => sum + s.合计已交, 0),
       待收金额: studentDetails.reduce((sum, s) => sum + s.待收金额, 0),
+      备注: ''
     };
 
     const sheetData = [...studentDetails, totalRow];
@@ -883,6 +889,7 @@ async function exportSchoolAllClasses(workbook: XLSX.WorkBook, students: Student
       { wch: 10 }, { wch: 10 }, // 社团费
       { wch: 10 }, { wch: 10 }, // 代办费
       { wch: 10 }, { wch: 10 }, { wch: 10 }, // 合计
+      { wch: 30 }, // 备注
     ];
     XLSX.utils.book_append_sheet(workbook, ws, sheetName);
   }
